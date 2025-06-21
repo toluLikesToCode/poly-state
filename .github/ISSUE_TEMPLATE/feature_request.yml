@@ -1,0 +1,106 @@
+name: Feature Request
+description: Suggest a new feature for Universal Store
+title: "[Feature]: "
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting a new feature! Please provide details below.
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      description: Please confirm you have done the following
+      options:
+        - label: I have searched existing issues to ensure this is not a duplicate
+          required: true
+        - label: I have read the documentation
+          required: true
+        - label: This feature would benefit the Universal Store community
+          required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem Statement
+      description: What problem does this feature solve?
+      placeholder: "I'm always frustrated when..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: Describe the solution you'd like to see
+      placeholder: "I would like to see..."
+    validations:
+      required: true
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Feature Scope
+      description: Which part of Universal Store does this feature relate to?
+      options:
+        - Core Store
+        - React Integration
+        - Plugins
+        - TypeScript Types
+        - Documentation
+        - Build System
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternative Solutions
+      description: Describe alternatives you've considered
+      placeholder: "Alternatively, we could..."
+    validations:
+      required: false
+
+  - type: textarea
+    id: api
+    attributes:
+      label: Proposed API
+      description: If applicable, show how you envision the API would look
+      render: typescript
+      placeholder: |
+        // Example API design
+        const store = createStore({
+          // your proposed API here
+        });
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: breaking
+    attributes:
+      label: Breaking Changes
+      description: Would this feature require breaking changes?
+      options:
+        - label: This feature would require breaking changes
+        - label: This feature could be implemented without breaking changes
+
+  - type: textarea
+    id: implementation
+    attributes:
+      label: Implementation Ideas
+      description: Do you have ideas on how this could be implemented?
+      placeholder: "This could be implemented by..."
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Any additional information or context
+      placeholder: "Additional context..."
+    validations:
+      required: false

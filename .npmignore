@@ -1,0 +1,39 @@
+# Files to exclude from npm package
+node_modules/
+src/
+test/
+examples/
+coverage/
+*.log
+.env*
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Development files
+rollup.config.js
+vitest.config.ts
+tsconfig.json
+tsconfig.build.json
+.eslintrc*
+.prettierrc*
+.gitignore
+.npmignore
+
+# Test and development docs
+DEVELOPMENT_WORKFLOW.md
+TESTING.md
+CONTRIBUTING.md
+
+# Build artifacts we don't want
+*.tsbuildinfo
+.nyc_output/
+.coverage/
+
+# Lock files
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
