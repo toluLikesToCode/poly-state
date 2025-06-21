@@ -1,6 +1,13 @@
 import { ValidationError } from "../../shared/errors";
 import * as storage from "../storage/index";
-import { ActionPayload, Middleware, PersistedState } from "./index";
+import {
+  ActionPayload,
+  Middleware,
+  PersistedState,
+  StorageType,
+  Store,
+  StoreOptions,
+} from "./types";
 /**
  * Clean up stale persisted states across all storage types
  */
@@ -181,3 +188,6 @@ export function createValidatorMiddleware<S extends object>(
     }
   };
 }
+
+// --- Convenience Store Creation Functions ---
+// (Moved to storeCreationHelpers.ts)

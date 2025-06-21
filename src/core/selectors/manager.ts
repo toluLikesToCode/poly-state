@@ -6,10 +6,10 @@ import {
   DependencySubscriptionOptions,
   Selector,
 } from "./types";
-import { deepEqual } from "../utils/equality";
-import { getPath } from "../utils/path";
+import { getPath } from "../utils/index";
 import { StoreError } from "../../shared/errors";
-import { Store } from "../state/index";
+import type { Store } from "../state/index";
+import * as utils from "./utils";
 
 export class SelectorManager<S extends object> implements ISelectorManager<S> {
   private storeInstance: Store<S> = {} as Store<S>;
@@ -26,107 +26,6 @@ export class SelectorManager<S extends object> implements ISelectorManager<S> {
 
   constructor(store: Store<S>) {
     this.storeInstance = store;
-  }
-
-  private smartEqual<T>(a: T, b: T): boolean {
-    // Fast path: reference equality (works great with Immer's structural sharing)
-    if (Object.is(a, b)) {
-      return true;
-    }
-
-    // Handle null/undefined cases
-    if (a == null || b == null) {
-      return a === b;
-    }
-
-    // Handle primitives
-    if (typeof a !== "object" || typeof b !== "object") {
-      return a === b;
-    }
-
-    // For arrays, check length first then shallow compare elements
-    if (Array.isArray(a) && Array.isArray(b)) {
-      if (a.length !== b.length) return false;
-
-      // Shallow equality check for array elements
-      for (let i = 0; i < a.length; i++) {
-        if (!Object.is(a[i], b[i])) {
-          // If reference equality fails, fall back to deep equality only if needed
-          if (!this.isSimpleValue(a[i]) || !this.isSimpleValue(b[i])) {
-            return deepEqual(a, b);
-          }
-          if (a[i] !== b[i]) return false;
-        }
-      }
-      return true;
-    }
-
-    // For objects, check keys count first then shallow compare values
-    if (this.isPlainObject(a) && this.isPlainObject(b)) {
-      const keysA = Object.keys(a);
-      const keysB = Object.keys(b);
-
-      if (keysA.length !== keysB.length) return false;
-
-      // Shallow equality check for object properties
-      for (const key of keysA) {
-        if (!(key in b)) return false;
-
-        const valueA = (a as any)[key];
-        const valueB = (b as any)[key];
-
-        if (!Object.is(valueA, valueB)) {
-          // If reference equality fails, fall back to deep equality only if needed
-          if (!this.isSimpleValue(valueA) || !this.isSimpleValue(valueB)) {
-            return deepEqual(a, b);
-          }
-          if (valueA !== valueB) return false;
-        }
-      }
-      return true;
-    }
-
-    // For complex objects (Sets, Maps, etc.), fall back to deep equality
-    return deepEqual(a, b);
-  }
-
-  private isSimpleValue(value: any): boolean {
-    if (value == null) return true;
-    const type = typeof value;
-    return (
-      type === "string" ||
-      type === "number" ||
-      type === "boolean" ||
-      type === "symbol"
-    );
-  }
-
-  private isPlainObject(value: any): boolean {
-    return (
-      value != null &&
-      typeof value === "object" &&
-      Object.getPrototypeOf(value) === Object.prototype
-    );
-  }
-
-  private haveInputsChanged<T extends readonly unknown[]>(
-    previousInputs: T | undefined,
-    currentInputs: T
-  ): boolean {
-    // No previous inputs means this is the first run
-    if (!previousInputs) return true;
-
-    // Length mismatch is always a change
-    if (previousInputs.length !== currentInputs.length) return true;
-
-    // Check each input using smart equality
-    for (let i = 0; i < currentInputs.length; i++) {
-      if (!this.smartEqual(previousInputs[i], currentInputs[i])) {
-        return true;
-      }
-    }
-
-    return false;
   }
 
   private ensureCleanupRunning() {
@@ -295,7 +194,7 @@ export class SelectorManager<S extends object> implements ISelectorManager<S> {
       const currentInputResults = inputSelectors.map(sel => sel(currentState));
 
       // Check if inputs have changed using enhanced equality
-      const inputsChanged = this.haveInputsChanged(
+      const inputsChanged = utils.haveInputsChanged(
         cachedInputResults,
         currentInputResults
       );
@@ -343,84 +242,23 @@ export class SelectorManager<S extends object> implements ISelectorManager<S> {
     >();
 
     // Cleanup configuration
-    let cleanupInterval: NodeJS.Timeout | null = null;
+    let cleanupStopper: (() => void) | null = null;
     const CLEANUP_INTERVAL = 30 * 1000; // 30 seconds
     const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
-    /**
-     * Ensures cleanup interval is running to prevent memory leaks.
-     *
-     * @remarks
-     * This method starts a periodic cleanup that removes unused parameter
-     * combinations from the cache. The cleanup automatically stops when
-     * the cache becomes empty to avoid unnecessary background work.
-     */
+    // Use extracted utility for parameter serialization
+    const { serializeParams } = utils;
+
+    // Use extracted utility for TTL cache cleanup
     const ensureCleanupRunning = () => {
-      if (cleanupInterval) return;
-
-      cleanupInterval = setInterval(() => {
-        const now = Date.now();
-        const toRemove: string[] = [];
-
-        parameterCache.forEach((entry, key) => {
-          if (now - entry.lastAccessed > CACHE_TTL) {
-            toRemove.push(key);
+      if (!cleanupStopper) {
+        cleanupStopper = utils.startTTLCacheCleanup(
+          parameterCache,
+          CACHE_TTL,
+          (key, entry) => {
+            if (entry.selector._cleanup) entry.selector._cleanup();
           }
-        });
-
-        toRemove.forEach(key => {
-          const entry = parameterCache.get(key);
-          if (entry?.selector._cleanup) {
-            entry.selector._cleanup();
-          }
-          parameterCache.delete(key);
-        });
-
-        // Stop cleanup if cache is empty to avoid unnecessary work
-        if (parameterCache.size === 0 && cleanupInterval) {
-          clearInterval(cleanupInterval);
-          cleanupInterval = null;
-        }
-      }, CLEANUP_INTERVAL);
-    };
-
-    /**
-     * Smart parameter serialization that handles complex objects efficiently.
-     *
-     * @param params - The parameters to serialize
-     * @returns A string key for caching
-     *
-     * @remarks
-     * This function provides consistent serialization for parameter caching:
-     * - Sorts object keys for consistent results
-     * - Handles non-serializable objects gracefully
-     * - Falls back to unique identifiers for complex cases
-     */
-    const serializeParams = (params: Props): string => {
-      try {
-        // For simple primitives, use direct JSON serialization
-        if (
-          params === null ||
-          params === undefined ||
-          typeof params !== "object"
-        ) {
-          return JSON.stringify(params);
-        }
-
-        // For objects, sort keys for consistent serialization
-        const sortedParams = Object.keys(params as any)
-          .sort()
-          .reduce((acc, key) => {
-            acc[key] = (params as any)[key];
-            return acc;
-          }, {} as any);
-
-        return JSON.stringify(sortedParams);
-      } catch {
-        // Fallback for non-serializable objects (functions, symbols, etc.)
-        return `non_serializable_${Date.now()}_${Math.random()
-          .toString(36)
-          .substring(2)}`;
+        );
       }
     };
 
@@ -448,11 +286,9 @@ export class SelectorManager<S extends object> implements ISelectorManager<S> {
             originalCleanup();
           }
           parameterCache.delete(paramsKey);
-
-          // Check if we should stop cleanup interval
-          if (parameterCache.size === 0 && cleanupInterval) {
-            clearInterval(cleanupInterval);
-            cleanupInterval = null;
+          if (parameterCache.size === 0 && cleanupStopper) {
+            cleanupStopper();
+            cleanupStopper = null;
           }
         };
 
@@ -511,7 +347,7 @@ export class SelectorManager<S extends object> implements ISelectorManager<S> {
       const currentInputResults = inputSelectors.map(sel => sel(currentState));
 
       // Check if inputs have changed using enhanced equality detection
-      const inputsChanged = this.haveInputsChanged(
+      const inputsChanged = utils.haveInputsChanged(
         cachedInputResults,
         currentInputResults
       );
@@ -547,7 +383,7 @@ export class SelectorManager<S extends object> implements ISelectorManager<S> {
   ): () => void {
     const {
       immediate = false,
-      equalityFn = this.smartEqual.bind(this), // Use enhanced equality by default
+      equalityFn = utils.smartEqual.bind(this), // Use enhanced equality by default
       debounceMs = 0,
     } = options;
 
@@ -701,7 +537,7 @@ export class SelectorManager<S extends object> implements ISelectorManager<S> {
   ): () => void {
     const {
       immediate = false,
-      equalityFn = this.smartEqual.bind(this),
+      equalityFn = utils.smartEqual.bind(this),
       debounceMs = 0,
     } = options;
 

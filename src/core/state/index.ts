@@ -4,3 +4,4 @@ export * from "./storeRegistry";
 export * from "./typeRegistry";
 export * from "./types";
 export * from "./utils";
+export * from "./storeCreationHelpers";

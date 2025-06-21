@@ -46,11 +46,6 @@ import { storeRegistry } from "./storeRegistry";
 immer.enableMapSet();
 
 /**
- * Global type registry instance for handling complex object serialization
- */
-export const typeRegistry = new TypeRegistry();
-
-/**
  * Creates a new store
  */
 export function createStore<S extends object>(
@@ -95,6 +90,8 @@ export function createStore<S extends object>(
   const storeInstance: Store<S> = {} as Store<S>;
 
   const selectorManager = new SelectorManager(storeInstance);
+
+  const typeRegistry = new TypeRegistry();
 
   // --- Core Store Functions ---
   const handleError = (error: StoreError) => {
@@ -1516,52 +1513,6 @@ export function createStore<S extends object>(
   }
 
   return storeInstance;
-}
-
-// --- Convenience Store Creation Functions ---
-
-/**
- * Creates a store with automatic persistence
- * @template S - The store state type
- * @param initialState - Initial state for the store
- * @param persistKey - Key to use for persistence
- * @param options - Additional store options
- * @returns Store instance with persistence enabled
- */
-export function createPersistentStore<S extends object>(
-  initialState: S,
-  persistKey: string,
-  options: Omit<StoreOptions<S>, "persistKey"> = {}
-): Store<S> {
-  return createStore(initialState, {
-    ...options,
-    persistKey,
-    storageType: options.storageType || StorageType.Local,
-  });
-}
-
-/**
- * Creates a store with cross-tab synchronization
- * @template S - The store state type
- * @param initialState - Initial state for the store
- * @param persistKey - Key to use for persistence and sync
- * @param options - Additional store options
- * @returns Store instance with cross-tab sync enabled
- */
-export function createSharedStore<S extends object>(
-  initialState: S,
-  persistKey: string,
-  options: Omit<
-    StoreOptions<S>,
-    "persistKey" | "storageType" | "syncAcrossTabs"
-  > = {}
-): Store<S> {
-  return createStore(initialState, {
-    ...options,
-    persistKey,
-    storageType: StorageType.Local,
-    syncAcrossTabs: true,
-  });
 }
 
 export default createStore;

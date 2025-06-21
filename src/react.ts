@@ -19,6 +19,4 @@
 
 // Storage API for use in React apps
 export * from "./core/storage/index";
-
-// React-specific hooks and components
-export * from "./react";
+export * from "./react/index";
