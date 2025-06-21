@@ -23,10 +23,9 @@ export * from './plugins';
 
 // Re-export everything from core
 export * from "./core/store";
-export * from "./core/types";
-export * from "./core/selector-manager-types";
+export * from "./core/utils/index";
 export * from "./core/utils";
-export * from "./core/storage";
+export * from "./core/storage/index";
 
 // Re-export plugins when you add them
 export * from "./plugins";

@@ -13,11 +13,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import {
-  createStore,
-  type Store,
-  type Selector,
-} from "../../src/core/store.js";
+import { createStore, type Store } from "../../src/core/store";
 
 // Test state interfaces
 interface UserProfile {
@@ -249,9 +245,9 @@ describe("Advanced Selector Operations", () => {
   describe("Basic Memoized Selectors", () => {
     it("should create and cache simple selectors", () => {
       const selectActiveUserId = store.select(
-        (state) => state.users.activeUserId
+        state => state.users.activeUserId
       );
-      const selectLoadingState = store.select((state) => state.ui.loading);
+      const selectLoadingState = store.select(state => state.ui.loading);
 
       // First calls
       const userId1 = selectActiveUserId();
@@ -269,7 +265,7 @@ describe("Advanced Selector Operations", () => {
 
     it("should recompute when state changes", () => {
       const selectActiveUserId = store.select(
-        (state) => state.users.activeUserId
+        state => state.users.activeUserId
       );
 
       const initialUserId = selectActiveUserId();
@@ -283,7 +279,7 @@ describe("Advanced Selector Operations", () => {
     });
 
     it("should handle complex state transformations", () => {
-      const selectActiveUser = store.select((state) => {
+      const selectActiveUser = store.select(state => {
         const { activeUserId, byId } = state.users;
         return activeUserId ? byId.get(activeUserId) || null : null;
       });
@@ -294,10 +290,8 @@ describe("Advanced Selector Operations", () => {
     });
 
     it("should maintain type safety with selectors", () => {
-      const selectUserCount = store.select((state) => state.users.byId.size);
-      const selectFirstProduct = store.select(
-        (state) => state.products.items[0]
-      );
+      const selectUserCount = store.select(state => state.users.byId.size);
+      const selectFirstProduct = store.select(state => state.products.items[0]);
 
       const userCount: number = selectUserCount();
       const firstProduct: Product = selectFirstProduct();
@@ -309,9 +303,9 @@ describe("Advanced Selector Operations", () => {
 
   describe("Multi-Input Selectors", () => {
     it("should combine multiple selectors into computed values", () => {
-      const selectUsers = store.select((state) => state.users.byId);
+      const selectUsers = store.select(state => state.users.byId);
       const selectActiveUserId = store.select(
-        (state) => state.users.activeUserId
+        state => state.users.activeUserId
       );
 
       const selectActiveUserWithStatus = store.select(
@@ -336,11 +330,9 @@ describe("Advanced Selector Operations", () => {
     });
 
     it("should handle complex multi-selector computations", () => {
-      const selectProducts = store.select((state) => state.products.items);
-      const selectFilters = store.select((state) => state.products.filters);
-      const selectCategories = store.select(
-        (state) => state.products.categories
-      );
+      const selectProducts = store.select(state => state.products.items);
+      const selectFilters = store.select(state => state.products.filters);
+      const selectCategories = store.select(state => state.products.categories);
 
       const selectFilteredProductsWithStats = store.select(
         selectProducts,
@@ -351,28 +343,28 @@ describe("Advanced Selector Operations", () => {
 
           // Apply category filter
           if (filters.category) {
-            filtered = filtered.filter((p) => p.category === filters.category);
+            filtered = filtered.filter(p => p.category === filters.category);
           }
 
           // Apply price range filter
           filtered = filtered.filter(
-            (p) =>
+            p =>
               p.price >= filters.priceRange[0] &&
               p.price <= filters.priceRange[1]
           );
 
           // Apply stock filter
           if (filters.inStockOnly) {
-            filtered = filtered.filter((p) => p.inStock);
+            filtered = filtered.filter(p => p.inStock);
           }
 
           // Apply search filter
           if (filters.searchTerm) {
             const term = filters.searchTerm.toLowerCase();
             filtered = filtered.filter(
-              (p) =>
+              p =>
                 p.name.toLowerCase().includes(term) ||
-                p.tags.some((tag) => tag.toLowerCase().includes(term))
+                p.tags.some(tag => tag.toLowerCase().includes(term))
             );
           }
 
@@ -384,9 +376,9 @@ describe("Advanced Selector Operations", () => {
                 ? filtered.reduce((sum, p) => sum + p.price, 0) /
                   filtered.length
                 : 0,
-            inStockCount: filtered.filter((p) => p.inStock).length,
+            inStockCount: filtered.filter(p => p.inStock).length,
             categoryCounts: categories.reduce((acc, cat) => {
-              acc[cat] = filtered.filter((p) => p.category === cat).length;
+              acc[cat] = filtered.filter(p => p.category === cat).length;
               return acc;
             }, {} as Record<string, number>),
           };
@@ -403,8 +395,8 @@ describe("Advanced Selector Operations", () => {
     });
 
     it("should only recompute when dependencies change", () => {
-      const selectProducts = store.select((state) => state.products.items);
-      const selectFilters = store.select((state) => state.products.filters);
+      const selectProducts = store.select(state => state.products.items);
+      const selectFilters = store.select(state => state.products.filters);
 
       const computationSpy = vi.fn();
       const selectFilteredProducts = store.select(
@@ -413,7 +405,7 @@ describe("Advanced Selector Operations", () => {
         (products, filters) => {
           computationSpy();
           return products.filter(
-            (p) => !filters.category || p.category === filters.category
+            p => !filters.category || p.category === filters.category
           );
         }
       );
@@ -449,8 +441,8 @@ describe("Advanced Selector Operations", () => {
   describe("Parameterized Selectors", () => {
     it("should create selectors that accept runtime parameters", () => {
       const selectUserById = store.selectWith(
-        [(state) => state.users.byId] as const,
-        (userId: number) => (users) => users.get(userId) || null
+        [state => state.users.byId] as const,
+        (userId: number) => users => users.get(userId) || null
       );
 
       const getUser1 = selectUserById(1);
@@ -467,10 +459,10 @@ describe("Advanced Selector Operations", () => {
       const computationSpy = vi.fn();
 
       const selectProductsByCategory = store.selectWith(
-        [(state) => state.products.items] as const,
-        (category: string) => (products) => {
+        [state => state.products.items] as const,
+        (category: string) => products => {
           computationSpy(category);
-          return products.filter((p) => p.category === category);
+          return products.filter(p => p.category === category);
         }
       );
 
@@ -503,30 +495,30 @@ describe("Advanced Selector Operations", () => {
       }
 
       const selectProductsWithParams = store.selectWith(
-        [(state) => state.products.items] as const,
-        (params: ProductSearchParams) => (products) => {
+        [state => state.products.items] as const,
+        (params: ProductSearchParams) => products => {
           let filtered = products;
 
           if (params.category) {
-            filtered = filtered.filter((p) => p.category === params.category);
+            filtered = filtered.filter(p => p.category === params.category);
           }
 
           if (params.minPrice !== undefined) {
-            filtered = filtered.filter((p) => p.price >= params.minPrice!);
+            filtered = filtered.filter(p => p.price >= params.minPrice!);
           }
 
           if (params.maxPrice !== undefined) {
-            filtered = filtered.filter((p) => p.price <= params.maxPrice!);
+            filtered = filtered.filter(p => p.price <= params.maxPrice!);
           }
 
           if (params.tags?.length) {
-            filtered = filtered.filter((p) =>
-              params.tags!.some((tag) => p.tags.includes(tag))
+            filtered = filtered.filter(p =>
+              params.tags!.some(tag => p.tags.includes(tag))
             );
           }
 
           if (params.inStockOnly) {
-            filtered = filtered.filter((p) => p.inStock);
+            filtered = filtered.filter(p => p.inStock);
           }
 
           return {
@@ -553,8 +545,8 @@ describe("Advanced Selector Operations", () => {
 
     it("should support nested parameterized selectors", () => {
       const selectUsersByPreference = store.selectWith(
-        [(state) => state.users.byId] as const,
-        (preference: keyof UserProfile["preferences"]) => (users) => {
+        [state => state.users.byId] as const,
+        (preference: keyof UserProfile["preferences"]) => users => {
           return Array.from(users.values()).reduce((acc, user) => {
             const value = String(user.preferences[preference]);
             if (!acc[value]) acc[value] = [];
@@ -578,11 +570,11 @@ describe("Advanced Selector Operations", () => {
     it("should subscribe to specific selector changes", async () => {
       const listener = vi.fn();
       const selectActiveUserId = store.select(
-        (state) => state.users.activeUserId
+        state => state.users.activeUserId
       );
 
       const unsubscribe = store.subscribeTo(
-        (state) => state.users.activeUserId,
+        state => state.users.activeUserId,
         listener
       );
 
@@ -602,7 +594,7 @@ describe("Advanced Selector Operations", () => {
     it("should support immediate subscription callbacks", () => {
       const listener = vi.fn();
 
-      store.subscribeTo((state) => state.users.activeUserId, listener, {
+      store.subscribeTo(state => state.users.activeUserId, listener, {
         immediate: true,
       });
 
@@ -613,7 +605,7 @@ describe("Advanced Selector Operations", () => {
       const listener = vi.fn();
 
       // Custom equality that only cares about user count changes
-      store.subscribeTo((state) => state.users.byId, listener, {
+      store.subscribeTo(state => state.users.byId, listener, {
         equalityFn: (a, b) =>
           (a as Map<number, UserProfile>).size ===
           (b as Map<number, UserProfile>).size, // Only notify on size changes
@@ -660,11 +652,9 @@ describe("Advanced Selector Operations", () => {
       vi.useFakeTimers();
       const listener = vi.fn();
 
-      store.subscribeTo(
-        (state) => state.products.filters.searchTerm,
-        listener,
-        { debounceMs: 100 }
-      );
+      store.subscribeTo(state => state.products.filters.searchTerm, listener, {
+        debounceMs: 100,
+      });
 
       // Rapid changes
       store.dispatch({
@@ -707,17 +697,17 @@ describe("Advanced Selector Operations", () => {
       const uiListener = vi.fn();
 
       const unsubscribeUser = store.subscribeTo(
-        (state) => state.users.activeUserId,
+        state => state.users.activeUserId,
         userListener
       );
 
       const unsubscribeProduct = store.subscribeTo(
-        (state) => state.products.filters.category,
+        state => state.products.filters.category,
         productListener
       );
 
       const unsubscribeUI = store.subscribeTo(
-        (state) => state.ui.loading,
+        state => state.ui.loading,
         uiListener
       );
 
@@ -757,9 +747,9 @@ describe("Advanced Selector Operations", () => {
 
       const unsubscribe = store.subscribeToMultiple(
         [
-          (state) => state.users.activeUserId,
-          (state) => state.products.filters.category,
-          (state) => state.ui.loading,
+          state => state.users.activeUserId,
+          state => state.products.filters.category,
+          state => state.ui.loading,
         ] as const,
         listener
       );
@@ -793,9 +783,9 @@ describe("Advanced Selector Operations", () => {
 
       store.subscribeToMultiple(
         [
-          (state) => state.users.byId.size,
-          (state) => state.products.items.length,
-          (state) => state.products.items.filter((p) => p.inStock).length,
+          state => state.users.byId.size,
+          state => state.products.items.length,
+          state => state.products.items.filter(p => p.inStock).length,
         ] as const,
         listener
       );
@@ -891,12 +881,12 @@ describe("Advanced Selector Operations", () => {
     it.skip("should handle frequent state updates efficiently", () => {
       const computationSpy = vi.fn();
 
-      const selectExpensiveComputation = store.select((state) => {
+      const selectExpensiveComputation = store.select(state => {
         computationSpy();
         return state.products.items
-          .filter((p) => p.inStock)
+          .filter(p => p.inStock)
           .sort((a, b) => b.ratings.average - a.ratings.average)
-          .map((p) => ({
+          .map(p => ({
             ...p,
             score:
               p.ratings.average * p.ratings.count * (p.inStock ? 1.2 : 0.8),
@@ -924,7 +914,7 @@ describe("Advanced Selector Operations", () => {
           ...store.getState().products,
           items: store
             .getState()
-            .products.items.map((p) =>
+            .products.items.map(p =>
               p.id === 1 ? { ...p, inStock: false } : p
             ),
         },
@@ -958,9 +948,9 @@ describe("Advanced Selector Operations", () => {
         users: { ...store.getState().users, byId: largeUserSet },
       });
 
-      const selectActiveUsers = store.select((state) =>
+      const selectActiveUsers = store.select(state =>
         Array.from(state.users.byId.values())
-          .filter((user) => Date.now() - user.metadata.lastLogin < 3600000) // Active in last hour
+          .filter(user => Date.now() - user.metadata.lastLogin < 3600000) // Active in last hour
           .sort((a, b) => b.metadata.lastLogin - a.metadata.lastLogin)
       );
 
@@ -980,10 +970,10 @@ describe("Advanced Selector Operations", () => {
     });
 
     it("should handle complex selector compositions", () => {
-      const selectUsers = store.select((state) => state.users.byId);
-      const selectProducts = store.select((state) => state.products.items);
+      const selectUsers = store.select(state => state.users.byId);
+      const selectProducts = store.select(state => state.products.items);
       const selectActiveUserId = store.select(
-        (state) => state.users.activeUserId
+        state => state.users.activeUserId
       );
 
       const selectUserProductRecommendations = store.select(
@@ -996,8 +986,8 @@ describe("Advanced Selector Operations", () => {
 
           // Simple recommendation algorithm based on user preferences
           return products
-            .filter((p) => p.inStock)
-            .map((p) => ({
+            .filter(p => p.inStock)
+            .map(p => ({
               product: p,
               // Prefer cheaper items
               score:
@@ -1011,7 +1001,7 @@ describe("Advanced Selector Operations", () => {
             }))
             .sort((a, b) => b.score - a.score)
             .slice(0, 5)
-            .map((item) => item.product);
+            .map(item => item.product);
         }
       );
 
@@ -1023,7 +1013,7 @@ describe("Advanced Selector Operations", () => {
 
   describe("Selector Error Handling", () => {
     it("should handle selector errors gracefully", () => {
-      const errorSelector = store.select((state) => {
+      const errorSelector = store.select(state => {
         if (!state.users.byId) {
           throw new Error("Users not available");
         }
@@ -1044,8 +1034,8 @@ describe("Advanced Selector Operations", () => {
 
     it("should handle parameterized selector errors", () => {
       const selectUserWithValidation = store.selectWith(
-        [(state) => state.users.byId] as const,
-        (userId: number) => (users) => {
+        [state => state.users.byId] as const,
+        (userId: number) => users => {
           if (userId <= 0) {
             throw new Error("Invalid user ID");
           }
@@ -1066,11 +1056,11 @@ describe("Advanced Selector Operations", () => {
       // Create many selectors
       const selectors: Array<() => number> = [];
       for (let i = 0; i < 100; i++) {
-        selectors.push(store.select((state) => state.users.byId.size + i));
+        selectors.push(store.select(state => state.users.byId.size + i));
       }
 
       // Call all selectors to initialize them
-      selectors.forEach((s) => s());
+      selectors.forEach(s => s());
 
       // Cleanup should work without errors
       const cleanedCount = (store as any).cleanupSelectors();
@@ -1084,14 +1074,14 @@ describe("Advanced Selector Operations", () => {
       for (let i = 0; i < 50; i++) {
         subscriptions.push(
           store.subscribeTo(
-            (state) => state.ui.loading,
+            state => state.ui.loading,
             () => {}
           )
         );
       }
 
       // Cleanup all subscriptions
-      subscriptions.forEach((unsub) => unsub());
+      subscriptions.forEach(unsub => unsub());
 
       // Should not leak memory or cause errors
       expect(() => {
@@ -1103,33 +1093,33 @@ describe("Advanced Selector Operations", () => {
   describe("Advanced Selector Integration Scenarios", () => {
     it("should handle real-world e-commerce filtering scenario", () => {
       const selectFilteredProductsWithPagination = store.select(
-        (state) => state.products.items,
-        (state) => state.products.filters,
-        (state) => state.products.pagination,
+        state => state.products.items,
+        state => state.products.filters,
+        state => state.products.pagination,
         (products, filters, pagination) => {
           // Apply filters
           let filtered = products;
 
           if (filters.category) {
-            filtered = filtered.filter((p) => p.category === filters.category);
+            filtered = filtered.filter(p => p.category === filters.category);
           }
 
           if (filters.inStockOnly) {
-            filtered = filtered.filter((p) => p.inStock);
+            filtered = filtered.filter(p => p.inStock);
           }
 
           if (filters.searchTerm) {
             const term = filters.searchTerm.toLowerCase();
             filtered = filtered.filter(
-              (p) =>
+              p =>
                 p.name.toLowerCase().includes(term) ||
-                p.tags.some((tag) => tag.toLowerCase().includes(term))
+                p.tags.some(tag => tag.toLowerCase().includes(term))
             );
           }
 
           // Apply price range
           filtered = filtered.filter(
-            (p) =>
+            p =>
               p.price >= filters.priceRange[0] &&
               p.price <= filters.priceRange[1]
           );
@@ -1178,16 +1168,16 @@ describe("Advanced Selector Operations", () => {
 
     it("should handle dynamic dashboard data aggregation", () => {
       const selectDashboardData = store.select(
-        (state) => state.users.byId,
-        (state) => state.products.items,
-        (state) => state.ui.notifications,
+        state => state.users.byId,
+        state => state.products.items,
+        state => state.ui.notifications,
         (users, products, notifications) => {
           const userArray = Array.from(users.values()) as UserProfile[];
           const userStats = {
             total: users.size,
-            verified: userArray.filter((u) => u.metadata.isVerified).length,
+            verified: userArray.filter(u => u.metadata.isVerified).length,
             recent: userArray.filter(
-              (u) => Date.now() - u.metadata.lastLogin < 86400000 // Last 24 hours
+              u => Date.now() - u.metadata.lastLogin < 86400000 // Last 24 hours
             ).length,
             byTheme: userArray.reduce(
               (acc: Record<string, number>, user: UserProfile) => {
@@ -1201,7 +1191,7 @@ describe("Advanced Selector Operations", () => {
 
           const productStats = {
             total: products.length,
-            inStock: products.filter((p) => p.inStock).length,
+            inStock: products.filter(p => p.inStock).length,
             averagePrice:
               products.reduce((sum, p) => sum + p.price, 0) / products.length,
             byCategory: products.reduce((acc, product) => {
@@ -1209,10 +1199,10 @@ describe("Advanced Selector Operations", () => {
               return acc;
             }, {} as Record<string, number>),
             topRated: products
-              .filter((p) => p.ratings.count > 0)
+              .filter(p => p.ratings.count > 0)
               .sort((a, b) => b.ratings.average - a.ratings.average)
               .slice(0, 3)
-              .map((p) => ({ name: p.name, rating: p.ratings.average })),
+              .map(p => ({ name: p.name, rating: p.ratings.average })),
           };
 
           const systemStats = {

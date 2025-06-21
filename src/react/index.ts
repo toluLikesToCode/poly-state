@@ -11,7 +11,7 @@ import React, {
   type ReactNode,
   type ComponentType,
 } from "react";
-import type { Store, ReadOnlyStore, Selector } from "../core/store.js";
+import type { Store, ReadOnlyStore, Selector } from "../core/store";
 
 export interface StoreContextValue<S extends object> {
   store: ReadOnlyStore<S>;
@@ -102,12 +102,12 @@ export function withStore<S extends object, P extends object>(
 ): React.FC<P> {
   const { StoreProvider, useStore } = createStoreContext(store);
 
-  const WrappedComponent: React.FC<P> = (props) =>
+  const WrappedComponent: React.FC<P> = props =>
     React.createElement(StoreProvider, {
       children: React.createElement(ConnectedComponent, props),
     });
 
-  const ConnectedComponent: React.FC<P> = (props) => {
+  const ConnectedComponent: React.FC<P> = props => {
     const storeInstance = useStore();
     return React.createElement(Component, {
       ...props,

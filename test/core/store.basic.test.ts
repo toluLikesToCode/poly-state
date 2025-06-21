@@ -10,7 +10,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { createStore, type Store, type Plugin } from "../../src/core/store.js";
+import { createStore, type Store, type Plugin } from "../../src/core/store";
 
 interface BasicTestState {
   count: number;
@@ -372,7 +372,7 @@ describe("Path-based Updates (updatePath)", () => {
     });
 
     it("should handle object merging at paths", () => {
-      store.updatePath(["profile"], (currentProfile) => ({
+      store.updatePath(["profile"], currentProfile => ({
         ...currentProfile,
         email: "john@example.com",
       }));
@@ -464,14 +464,14 @@ describe("Selector Functionality", () => {
 
   describe("Basic Selector Functionality", () => {
     it("should return a function that provides the selected value", () => {
-      const selectUserId = store.select((state) => state.user.id);
+      const selectUserId = store.select(state => state.user.id);
 
       expect(typeof selectUserId).toBe("function");
       expect(selectUserId()).toBe(1);
     });
 
     it("should return updated values after state changes", () => {
-      const selectUserName = store.select((state) => state.user.details.name);
+      const selectUserName = store.select(state => state.user.details.name);
 
       expect(selectUserName()).toBe("Alice");
 
@@ -489,7 +489,7 @@ describe("Selector Functionality", () => {
     });
 
     it("should work with complex selectors", () => {
-      const selectUserSummary = store.select((state) => ({
+      const selectUserSummary = store.select(state => ({
         name: state.user.details.name,
         id: state.user.id,
         theme: state.user.details.preferences.theme,
@@ -508,7 +508,7 @@ describe("Selector Functionality", () => {
 
   describe("Selector Memoization", () => {
     it("should memoize results and avoid recomputation", () => {
-      const selectorFn = vi.fn((state) => state.user.details.name);
+      const selectorFn = vi.fn(state => state.user.details.name);
       const selectUserName = store.select(selectorFn);
 
       // Initial call
@@ -524,7 +524,7 @@ describe("Selector Functionality", () => {
     });
 
     it("should recompute when relevant state changes", () => {
-      const selectorFn = vi.fn((state) => state.user.details.name);
+      const selectorFn = vi.fn(state => state.user.details.name);
       const selectUserName = store.select(selectorFn);
 
       selectUserName();
@@ -539,7 +539,7 @@ describe("Selector Functionality", () => {
     });
 
     it("should recompute when irrelevant state changes but still memoize results", () => {
-      const selectorFn = vi.fn((state) => state.user.details.name);
+      const selectorFn = vi.fn(state => state.user.details.name);
       const selectUserName = store.select(selectorFn);
 
       const name1 = selectUserName();
@@ -555,7 +555,7 @@ describe("Selector Functionality", () => {
     });
 
     it("should handle object memoization correctly", () => {
-      const selectorFn = vi.fn((state) => state.user.details.preferences);
+      const selectorFn = vi.fn(state => state.user.details.preferences);
       const selectPreferences = store.select(selectorFn);
 
       const prefs1 = selectPreferences();
@@ -572,9 +572,9 @@ describe("Selector Functionality", () => {
 
   describe("Multiple Selectors", () => {
     it("should support multiple independent selectors", () => {
-      const selectUserName = store.select((state) => state.user.details.name);
-      const selectAppVersion = store.select((state) => state.app.version);
-      const selectItemCount = store.select((state) => state.data.items.length);
+      const selectUserName = store.select(state => state.user.details.name);
+      const selectAppVersion = store.select(state => state.app.version);
+      const selectItemCount = store.select(state => state.data.items.length);
 
       expect(selectUserName()).toBe("Alice");
       expect(selectAppVersion()).toBe("1.0.0");
@@ -589,8 +589,8 @@ describe("Selector Functionality", () => {
     });
 
     it("should handle selector composition", () => {
-      const selectUser = store.select((state) => state.user);
-      const selectUserName = store.select((state) => selectUser().details.name);
+      const selectUser = store.select(state => state.user);
+      const selectUserName = store.select(state => selectUser().details.name);
 
       expect(selectUserName()).toBe("Alice");
 
@@ -602,8 +602,8 @@ describe("Selector Functionality", () => {
   describe("Advanced Selector Patterns", () => {
     it("should work with parameterized selectors", () => {
       const createItemSelector = (itemId: number) =>
-        store.select((state) =>
-          state.data.items.find((item) => item.id === itemId)
+        store.select(state =>
+          state.data.items.find(item => item.id === itemId)
         );
 
       const selectItem1 = createItemSelector(1);
@@ -614,10 +614,10 @@ describe("Selector Functionality", () => {
     });
 
     it("should handle array filtering and transformation", () => {
-      const selectActiveItems = store.select((state) =>
+      const selectActiveItems = store.select(state =>
         state.data.items
-          .filter((item) => item.value.includes("item"))
-          .map((item) => ({ ...item, processed: true }))
+          .filter(item => item.value.includes("item"))
+          .map(item => ({ ...item, processed: true }))
       );
 
       const activeItems = selectActiveItems();
@@ -630,7 +630,7 @@ describe("Selector Functionality", () => {
     });
 
     it("should work with computed values", () => {
-      const selectStats = store.select((state) => ({
+      const selectStats = store.select(state => ({
         totalItems: state.data.items.length,
         hasItems: state.data.items.length > 0,
         lastUpdated: state.data.cache.timestamp,

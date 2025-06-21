@@ -14,11 +14,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   createStore,
   type Store,
-  type Plugin,
   type Thunk,
   type Middleware,
-} from "../../src/core/store.js";
-import { StoreError, TransactionError } from "../../src/core/types.js";
+  StoreError,
+  TransactionError,
+} from "../../src/core/store";
 
 interface ThunkTestState {
   value: number;
@@ -198,7 +198,7 @@ describe("Advanced Store Operations", () => {
           dispatch({ status: "pending" });
 
           // Simulate async work
-          await new Promise((resolve) => setTimeout(resolve, 50));
+          await new Promise(resolve => setTimeout(resolve, 50));
 
           const fetchedData = "async-fetched-data";
           dispatch({
@@ -220,10 +220,11 @@ describe("Advanced Store Operations", () => {
 
       it("should return promises from async thunks", async () => {
         const returnValue = "async-result";
-        const asyncThunk: Thunk<ThunkTestState, Promise<string>> = async (
-          dispatch
-        ) => {
-          await new Promise((resolve) => setTimeout(resolve, 10));
+        const asyncThunk: Thunk<
+          ThunkTestState,
+          Promise<string>
+        > = async dispatch => {
+          await new Promise(resolve => setTimeout(resolve, 10));
           dispatch({ status: "completed" });
           return returnValue;
         };
@@ -284,11 +285,12 @@ describe("Advanced Store Operations", () => {
       });
 
       it("should handle async thunk errors properly", async () => {
-        const erroringAsyncThunk: Thunk<ThunkTestState, Promise<void>> = async (
-          dispatch
-        ) => {
+        const erroringAsyncThunk: Thunk<
+          ThunkTestState,
+          Promise<void>
+        > = async dispatch => {
           dispatch({ status: "pending" });
-          await new Promise((resolve) => setTimeout(resolve, 10));
+          await new Promise(resolve => setTimeout(resolve, 10));
           throw new Error("Async operation failed");
         };
 
@@ -304,7 +306,7 @@ describe("Advanced Store Operations", () => {
         const createAsyncThunk =
           (id: number, delay: number): Thunk<ThunkTestState, Promise<number>> =>
           async (dispatch, getState) => {
-            await new Promise((resolve) => setTimeout(resolve, delay));
+            await new Promise(resolve => setTimeout(resolve, delay));
             dispatch({
               value: getState().value + id,
               data: `thunk-${id}-completed`,
@@ -334,7 +336,7 @@ describe("Advanced Store Operations", () => {
 
       it("should return primitive values from synchronous thunks", () => {
         // String return value
-        const stringThunk: Thunk<ThunkTestState, string> = (dispatch) => {
+        const stringThunk: Thunk<ThunkTestState, string> = dispatch => {
           dispatch({ value: 1 });
           return "operation-completed";
         };
@@ -467,11 +469,12 @@ describe("Advanced Store Operations", () => {
 
       it("should return primitive values from asynchronous thunks", async () => {
         // String from async thunk
-        const asyncStringThunk: Thunk<ThunkTestState, Promise<string>> = async (
-          dispatch
-        ) => {
+        const asyncStringThunk: Thunk<
+          ThunkTestState,
+          Promise<string>
+        > = async dispatch => {
           dispatch({ status: "pending" });
-          await new Promise((resolve) => setTimeout(resolve, 10));
+          await new Promise(resolve => setTimeout(resolve, 10));
           dispatch({ status: "completed", data: "async-string-operation" });
           return "async-string-result";
         };
@@ -484,7 +487,7 @@ describe("Advanced Store Operations", () => {
           dispatch,
           getState
         ) => {
-          await new Promise((resolve) => setTimeout(resolve, 10));
+          await new Promise(resolve => setTimeout(resolve, 10));
           const calculatedValue = getState().value * 2;
           dispatch({ value: calculatedValue });
           return calculatedValue;
@@ -522,7 +525,7 @@ describe("Advanced Store Operations", () => {
           dispatch({ status: "pending", data: "fetching-user-data" });
 
           // Simulate API call
-          await new Promise((resolve) => setTimeout(resolve, 20));
+          await new Promise(resolve => setTimeout(resolve, 20));
 
           const mockApiResponse: AsyncApiResult = {
             userId: 123,
@@ -620,9 +623,10 @@ describe("Advanced Store Operations", () => {
           multiplier: number
         ) => Thunk<ThunkTestState, number>;
 
-        const thunkFactoryThunk: Thunk<ThunkTestState, ThunkFactory> = (
-          dispatch
-        ) => {
+        const thunkFactoryThunk: Thunk<
+          ThunkTestState,
+          ThunkFactory
+        > = dispatch => {
           dispatch({ data: "thunk-factory-created" });
 
           return (multiplier: number) => (innerDispatch, innerGetState) => {
@@ -944,7 +948,7 @@ describe("Advanced Store Operations", () => {
           dispatchNext
         ) => {
           if (action.text === "async-process") {
-            await new Promise((resolve) => setTimeout(resolve, 10));
+            await new Promise(resolve => setTimeout(resolve, 10));
             dispatchNext({
               ...action,
               items: [...(prevState.items || []), "async-processed"],
@@ -1001,7 +1005,7 @@ describe("Advanced Store Operations", () => {
         const listener = vi.fn();
         store.subscribe(listener);
 
-        const result = store.transaction((draft) => {
+        const result = store.transaction(draft => {
           draft.balance = 150;
           draft.status = "updated";
           draft.transactions.push({
@@ -1024,7 +1028,7 @@ describe("Advanced Store Operations", () => {
       });
 
       it("should return updated state object when explicitly returned", () => {
-        const result = store.transaction((draft) => {
+        const result = store.transaction(draft => {
           return {
             balance: 200,
             status: "explicitly-updated",
@@ -1046,7 +1050,7 @@ describe("Advanced Store Operations", () => {
       });
 
       it("should handle complex transaction logic", () => {
-        const result = store.transaction((draft) => {
+        const result = store.transaction(draft => {
           // Complex business logic
           const transferAmount = 25;
 
@@ -1088,7 +1092,7 @@ describe("Advanced Store Operations", () => {
         const listener = vi.fn();
         errorStore.subscribe(listener);
 
-        const result = errorStore.transaction((draft) => {
+        const result = errorStore.transaction(draft => {
           draft.balance = 500; // Make changes
           draft.status = "should-not-persist";
 
@@ -1112,7 +1116,7 @@ describe("Advanced Store Operations", () => {
         const mockOnError = vi.fn();
         const errorStore = createStore(initialState, { onError: mockOnError });
 
-        const result = errorStore.transaction((draft) => {
+        const result = errorStore.transaction(draft => {
           // Make multiple complex changes
           draft.balance = 250;
           draft.transactions.push(
@@ -1137,7 +1141,7 @@ describe("Advanced Store Operations", () => {
 
           // Validation that causes rollback
           const totalCredits = draft.transactions
-            .filter((tx) => tx.type === "credit")
+            .filter(tx => tx.type === "credit")
             .reduce((sum, tx) => sum + tx.amount, 0);
 
           if (totalCredits > 100) {
@@ -1156,7 +1160,7 @@ describe("Advanced Store Operations", () => {
         const listener = vi.fn();
         store.subscribe(listener);
 
-        const result = store.transaction((draft) => {
+        const result = store.transaction(draft => {
           // Read state but make no changes
           const currentBalance = draft.balance;
           console.log("Current balance:", currentBalance);
@@ -1178,7 +1182,7 @@ describe("Advanced Store Operations", () => {
 
         const nestedStore = createStore(initialStateWithNested);
 
-        const result = nestedStore.transaction((draft) => {
+        const result = nestedStore.transaction(draft => {
           draft.metadata!.totalProcessed = 5;
           draft.metadata!.lastTransaction = "nested-update";
 
@@ -1200,7 +1204,7 @@ describe("Advanced Store Operations", () => {
       });
 
       it("should handle array mutations correctly", () => {
-        const result = store.transaction((draft) => {
+        const result = store.transaction(draft => {
           // Add multiple transactions
           draft.transactions.push(
             {
@@ -1251,7 +1255,7 @@ describe("Advanced Store Operations", () => {
         const largeStore = createStore(largeState);
         const startTime = performance.now();
 
-        const result = largeStore.transaction((draft) => {
+        const result = largeStore.transaction(draft => {
           // Perform bulk operation
           draft.transactions.forEach((tx, index) => {
             if (tx.type === "credit" && tx.amount > 50) {
@@ -1261,7 +1265,7 @@ describe("Advanced Store Operations", () => {
 
           // Add summary transaction
           const totalCredits = draft.transactions
-            .filter((tx) => tx.type === "credit")
+            .filter(tx => tx.type === "credit")
             .reduce((sum, tx) => sum + tx.amount, 0);
 
           draft.metadata = {
@@ -1357,7 +1361,7 @@ describe("Advanced Store Operations", () => {
 
         try {
           // Simulate async data fetch
-          await new Promise((resolve) => setTimeout(resolve, 20));
+          await new Promise(resolve => setTimeout(resolve, 20));
 
           // Use batch for multiple UI updates
           const currentState = getState();
@@ -1377,7 +1381,7 @@ describe("Advanced Store Operations", () => {
           });
 
           // Use transaction for complex state changes
-          const transactionResult = complexStore.transaction((draft) => {
+          const transactionResult = complexStore.transaction(draft => {
             // Complex business logic
             const totalValue = draft.data.items.reduce(
               (sum, item) => sum + item.value,
@@ -1390,7 +1394,7 @@ describe("Advanced Store Operations", () => {
             }
 
             // Activate all items
-            draft.data.items.forEach((item) => {
+            draft.data.items.forEach(item => {
               item.status = "active";
             });
 
@@ -1422,7 +1426,7 @@ describe("Advanced Store Operations", () => {
       expect(finalState.ui.loading).toBe(false);
       expect(finalState.data.items).toHaveLength(2);
       expect(
-        finalState.data.items.every((item) => item.status === "active")
+        finalState.data.items.every(item => item.status === "active")
       ).toBe(true);
       expect(finalState.user.profile.preferences.notifications).toBe(false);
       expect(finalState.ui.modals["high-value-warning"]).toBe(true);

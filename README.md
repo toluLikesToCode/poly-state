@@ -32,7 +32,7 @@ import { createStore } from "@tolulikescode/universal-store";
 const store = createStore({ count: 0 });
 
 // Subscribe to changes
-store.subscribe((state) => console.log("State:", state));
+store.subscribe(state => console.log("State:", state));
 
 // Update state
 store.dispatch({ count: 1 });
@@ -48,14 +48,10 @@ const store = createStore({ count: 0 });
 const { StoreProvider, useSelector, useDispatch } = createStoreContext(store);
 
 function Counter() {
-  const count = useSelector((state) => state.count);
+  const count = useSelector(state => state.count);
   const dispatch = useDispatch();
 
-  return (
-    <button onClick={() => dispatch({ count: count + 1 })}>
-      Count: {count}
-    </button>
-  );
+  return <button onClick={() => dispatch({ count: count + 1 })}>Count: {count}</button>;
 }
 
 function App() {
@@ -103,8 +99,7 @@ const store = createStore(
 Creates React context and hooks for a store.
 
 ```typescript
-const { StoreProvider, useSelector, useDispatch, useStore } =
-  createStoreContext(store);
+const { StoreProvider, useSelector, useDispatch, useStore } = createStoreContext(store);
 ```
 
 #### Hooks
@@ -161,7 +156,7 @@ npm run build
 
 ### 3. Test in Your Projects
 
-#### Vanilla TypeScript
+#### Vanilla TypeScript\Javascript
 
 ```typescript
 import { createStore } from "@tolulikescode/universal-store";

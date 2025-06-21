@@ -25,6 +25,7 @@ and information for contributors.
    ```
 
 4. **Run Tests**
+
    ```bash
    npm run test
    ```
@@ -92,10 +93,9 @@ We follow conventional commit format:
 
 Example:
 
-```
-feat(core): add new selector optimization feature
-fix(react): resolve hook dependency issue
-docs: update API documentation
+```md
+feat(core): add new selector optimization feature fix(react): resolve hook dependency issue docs:
+update API documentation
 ```
 
 ### 4. Pull Request Process

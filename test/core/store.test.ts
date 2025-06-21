@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { createStore, type Store } from "../../src/core/store.js";
+import { createStore, type Store } from "../../src/core/store";
 
 describe("Store Core Functionality", () => {
   let store: Store<{ count: number; name: string }>;
@@ -28,7 +28,7 @@ describe("Store Core Functionality", () => {
     let callCount = 0;
     let lastState: any = null;
 
-    const unsubscribe = store.subscribe((state) => {
+    const unsubscribe = store.subscribe(state => {
       callCount++;
       lastState = state;
     });

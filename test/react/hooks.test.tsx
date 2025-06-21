@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { createStore } from "../../src/core/store.js";
-import { createStoreContext } from "../../src/react/index.js";
+import { createStore } from "../../src/core/store";
+import { createStoreContext } from "../../src/react/index";
 
 describe("React Integration", () => {
   let store: ReturnType<typeof createStore<{ count: number }>>;

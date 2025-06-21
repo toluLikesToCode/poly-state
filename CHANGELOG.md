@@ -23,7 +23,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [1.0.0] - 2025-06-21
 
-### Added
+### Add
 
 - Core store implementation with TypeScript support
 - React integration with hooks and context
