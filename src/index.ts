@@ -22,13 +22,12 @@ export * from './plugins';
  */
 
 // Re-export everything from core
-export * from "./core/store";
-export * from "./core/utils/index";
-export * from "./core/utils";
-export * from "./core/storage/index";
+export * from "./core";
 
-// Re-export plugins when you add them
+// Re-export plugins Note: Add plugin later
 export * from "./plugins";
 
+export * from "./shared";
+
 // Default export for convenience
-export { createStore as default } from "./core/store";
+export { createStore as default } from "./core/state/createStore";

@@ -12,6 +12,16 @@ export class MiddlewareError extends StoreError {}
 export class TransactionError extends StoreError {}
 
 /**
+ * Context information for error handling
+ */
+export interface ErrorContext {
+  operation: string;
+  pluginName?: string;
+  actionPayload?: any;
+  additionalInfo?: Record<string, any>;
+}
+
+/**
  * Storage operation error with context
  */
 export class StorageError extends Error {

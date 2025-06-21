@@ -21,4 +21,4 @@
 export * from "./core/storage/index";
 
 // React-specific hooks and components
-export * from "./react/index";
+export * from "./react";

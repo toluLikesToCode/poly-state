@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { createStore, type Store } from "../src/core/store.js";
+import { createStore, type Store } from "../src/core";
 // For React tests, also import:
 // import { createStoreContext } from '../src/react/index.js'
 

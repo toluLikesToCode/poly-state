@@ -9,7 +9,7 @@ import {
 import { deepEqual } from "../utils/equality";
 import { getPath } from "../utils/path";
 import { StoreError } from "../../shared/errors";
-import { Store } from "../types";
+import { Store } from "../state/index";
 
 export class SelectorManager<S extends object> implements ISelectorManager<S> {
   private storeInstance: Store<S> = {} as Store<S>;

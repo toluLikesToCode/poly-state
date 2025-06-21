@@ -11,7 +11,8 @@ import React, {
   type ReactNode,
   type ComponentType,
 } from "react";
-import type { Store, ReadOnlyStore, Selector } from "../core/store";
+import type { Store, ReadOnlyStore } from "../core/state/index";
+import type { Selector } from "../core/selectors/index";
 
 export interface StoreContextValue<S extends object> {
   store: ReadOnlyStore<S>;

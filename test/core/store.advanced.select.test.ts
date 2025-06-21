@@ -13,7 +13,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { createStore, type Store } from "../../src/core/store";
+import { createStore, type Store } from "../../src/core";
 
 // Test state interfaces
 interface UserProfile {

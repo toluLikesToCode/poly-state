@@ -1,35 +1,42 @@
 import type { Draft } from "immer";
-
-// --- Custom Error Types ---
-export class StoreError extends Error {
-  constructor(message: string, public context?: any) {
-    super(message);
-    this.name = this.constructor.name;
-  }
-}
-
-export class ValidationError extends StoreError {}
-export class PersistenceError extends StoreError {}
-export class SyncError extends StoreError {}
-export class MiddlewareError extends StoreError {}
-export class TransactionError extends StoreError {}
+import { ErrorContext, StoreError } from "../../shared/errors";
+import {
+  DependencyListener,
+  DependencySubscriptionOptions,
+  Selector,
+} from "../selectors/types";
 
 /**
- * Context information for error handling
+ * Type definition for custom serialization/deserialization of complex objects
+ * @template T - The type of the object being handled
  */
-export interface ErrorContext {
-  operation: string;
-  pluginName?: string;
-  actionPayload?: any;
-  additionalInfo?: Record<string, any>;
-}
+export interface TypeDefinition<T> {
+  /**
+   * Identifies if a value matches this type
+   * @param value - The value to check
+   * @returns True if the value is of this type
+   */
+  isType: (value: any) => boolean;
 
-/**
- * Function that computes a derived state value
- * @typeParam S - The type of the main state
- * @typeParam R - The type of the derived value
- */
-export type Selector<S extends object, R = unknown> = (state: S) => R;
+  /**
+   * Converts the value to a serializable form
+   * @param value - The value to serialize
+   * @returns The serialized representation
+   */
+  serialize: (value: T) => any;
+
+  /**
+   * Converts the serialized form back to the original type
+   * @param value - The serialized value to deserialize
+   * @returns The deserialized object
+   */
+  deserialize: (value: any) => T;
+
+  /**
+   * Type name for debugging and identification
+   */
+  typeName: string;
+}
 
 /**
  * Function that receives state updates
@@ -113,84 +120,6 @@ export interface historyChangePluginOptions<S extends object> {
   store: Store<S>;
   oldState: S;
   newState: S;
-}
-
-/**
- * Dependency-based subscription callback function.
- *
- * @template T - The type of the selected value
- * @param newValue - The new value after the change
- * @param oldValue - The previous value before the change
- *
- * @example
- * ```typescript
- * const listener: DependencyListener<string> = (newName, oldName) => {
- *   console.log(`Name changed from ${oldName} to ${newName}`);
- * };
- * ```
- */
-export type DependencyListener<T> = (newValue: T, oldValue: T) => void;
-
-/**
- * Configuration options for dependency-based subscriptions.
- *
- * @remarks
- * These options control how the subscription behaves, including immediate execution,
- * custom equality checking, and debouncing for performance optimization.
- */
-export interface DependencySubscriptionOptions {
-  /**
-   * Whether to call the listener immediately with the current value.
-   *
-   * @remarks
-   * When true, the listener is called once immediately after subscription
-   * with the current value passed as both new and old parameters.
-   *
-   * @defaultValue false
-   */
-  immediate?: boolean;
-
-  /**
-   * Custom equality function to determine if the value has changed.
-   *
-   * @remarks
-   * If not provided, uses the store's built-in deep equality comparison.
-   * Custom equality functions can optimize performance for complex objects
-   * or provide specialized comparison logic.
-   *
-   * @param a - The previous value
-   * @param b - The current value
-   * @returns True if the values are considered equal, false if they differ
-   *
-   * @defaultValue Uses {@link deepEqual} from store utilities
-   *
-   * @example
-   * ```typescript
-   * // Custom equality for arrays based on length only
-   * const options = {
-   *   equalityFn: (a: any[], b: any[]) => a.length === b.length
-   * };
-   * ```
-   */
-  equalityFn?: <T>(a: T, b: T) => boolean;
-
-  /**
-   * Debounce delay in milliseconds for throttling rapid changes.
-   *
-   * @remarks
-   * When set to a value greater than 0, the listener will be delayed and
-   * only called once after the specified time has passed since the last change.
-   * This is useful for expensive operations that shouldn't run on every change.
-   *
-   * @defaultValue 0 (no debouncing)
-   *
-   * @example
-   * ```typescript
-   * // Debounce API calls for 300ms
-   * const options = { debounceMs: 300 };
-   * ```
-   */
-  debounceMs?: number;
 }
 
 export interface Plugin<S extends object> {

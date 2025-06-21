@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { createStore } from "../../src/core/store";
+import { createStore } from "../../src/core";
 import { createStoreContext } from "../../src/react/index";
 
 describe("React Integration", () => {

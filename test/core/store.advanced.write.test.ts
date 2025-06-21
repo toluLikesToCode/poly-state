@@ -16,9 +16,8 @@ import {
   type Store,
   type Thunk,
   type Middleware,
-  StoreError,
-  TransactionError,
-} from "../../src/core/store";
+} from "../../src/core";
+import { StoreError, TransactionError } from "../../src/shared";
 
 interface ThunkTestState {
   value: number;

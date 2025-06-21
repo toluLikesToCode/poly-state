@@ -1,11 +1,6 @@
-import * as storage from "./storage/index";
-import {
-  ActionPayload,
-  Middleware,
-  ValidationError,
-  PersistedState,
-} from "./types";
-
+import { ValidationError } from "../../shared/errors";
+import * as storage from "../storage/index";
+import { ActionPayload, Middleware, PersistedState } from "./index";
 /**
  * Clean up stale persisted states across all storage types
  */
@@ -92,6 +87,7 @@ export function cleanupStaleStates(
   }
   return result;
 }
+
 // --- Built-in Middleware Creators (createLoggerMiddleware, createValidatorMiddleware) ---
 export function createLoggerMiddleware<S extends object>(
   logger: (...args: any[]) => void = console.log
@@ -184,12 +180,4 @@ export function createValidatorMiddleware<S extends object>(
       else console.error(validationError.message, validationError.context);
     }
   };
-}
-
-export function isDevMode() {
-  const isDevMode: boolean = storage.getLocalStorage(
-    "APP_CLIENT_DEV_MODE",
-    true
-  );
-  return isDevMode;
 }

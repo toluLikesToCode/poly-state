@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { createStore, type Store } from "../../src/core/store";
+import { createStore, type Store } from "../../src/core";
 
 describe("Store Core Functionality", () => {
   let store: Store<{ count: number; name: string }>;

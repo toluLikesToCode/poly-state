@@ -6,7 +6,7 @@
  * subscriptions, and parameterized selectors with optimal performance.
  */
 
-import type { Store } from "../types";
+import type { Store } from "../state/index";
 
 /**
  * Function that computes a derived state value

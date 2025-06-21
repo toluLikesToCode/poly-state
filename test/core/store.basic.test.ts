@@ -10,7 +10,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { createStore, type Store, type Plugin } from "../../src/core/store";
+import { createStore, type Store, type Plugin } from "../../src/core";
 
 interface BasicTestState {
   count: number;
