@@ -1,4 +1,4 @@
-import { ValidationError } from "../../shared/errors";
+import { StoreError, ValidationError } from "../../shared/errors";
 import * as storage from "../storage/index";
 import {
   ActionPayload,
@@ -188,6 +188,3 @@ export function createValidatorMiddleware<S extends object>(
     }
   };
 }
-
-// --- Convenience Store Creation Functions ---
-// (Moved to storeCreationHelpers.ts)

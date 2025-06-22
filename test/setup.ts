@@ -30,6 +30,11 @@ Object.defineProperty(window, "sessionStorage", {
   value: sessionStorageMock,
 });
 
+// Mock isDevMode globally for all tests
+vi.mock("../src/core/utils/devMode", () => ({
+  isDevMode: vi.fn(() => true), // Default mock implementation
+}));
+
 // Reset all mocks before each test
 beforeEach(() => {
   vi.clearAllMocks();

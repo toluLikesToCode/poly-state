@@ -43,6 +43,7 @@ import { StorageType } from "./types";
 import { cleanupStaleStates } from "./utils";
 import { TypeRegistry } from "./typeRegistry";
 import { storeRegistry } from "./storeRegistry";
+import { PluginManager } from "../../plugins/pluginManager";
 immer.enableMapSet();
 
 /**
@@ -95,26 +96,10 @@ export function createStore<S extends object>(
 
   // --- Core Store Functions ---
   const handleError = (error: StoreError) => {
-    // Call plugin onError hooks
-    for (const plugin of plugins) {
-      try {
-        plugin.onError?.(
-          error,
-          error.context || { operation: "unknown" },
-          storeInstance
-        );
-      } catch (pluginError: any) {
-        // Prevent infinite recursion by not calling handleError again
-        console.error(
-          `[Store: ${name || "Unnamed"}] Plugin ${plugin.name}.onError failed:`,
-          {
-            originalError: error.message,
-            pluginError: pluginError.message || String(pluginError),
-          }
-        );
-      }
-    }
+    // Call plugin onError hooks first
+    pluginManager.onError(error, error.context, storeInstance);
 
+    // Then call the store's onError callback
     if (onError) {
       onError(error);
     } else {
@@ -126,6 +111,9 @@ export function createStore<S extends object>(
       });
     }
   };
+
+  // Initialize plugin manager for consistent plugin lifecycle handling
+  const pluginManager = new PluginManager(plugins, handleError, name);
 
   const isStorageAvailable = (): boolean => {
     switch (storageType) {
@@ -152,30 +140,15 @@ export function createStore<S extends object>(
     if (!currentPersistKey || !isStorageAvailable() || isDestroyed) return;
 
     try {
-      let stateToStore = dataToPersist;
-
       // Call plugin beforePersist hooks
-      for (const plugin of plugins) {
-        try {
-          const transformedState = plugin.beforePersist?.(
-            stateToStore,
-            storageType,
-            storeInstance
-          );
-          if (transformedState) {
-            stateToStore = transformedState;
-          }
-        } catch (e: any) {
-          handleError(
-            new MiddlewareError(`Plugin ${plugin.name}.beforePersist failed`, {
-              error: e,
-              pluginName: plugin.name,
-              operation: "beforePersist",
-            })
-          );
-          // Continue with next plugin if this plugin fails
-          continue;
-        }
+      let stateToStore = dataToPersist;
+      const transformedState = pluginManager.beforePersist(
+        dataToPersist,
+        storageType,
+        storeInstance
+      );
+      if (transformedState) {
+        stateToStore = transformedState;
       }
 
       // Use type registry to properly serialize complex types
@@ -203,19 +176,7 @@ export function createStore<S extends object>(
       }
 
       // Call plugin onPersisted hooks
-      for (const plugin of plugins) {
-        try {
-          plugin.onPersisted?.(stateToStore, storageType, storeInstance);
-        } catch (e: any) {
-          handleError(
-            new MiddlewareError(`Plugin ${plugin.name}.onPersisted failed`, {
-              error: e,
-              pluginName: plugin.name,
-              operation: "onPersisted",
-            })
-          );
-        }
-      }
+      pluginManager.onPersisted(stateToStore, storageType, storeInstance);
     } catch (e: any) {
       handleError(
         new PersistenceError("Failed to persist state", {
@@ -267,30 +228,13 @@ export function createStore<S extends object>(
         ) as Partial<S>;
 
         // Call plugin onStateLoaded hooks
-        for (const plugin of plugins) {
-          try {
-            const transformedState = plugin.onStateLoaded?.(
-              deserializedData,
-              storageType,
-              storeInstance
-            );
-            if (transformedState) {
-              deserializedData = transformedState;
-            }
-          } catch (e: any) {
-            handleError(
-              new MiddlewareError(
-                `Plugin ${plugin.name}.onStateLoaded failed`,
-                {
-                  error: e,
-                  pluginName: plugin.name,
-                  operation: "onStateLoaded",
-                }
-              )
-            );
-            // Continue with original state if plugin fails
-            continue;
-          }
+        const transformedState = pluginManager.onStateLoaded(
+          deserializedData,
+          storageType,
+          storeInstance
+        );
+        if (transformedState) {
+          deserializedData = transformedState;
         }
 
         return deserializedData;
@@ -365,23 +309,12 @@ export function createStore<S extends object>(
       // Empty producer - just creates an immutable copy
     });
 
-    for (const plugin of plugins) {
-      try {
-        plugin.onStateChange?.(
-          safeCurrentState,
-          safePrevState,
-          actionApplied,
-          storeInstance
-        );
-      } catch (e: any) {
-        handleError(
-          new MiddlewareError(`Plugin ${plugin.name}.onStateChange failed`, {
-            error: e,
-            pluginName: plugin.name,
-          })
-        );
-      }
-    }
+    pluginManager.onStateChange(
+      safeCurrentState,
+      safePrevState,
+      actionApplied,
+      storeInstance
+    );
 
     listeners.forEach(listener => {
       try {
@@ -429,25 +362,15 @@ export function createStore<S extends object>(
     let newPartialState = payload;
 
     // Plugin: beforeStateChange
-    for (const plugin of plugins) {
-      try {
-        const transformed = plugin.beforeStateChange?.(
-          newPartialState,
-          prevState,
-          storeInstance
-        );
-        if (transformed) {
-          newPartialState = transformed;
-        }
-      } catch (e: any) {
-        handleError(
-          new MiddlewareError(
-            `Plugin ${plugin.name}.beforeStateChange failed`,
-            { error: e, pluginName: plugin.name }
-          )
-        );
-        return;
-      }
+
+    let transformed = pluginManager.beforeStateChange(
+      newPartialState,
+      prevState,
+      storeInstance
+    );
+    if (transformed) {
+      // If the plugin transformed the payload, use it
+      newPartialState = transformed;
     }
 
     /* 🏃‍♂️ Bail early if the payload is empty so we don’t burn cycles
@@ -744,44 +667,12 @@ export function createStore<S extends object>(
   const runHistoryPlugin = {
     beforeChange: (options: historyChangePluginOptions<S>): boolean | void => {
       // Call plugin beforeHistoryChange hooks
-      for (const plugin of plugins) {
-        try {
-          const result = plugin.beforeHistoryChange?.({ ...options });
-          if (result === false) {
-            return false; // Prevent the operation
-          }
-        } catch (e: any) {
-          handleError(
-            new MiddlewareError(
-              `Plugin ${plugin.name}.beforeHistoryChange failed`,
-              {
-                operation: "beforeHistoryChange",
-                error: e,
-                pluginName: plugin.name,
-              }
-            )
-          );
-        }
-      }
-      return true; // Allow the operation by default
+      const result = pluginManager.beforeHistoryChange(options);
+      if (result === false) return false;
+      return true; // Default to allowing the change
     },
     afterChange: (options: historyChangePluginOptions<S>): void => {
-      for (const plugin of plugins) {
-        try {
-          plugin.onHistoryChanged?.({ ...options });
-        } catch (e: any) {
-          handleError(
-            new MiddlewareError(
-              `Plugin ${plugin.name}.onHistoryChanged failed`,
-              {
-                operation: "onHistoryChanged",
-                error: e,
-                pluginName: plugin.name,
-              }
-            )
-          );
-        }
-      }
+      pluginManager.onHistoryChanged(options);
     },
   };
 
@@ -974,19 +865,7 @@ export function createStore<S extends object>(
     batchedActions = [];
 
     // Call onBatchStart for all plugins
-    for (const plugin of plugins) {
-      try {
-        plugin.onBatchStart?.(storeInstance);
-      } catch (e: any) {
-        handleError(
-          new MiddlewareError(`Plugin ${plugin.name}.onBatchStart failed`, {
-            error: e,
-            pluginName: plugin.name,
-            operation: "onBatchStart",
-          })
-        );
-      }
-    }
+    pluginManager.onBatchStart(storeInstance);
 
     try {
       fn();
@@ -1014,19 +893,7 @@ export function createStore<S extends object>(
 
       // Call onBatchEnd for all plugins with success
       const finalState = state; // Current state after all actions applied
-      for (const plugin of plugins) {
-        try {
-          plugin.onBatchEnd?.(batchedActions, finalState, storeInstance);
-        } catch (e: any) {
-          handleError(
-            new MiddlewareError(`Plugin ${plugin.name}.onBatchEnd failed`, {
-              error: e,
-              pluginName: plugin.name,
-              operation: "onBatchEnd",
-            })
-          );
-        }
-      }
+      pluginManager.onBatchEnd(batchedActions, finalState, storeInstance);
     } catch (e: any) {
       // Store the batched actions before clearing for error reporting
       const failedBatchedActions = [...batchedActions];
@@ -1128,22 +995,7 @@ export function createStore<S extends object>(
     let transactionError: Error | undefined;
 
     // Call onTransactionStart for all plugins
-    for (const plugin of plugins) {
-      try {
-        plugin.onTransactionStart?.(storeInstance);
-      } catch (e: any) {
-        handleError(
-          new MiddlewareError(
-            `Plugin ${plugin.name}.onTransactionStart failed`,
-            {
-              error: e,
-              pluginName: plugin.name,
-              operation: "onTransactionStart",
-            }
-          )
-        );
-      }
-    }
+    pluginManager.onTransactionStart(storeInstance);
 
     try {
       /**
@@ -1172,26 +1024,11 @@ export function createStore<S extends object>(
       }
 
       // Call onTransactionEnd for all plugins with success
-      for (const plugin of plugins) {
-        try {
-          plugin.onTransactionEnd?.(
-            true,
-            storeInstance,
-            nextState !== state ? (nextState as Partial<S>) : undefined
-          );
-        } catch (e: any) {
-          handleError(
-            new MiddlewareError(
-              `Plugin ${plugin.name}.onTransactionEnd failed`,
-              {
-                error: e,
-                pluginName: plugin.name,
-                operation: "onTransactionEnd",
-              }
-            )
-          );
-        }
-      }
+      pluginManager.onTransactionEnd(
+        true,
+        storeInstance,
+        nextState !== state ? (nextState as Partial<S>) : undefined
+      );
 
       return true;
     } catch (e: any) {
@@ -1205,28 +1042,12 @@ export function createStore<S extends object>(
       );
 
       // Call onTransactionEnd for all plugins with failure
-      for (const plugin of plugins) {
-        try {
-          plugin.onTransactionEnd?.(
-            false,
-            storeInstance,
-            undefined,
-            transactionError
-          );
-        } catch (pluginError: any) {
-          handleError(
-            new MiddlewareError(
-              `Plugin ${plugin.name}.onTransactionEnd failed after transaction error`,
-              {
-                error: pluginError,
-                pluginName: plugin.name,
-                operation: "onTransactionEnd",
-                originalError: e,
-              }
-            )
-          );
-        }
-      }
+      pluginManager.onTransactionEnd(
+        false,
+        storeInstance,
+        undefined,
+        transactionError
+      );
 
       return false;
     }
@@ -1239,19 +1060,7 @@ export function createStore<S extends object>(
 
     selectorManager.destroyAll();
 
-    for (const plugin of plugins) {
-      try {
-        plugin.onDestroy?.(storeInstance);
-      } catch (e: any) {
-        handleError(
-          new MiddlewareError(`Plugin ${plugin.name}.onDestroy failed`, {
-            operation: "pluginOnDestroy",
-            error: e,
-            pluginName: plugin.name,
-          })
-        );
-      }
-    }
+    pluginManager.onDestroy(storeInstance);
 
     listeners = [];
     if (cleanupOpts.clearHistory) {
@@ -1429,31 +1238,14 @@ export function createStore<S extends object>(
             let stateToApply = persisted.data;
 
             // Call plugin onCrossTabSync hooks
-            for (const plugin of plugins) {
-              try {
-                const transformedState = plugin.onCrossTabSync?.(
-                  stateToApply,
-                  persisted.meta.sessionId || "unknown",
-                  storeInstance
-                );
-                if (transformedState) {
-                  stateToApply = transformedState;
-                }
-              } catch (e: any) {
-                handleError(
-                  new MiddlewareError(
-                    `Plugin ${plugin.name}.onCrossTabSync failed`,
-                    {
-                      error: e,
-                      pluginName: plugin.name,
-                      operation: "onCrossTabSync",
-                      sourceSessionId: persisted.meta.sessionId,
-                    }
-                  )
-                );
-                // Continue with original state if plugin fails
-                continue;
-              }
+            const transformed = pluginManager.onCrossTabSync(
+              stateToApply,
+              persisted.meta.sessionId || "unknown",
+              storeInstance
+            );
+            if (transformed) {
+              // If the plugin transformed the state, use it
+              stateToApply = transformed;
             }
 
             // _applyStateChange will capture the current `state` as its `prevState`
@@ -1487,25 +1279,7 @@ export function createStore<S extends object>(
   }
 
   // Call onStoreCreate for plugins
-  for (const plugin of plugins) {
-    try {
-      plugin.onStoreCreate?.(storeInstance);
-    } catch (e: any) {
-      handleError(
-        new MiddlewareError(`Plugin ${plugin.name}.onStoreCreate failed`, {
-          error: e,
-          pluginName: plugin.name,
-        })
-      );
-      throw new StoreError(
-        `Store creation failed due to plugin ${plugin.name}`,
-        {
-          error: e,
-          pluginName: plugin.name,
-        }
-      );
-    }
-  }
+  pluginManager.onStoreCreate(storeInstance);
 
   // Initial state persistence if key provided and no saved state (or saved state was stale and removed)
   if (getPersistenceKey() && !savedState) {
