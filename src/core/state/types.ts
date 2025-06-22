@@ -120,6 +120,8 @@ export interface historyChangePluginOptions<S extends object> {
   store: Store<S>;
   oldState: S;
   newState: S;
+  persistFn?: (state: S) => void; // Optional function to persist state after history change
+  notifyFn?: (prevState: S, actionApplied?: ActionPayload<S> | null) => void; // Optional function to notify about history change
 }
 
 export interface Plugin<S extends object> {
@@ -301,7 +303,7 @@ export interface Plugin<S extends object> {
 /**
  * Metadata stored with persisted state
  */
-interface StateMetadata {
+export interface StateMetadata {
   lastUpdated: number;
   sessionId: string | null;
   storeName?: string;
@@ -630,6 +632,30 @@ export interface ReadOnlyStore<S extends object> {
    * @see {@link StoreOptions.syncAcrossTabs} for cross-tab synchronization
    */
   getSessionId: () => string | null;
+
+  /**
+   * Gets the current history of state changes.
+   *
+   * @remarks
+   * Returns an object containing the history of states, the current index in the history,
+   * and the initial state. The history is an array of states, allowing for undo/redo operations.
+   * The initial state is the state provided when the store was created.
+   *
+   * @returns An object with `history`, `currentIndex`, and `initialState`
+   *
+   * @example
+   * ```typescript
+   * const history = store.getHistory();
+   * console.log(history.history); // Array of past states
+   * console.log(history.currentIndex); // Current position in history
+   * console.log(history.initialState); // Initial state of the store
+   * ```
+   */
+  getHistory: () => {
+    history: readonly S[];
+    currentIndex: number;
+    initialState: Readonly<S> | null;
+  };
 }
 
 /**
@@ -922,14 +948,16 @@ export interface Store<S extends object> extends ReadOnlyStore<S> {
    * to create a draft state that can be safely mutated. The transaction function should
    * mutate the draft directly rather than returning values.
    *
-   * Benefits of using transactions:
-   * - Provides a clear and concise way to perform multiple related state updates atomically
+   * Key benefits over the previous transaction implementation:
    * - Uses Immer for safe mutations and automatic structural sharing
    * - Eliminates complex deep cloning and mutation detection logic
    * - Provides better TypeScript support for nested updates
    * - Automatically handles immutability without manual object spreading
+   * - Supports readonly properties through Immer's Draft type
    *
    * @param recipe - The transaction function that receives a mutable draft of the current state.
+   *                The draft parameter is typed as {@link Draft<S>} which allows mutation
+   *                of readonly properties and provides better TypeScript safety.
    *                Should mutate the draft directly and return `void`.
    * @returns `true` if the transaction succeeded and state was updated, `false` if it failed.
    *
@@ -948,14 +976,27 @@ export interface Store<S extends object> extends ReadOnlyStore<S> {
    *   draft.tagSet.add("typescript");
    *   draft.tagSet.delete("javascript");
    * });
+   *
+   * // Working with readonly properties (now supported)
+   * interface ReadonlyState {
+   *   readonly config: {
+   *     readonly apiUrl: string;
+   *     readonly timeout: number;
+   *   };
+   * }
+   * const success = store.transaction((draft) => {
+   *   // These mutations work even though the properties are readonly
+   *   draft.config.apiUrl = "https://new-api.example.com";
+   *   draft.config.timeout = 5000;
+   * });
    * ```
    *
    * @see {@link https://immerjs.github.io/immer/produce | Immer produce documentation}
    * @see {@link https://immerjs.github.io/immer/update-patterns | Immer update patterns}
+   * @see {@link https://immerjs.github.io/immer/typescript | Immer TypeScript documentation}
    * @see {@link batch} for batching multiple state updates
-   * @see {@link dispatch} for general state updates
-   * @see {@link updatePath} for nested property updates
    */
+
   transaction: (recipe: (draft: Draft<S>) => void) => boolean;
 
   /**

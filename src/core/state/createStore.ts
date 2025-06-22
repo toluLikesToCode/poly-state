@@ -13,20 +13,7 @@ import {
   type Selector,
   SelectorManager,
 } from "../selectors";
-import {
-  getClientSessionId,
-  getCookie,
-  getLocalStorage,
-  getSessionStorage,
-  isLocalStorageAvailable,
-  isSessionStorageAvailable,
-  removeCookie,
-  removeLocalStorage,
-  removeSessionStorage,
-  setCookie,
-  setLocalStorage,
-  setSessionStorage,
-} from "../storage/index";
+import { getClientSessionId } from "../storage/index";
 import { deepEqual, getPath, isDevMode } from "../utils/index";
 import type {
   ActionPayload,
@@ -44,6 +31,8 @@ import { cleanupStaleStates } from "./utils";
 import { TypeRegistry } from "./typeRegistry";
 import { storeRegistry } from "./storeRegistry";
 import { PluginManager } from "../../plugins/pluginManager";
+import { PersistenceManager } from "./persistenceManager";
+import { HistoryManager } from "./HistoryManager";
 immer.enableMapSet();
 
 /**
@@ -55,9 +44,6 @@ export function createStore<S extends object>(
 ): Store<S> {
   let state = { ...initialState };
   let listeners: Listener<S>[] = [];
-  let history: S[] = [];
-  let historyIndex = -1;
-  let isHistoryMutation = false;
   let isDestroyed = false;
   let batching = false;
   let batchedActions: ActionPayload<S>[] = [];
@@ -72,7 +58,7 @@ export function createStore<S extends object>(
     cookieOptions = {},
     cookiePrefix = "__store_",
     name,
-    staleAge = 30 * 24 * 60 * 60 * 1000,
+    staleAge = 30 * 24 * 60 * 60 * 1000, // 30 days
     cleanupStaleStatesOnLoad: shouldCleanupStaleStates = true,
     cleanupOptions: defaultCleanupOptions = {
       removePersistedState: false,
@@ -88,6 +74,7 @@ export function createStore<S extends object>(
   } = options;
 
   const sessionId = getClientSessionId();
+
   const storeInstance: Store<S> = {} as Store<S>;
 
   const selectorManager = new SelectorManager(storeInstance);
@@ -112,172 +99,45 @@ export function createStore<S extends object>(
     }
   };
 
+  // Initialize persistence manager for handling state persistence
+  const persistenceManager = new PersistenceManager<S>(
+    storageType,
+    typeRegistry,
+    handleError,
+    sessionId,
+    cookieOptions,
+    cookiePrefix,
+    name
+  );
+
   // Initialize plugin manager for consistent plugin lifecycle handling
-  const pluginManager = new PluginManager(plugins, handleError, name);
+  const pluginManager = new PluginManager<S>(plugins, handleError, name);
 
-  const isStorageAvailable = (): boolean => {
-    switch (storageType) {
-      case StorageType.Local:
-        return isLocalStorageAvailable();
-      case StorageType.Session:
-        return isSessionStorageAvailable();
-      case StorageType.Cookie:
-        return typeof document !== "undefined";
-      default:
-        return true;
-    }
-  };
-
-  const getPersistenceKey = () => {
-    if (!persistKey) return null;
-    return storageType === StorageType.Cookie
-      ? `${cookiePrefix}${persistKey}`
-      : persistKey;
-  };
-
-  const persistState = (dataToPersist: S): void => {
-    const currentPersistKey = getPersistenceKey();
-    if (!currentPersistKey || !isStorageAvailable() || isDestroyed) return;
-
-    try {
-      // Call plugin beforePersist hooks
-      let stateToStore = dataToPersist;
-      const transformedState = pluginManager.beforePersist(
-        dataToPersist,
-        storageType,
-        storeInstance
-      );
-      if (transformedState) {
-        stateToStore = transformedState;
-      }
-
-      // Use type registry to properly serialize complex types
-      const serializedData = typeRegistry.serialize(stateToStore);
-
-      const persistedState: PersistedState<any> = {
-        data: serializedData,
-        meta: { lastUpdated: Date.now(), sessionId, storeName: name },
-      };
-
-      switch (storageType) {
-        case StorageType.Local:
-          setLocalStorage(currentPersistKey, persistedState);
-          break;
-        case StorageType.Session:
-          setSessionStorage(currentPersistKey, persistedState);
-          break;
-        case StorageType.Cookie:
-          setCookie(
-            currentPersistKey,
-            JSON.stringify(persistedState),
-            cookieOptions
-          );
-          break;
-      }
-
-      // Call plugin onPersisted hooks
-      pluginManager.onPersisted(stateToStore, storageType, storeInstance);
-    } catch (e: any) {
-      handleError(
-        new PersistenceError("Failed to persist state", {
-          operation: "persistState",
-          error: e,
-          key: currentPersistKey,
-        })
+  function persistState(dataToPersist: S): void {
+    const success = persistenceManager.persistState(
+      persistKey,
+      dataToPersist,
+      pluginManager,
+      storeInstance
+    );
+    if (!success && isDevMode()) {
+      console.warn(
+        `[Store: ${
+          name || "Unnamed"
+        }] Failed to persist state. Check storage availability or configuration.`
       );
     }
-  };
+  }
 
-  const loadState = (): Partial<S> | null => {
-    const currentPersistKey = getPersistenceKey();
-    if (!currentPersistKey || !isStorageAvailable() || isDestroyed) return null;
-
-    try {
-      let wrappedState: PersistedState<any> | null = null;
-      switch (storageType) {
-        case StorageType.Local:
-          wrappedState = getLocalStorage<PersistedState<any>>(
-            currentPersistKey,
-            {} as PersistedState<any>
-          );
-          break;
-        case StorageType.Session:
-          wrappedState = getSessionStorage<PersistedState<any>>(
-            currentPersistKey,
-            {} as PersistedState<any>
-          );
-          break;
-        case StorageType.Cookie:
-          const cookieValue = getCookie(currentPersistKey);
-          if (cookieValue) wrappedState = JSON.parse(cookieValue);
-          break;
-      }
-
-      if (wrappedState && wrappedState.meta && staleAge) {
-        if (Date.now() - wrappedState.meta.lastUpdated > staleAge) {
-          console.warn(`Discarding stale state for ${currentPersistKey}`);
-          removeState();
-          return null;
-        }
-      }
-
-      if (wrappedState && wrappedState.data) {
-        // Deserialize using type registry to restore complex objects
-        let deserializedData = typeRegistry.deserialize(
-          wrappedState.data
-        ) as Partial<S>;
-
-        // Call plugin onStateLoaded hooks
-        const transformedState = pluginManager.onStateLoaded(
-          deserializedData,
-          storageType,
-          storeInstance
-        );
-        if (transformedState) {
-          deserializedData = transformedState;
-        }
-
-        return deserializedData;
-      }
-
-      return null;
-    } catch (e: any) {
-      handleError(
-        new PersistenceError("Failed to load persisted state", {
-          operation: "loadState",
-          error: e,
-          key: currentPersistKey,
-        })
-      );
-      return null;
-    }
-  };
-
-  const removeState = (): void => {
-    const currentPersistKey = getPersistenceKey();
-    if (!currentPersistKey || !isStorageAvailable()) return;
-    try {
-      switch (storageType) {
-        case StorageType.Local:
-          removeLocalStorage(currentPersistKey);
-          break;
-        case StorageType.Session:
-          removeSessionStorage(currentPersistKey);
-          break;
-        case StorageType.Cookie:
-          removeCookie(currentPersistKey);
-          break;
-      }
-    } catch (e: any) {
-      handleError(
-        new PersistenceError("Failed to remove persisted state", {
-          operation: "removeState",
-          error: e,
-          key: currentPersistKey,
-        })
-      );
-    }
-  };
+  function loadState(): Partial<S> | null {
+    const state = persistenceManager.loadState(
+      persistKey,
+      staleAge,
+      pluginManager,
+      storeInstance
+    );
+    return state;
+  }
 
   /* Freeze helper – prevents accidental mutation in dev
      while keeping reference‑equality for memoisation. */
@@ -331,26 +191,7 @@ export function createStore<S extends object>(
   };
 
   // --- History Management ---
-  const addToHistory = (newState: S): void => {
-    if (historyLimit > 0 && !isHistoryMutation) {
-      // If we're not at the end of history (after undo), clear future states
-      if (historyIndex >= 0 && historyIndex < history.length - 1) {
-        history = history.slice(0, historyIndex + 1);
-      }
-
-      // Add the new state to history
-      history.push({ ...newState });
-
-      // Trim history if it exceeds the limit
-      if (history.length > historyLimit) {
-        const excessCount = history.length - historyLimit;
-        history = history.slice(excessCount);
-      }
-
-      // Point to the newly added state
-      historyIndex = history.length - 1;
-    }
-  };
+  let historyManager = new HistoryManager<S>(historyLimit, pluginManager);
 
   const _applyStateChange = (
     payload: ActionPayload<S>,
@@ -387,11 +228,11 @@ export function createStore<S extends object>(
     }
 
     // --- Notifications and History ---
-    if (!fromSync && getPersistenceKey() && storageType !== StorageType.None) {
+    if (!fromSync && persistKey && storageType !== StorageType.None) {
       persistState(state);
     }
 
-    addToHistory(state); // Add new state to history for undo/redo
+    historyManager.addToHistory(state); // Add new state to history for undo/redo
     notifyListeners(prevState, newPartialState); // Notify with the state *before* this change as prevState
   };
 
@@ -655,109 +496,45 @@ export function createStore<S extends object>(
     persistState(state);
 
     // Clear history when resetting the store
-    history = [];
-    historyIndex = -1;
+    historyManager.clear();
 
     // Add the initial state to history after reset
-    addToHistory(state);
+    historyManager.addToHistory(state);
 
     notifyListeners(prevState, null); // Notify with state before reset as prevState
   };
 
-  const runHistoryPlugin = {
-    beforeChange: (options: historyChangePluginOptions<S>): boolean | void => {
-      // Call plugin beforeHistoryChange hooks
-      const result = pluginManager.beforeHistoryChange(options);
-      if (result === false) return false;
-      return true; // Default to allowing the change
-    },
-    afterChange: (options: historyChangePluginOptions<S>): void => {
-      pluginManager.onHistoryChanged(options);
-    },
-  };
-
   storeInstance.undo = (steps = 1) => {
-    if (
-      isDestroyed ||
-      historyLimit === 0 ||
-      history.length === 0 ||
-      historyIndex - steps < 0
-    )
-      return false;
-
-    // Check if any plugin wants to prevent this undo operation
-    const canUndo = runHistoryPlugin.beforeChange({
+    const result = historyManager.undo({
       operation: "undo",
       steps,
+      store: storeInstance,
       oldState: state,
-      newState: history[historyIndex - steps],
-      store: storeInstance,
+      newState: historyManager.getUndoState(steps) || state,
+      persistFn: persistState,
+      notifyFn: prevState => notifyListeners(prevState, null),
     });
-    if (canUndo === false) return false;
-
-    isHistoryMutation = true;
-    const prevStateForNotification = { ...state }; // Capture state before it changes
-
-    // Move back in history
-    historyIndex = historyIndex - steps;
-
-    // Restore the state from history
-    state = { ...history[historyIndex] };
-
-    persistState(state);
-    notifyListeners(prevStateForNotification, null); // Notify with the state *before* undo as prevState
-    isHistoryMutation = false;
-    // Call plugin afterHistoryChange hooks
-    runHistoryPlugin.afterChange({
-      operation: "undo",
-      steps,
-      oldState: prevStateForNotification,
-      newState: state,
-      store: storeInstance,
-    });
+    if (result === false) return false;
+    state = result; // Update the store's state
     return true;
   };
 
   storeInstance.redo = (steps = 1) => {
-    if (
-      isDestroyed ||
-      historyLimit === 0 ||
-      history.length === 0 ||
-      historyIndex + steps >= history.length
-    )
-      return false;
-    // Check if any plugin wants to prevent this redo operation
-    const canRedo = runHistoryPlugin.beforeChange({
+    const result = historyManager.redo({
       operation: "redo",
       steps,
       oldState: state,
-      newState: history[historyIndex + steps],
+      newState: historyManager.getRedoState(steps) || state,
       store: storeInstance,
+      persistFn: persistState,
+      notifyFn: prevState => notifyListeners(prevState, null),
     });
-    if (canRedo === false) return false;
 
-    isHistoryMutation = true;
-    const prevStateForNotification = { ...state }; // Capture state before it changes
-
-    // Move forward in history
-    historyIndex = historyIndex + steps;
-
-    // Restore the state from history
-    state = { ...history[historyIndex] };
-
-    persistState(state);
-    notifyListeners(prevStateForNotification, null); // Notify with the state *before* redo as prevState
-    isHistoryMutation = false;
-
-    // Call plugin afterHistoryChange hooks
-    runHistoryPlugin.afterChange({
-      operation: "redo",
-      steps,
-      oldState: prevStateForNotification,
-      newState: state,
-      store: storeInstance,
-    });
-    return true;
+    if (result !== false) {
+      state = result; // Update the store's state
+      return true;
+    }
+    return false;
   };
 
   storeInstance.updatePath = <V = any>(
@@ -814,6 +591,19 @@ export function createStore<S extends object>(
         }
       }
     }
+  };
+
+  storeInstance.getHistory = (): {
+    history: readonly S[];
+    currentIndex: number;
+    initialState: Readonly<S> | null;
+  } => {
+    if (historyLimit) return historyManager.getHistory();
+    return {
+      history: [],
+      currentIndex: -1,
+      initialState: null,
+    };
   };
 
   /**
@@ -931,62 +721,6 @@ export function createStore<S extends object>(
     }
   };
 
-  /**
-   * Executes a transaction function that can safely mutate a draft copy of the state.
-   *
-   * @remarks
-   * This method uses Immer's {@link https://immerjs.github.io/immer/produce | produce} function
-   * to create a draft state that can be safely mutated. The transaction function should
-   * mutate the draft directly rather than returning values.
-   *
-   * Key benefits over the previous transaction implementation:
-   * - Uses Immer for safe mutations and automatic structural sharing
-   * - Eliminates complex deep cloning and mutation detection logic
-   * - Provides better TypeScript support for nested updates
-   * - Automatically handles immutability without manual object spreading
-   * - Supports readonly properties through Immer's Draft type
-   *
-   * @param recipe - The transaction function that receives a mutable draft of the current state.
-   *                The draft parameter is typed as {@link Draft<S>} which allows mutation
-   *                of readonly properties and provides better TypeScript safety.
-   *                Should mutate the draft directly and return `void`.
-   * @returns `true` if the transaction succeeded and state was updated, `false` if it failed.
-   *
-   * @example
-   * ```typescript
-   * // Mutating the draft directly (recommended approach)
-   * const success = store.transaction((draft) => {
-   *   draft.user.name = "John Doe";
-   *   draft.todos.push({ id: 1, text: "Learn Immer", done: false });
-   *   draft.settings.theme = "dark";
-   * });
-   *
-   * // Working with Maps and Sets
-   * const success = store.transaction((draft) => {
-   *   draft.userMap.set("123", { name: "John", age: 30 });
-   *   draft.tagSet.add("typescript");
-   *   draft.tagSet.delete("javascript");
-   * });
-   *
-   * // Working with readonly properties (now supported)
-   * interface ReadonlyState {
-   *   readonly config: {
-   *     readonly apiUrl: string;
-   *     readonly timeout: number;
-   *   };
-   * }
-   * const success = store.transaction((draft) => {
-   *   // These mutations work even though the properties are readonly
-   *   draft.config.apiUrl = "https://new-api.example.com";
-   *   draft.config.timeout = 5000;
-   * });
-   * ```
-   *
-   * @see {@link https://immerjs.github.io/immer/produce | Immer produce documentation}
-   * @see {@link https://immerjs.github.io/immer/update-patterns | Immer update patterns}
-   * @see {@link https://immerjs.github.io/immer/typescript | Immer TypeScript documentation}
-   * @see {@link batch} for batching multiple state updates
-   */
   storeInstance.transaction = (recipe: (draft: Draft<S>) => void): boolean => {
     if (isDestroyed) {
       return false;
@@ -1063,13 +797,9 @@ export function createStore<S extends object>(
     pluginManager.onDestroy(storeInstance);
 
     listeners = [];
-    if (cleanupOpts.clearHistory) {
-      history = [];
-      historyIndex = -1;
-    }
-    if (cleanupOpts.removePersistedState) {
-      removeState();
-    }
+    if (cleanupOpts.clearHistory) historyManager.clear();
+    if (cleanupOpts.removePersistedState)
+      persistenceManager.removeState(persistKey);
 
     // Unregister from global registry
     if (sessionId && storeRegistry.has(sessionId)) {
@@ -1099,6 +829,7 @@ export function createStore<S extends object>(
       select: storeInstance.select,
       getName: storeInstance.getName,
       getSessionId: storeInstance.getSessionId,
+      getHistory: storeInstance.getHistory,
     };
   };
 
@@ -1174,13 +905,13 @@ export function createStore<S extends object>(
     state = { ...sanitizedState };
 
     // Persist the new state if needed
-    if (getPersistenceKey() && storageType !== StorageType.None) {
+    if (persistKey && storageType !== StorageType.None) {
       persistState(state);
     }
 
     // Skip history tracking for time travel operations
     if (!isTimeTravel && historyLimit > 0) {
-      addToHistory(state);
+      historyManager.addToHistory(state);
     }
 
     // Notify listeners but indicate this is a DevTools operation
@@ -1211,20 +942,15 @@ export function createStore<S extends object>(
     state = { ...state, ...savedState };
   }
 
-  // Initialize history with the current state if historyLimit is set
+  // Initialize history with the current state
   if (historyLimit > 0) {
-    addToHistory(state);
+    historyManager.addToHistory(state);
   }
 
   // Cross-tab sync
-  if (
-    syncAcrossTabs &&
-    storageType === StorageType.Local &&
-    getPersistenceKey()
-  ) {
-    const currentPersistKey = getPersistenceKey()!;
+  if (syncAcrossTabs && storageType === StorageType.Local && persistKey) {
     const storageEventHandler = (event: StorageEvent) => {
-      if (event.key === currentPersistKey && event.newValue && !isDestroyed) {
+      if (event.key === persistKey && event.newValue && !isDestroyed) {
         try {
           const persisted = JSON.parse(event.newValue) as PersistedState<S>;
           // Ensure this update isn't from the current session to avoid loops
@@ -1255,7 +981,7 @@ export function createStore<S extends object>(
           handleError(
             new SyncError("Failed to sync state from another tab", {
               error: e,
-              key: currentPersistKey,
+              key: persistKey,
             })
           );
         }
@@ -1282,7 +1008,7 @@ export function createStore<S extends object>(
   pluginManager.onStoreCreate(storeInstance);
 
   // Initial state persistence if key provided and no saved state (or saved state was stale and removed)
-  if (getPersistenceKey() && !savedState) {
+  if (persistKey && !savedState) {
     persistState(state);
   }
 

@@ -10,7 +10,12 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { createStore, type Store, type Plugin } from "../../src/core";
+import {
+  createStore,
+  type Store,
+  type Plugin,
+  historyChangePluginOptions,
+} from "../../src/core";
 
 interface BasicTestState {
   count: number;
@@ -116,6 +121,143 @@ describe("Store Core Functionality", () => {
       expect(state1).not.toBe(state2);
       expect(state1.count).toBe(0); // Original state unchanged
       expect(state2.count).toBe(1);
+    });
+
+    it.skip("should undo and redo state changes", () => {
+      store = createStore<BasicTestState>(
+        { count: 0, name: "test" },
+        { historyLimit: 50 }
+      );
+      const currentCount = store.select(state => state.count);
+      const currentName = store.select(state => state.name);
+
+      store.dispatch({ count: 5287425, name: "not-test" });
+      expect(currentCount()).toBe(5287425);
+      expect(currentName()).toBe("not-test");
+
+      const result1 = store.undo();
+      expect(result1).toBe(true);
+      expect(currentCount()).toBe(0);
+      expect(currentName()).toBe("test");
+
+      const result2 = store.redo();
+      expect(result2).toBe(true);
+      expect(currentCount()).toBe(5287425);
+      expect(currentName()).toBe("not-test");
+
+      // Ensure history limit is respected
+      for (let i = 0; i < 10; i++) {
+        store.dispatch({ count: i });
+      }
+
+      expect(currentCount()).toBe(9); // Last state
+      const result3 = store.undo(6); // Undo 6 steps
+      // should return false since 6 is outside of history limit
+      //expect(result3).toBe();
+      //expect(currentCount()).toBe(9); // Should still be 9
+      expect(currentName()).toBe("not-test"); // Should still be "not-test"
+
+      const result4 = store.undo(5); // Undo 5 steps
+      let history = store.getHistory();
+      console.table(
+        history.history.map(entry => {
+          return { Count: entry.count };
+        })
+      );
+      console.log(`Current history index: ${history.currentIndex}`);
+      expect(result4).toBe(true);
+
+      expect(history.history.length).toBe(6); // Should have 6 entries in history
+      expect(history.history[4].count).toBe(9);
+      expect(currentCount()).toBe(4); // 9 -> 8 -> 7 -> 6 -> 5 -> 4
+      expect(currentName()).toBe("not-test"); // Should still be "not-test"
+    });
+
+    it.skip("should handle undo and redo with plugins", () => {
+      const initialState: BasicTestState = { count: 0, name: "init" };
+      const initialSettings = { historyLimit: 5 };
+      const pluginState1: BasicTestState = { count: 10 };
+      let plugin: Plugin<BasicTestState> = {
+        name: "TestPlugin",
+        onStoreCreate(store) {
+          store.dispatch({ ...pluginState1, name: plugin.name });
+        },
+        beforeHistoryChange(
+          options: historyChangePluginOptions<BasicTestState>
+        ) {
+          if (options.operation === "undo") {
+            return false; // Prevent undo
+          }
+          if (options.operation === "redo") {
+            return true; // Allow redo
+          }
+        },
+      };
+      store = createStore(initialState, {
+        ...initialSettings,
+        plugins: [plugin],
+      });
+
+      expect(store.getState()).toEqual({ ...pluginState1, name: plugin.name });
+
+      const result1 = store.undo();
+      expect(result1).toBe(false); // Undo should be prevented by plugin
+      // The state should remain unchanged
+      expect(store.getState()).toEqual({ ...pluginState1, name: plugin.name });
+
+      const result2 = store.redo();
+      // Redo should not change state since there is no previous state to redo
+      expect(result2).toBe(false); // there is no state to redo
+      expect(store.getState()).toEqual({ ...pluginState1, name: plugin.name });
+
+      plugin = {
+        ...plugin,
+        name: "TestPlugin2",
+        beforeHistoryChange: options => {
+          if (options.operation === "undo") {
+            return true; // Allow undo
+          }
+        },
+      };
+      store.destroy(); // Cleanup previous store
+      store = createStore(initialState, {
+        ...initialSettings,
+        plugins: [plugin],
+      });
+
+      // Now undo should be allowed
+      expect(store.getState()).toEqual({ ...pluginState1, name: plugin.name });
+      const result3 = store.undo();
+      // Undo should now succeed
+      expect(result3).toBe(true);
+      // The state should revert to initial state
+      expect(store.getState()).toEqual(initialState);
+
+      let history = store.getHistory();
+      // History should contain the initial state and the plugin state
+      expect(history.history.length).toBe(2);
+      // The first entry is the initial state, the second is the plugin state
+      expect(history.history[0]).toEqual(initialState);
+      expect(history.history[1]).toEqual({
+        ...pluginState1,
+        name: plugin.name,
+      });
+
+      // Now lets dispatch some more actions
+      for (let i = 0; i < 10; i++) {
+        store.dispatch({ count: i });
+      }
+      // The state should now be the last dispatched state
+      expect(store.getState().count).toBe(9);
+
+      // history should now contain the initial state, plugin state and the last dispatched state
+      history = store.getHistory();
+      expect(history.history.length).toBe(6);
+      expect(history.history[0]).toEqual(initialState);
+      // The second entry shoyld be the last count state within the history limit
+      // The name should be the initial state name from the last undo
+      expect(history.history[1]).toEqual({ count: 5, name: initialState.name });
+      expect(history.history[5]).toEqual(store.getState());
     });
   });
 

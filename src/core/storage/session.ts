@@ -1,14 +1,4 @@
 import { StorageError } from "../../shared/errors";
-/**
- * Generates a new session ID using crypto.randomUUID() with fallback
- */
-function generateSessionId(): string {
-  if (crypto.randomUUID) {
-    return crypto.randomUUID();
-  }
-  // Fallback for older browsers
-  return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-}
 
 /**
  * Safe error handler for storage operations
@@ -24,6 +14,17 @@ function handleStorageError(
     key,
     error: errorMessage,
   });
+}
+
+/**
+ * Generates a new session ID using crypto.randomUUID() with fallback
+ */
+export function generateSessionId(): string {
+  if (crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  // Fallback for older browsers
+  return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 }
 
 /**
