@@ -128,7 +128,7 @@ describe("Non-Negotiable Selector Tests", () => {
 
   describe("Never return stale data", () => {
     it("should not return stale data", () => {
-      const { select, dispatch } = store;
+      const { select, dispatch, updatePath } = store;
 
       const trackingSpy = vi.fn();
       const updatedSpy = vi.fn();
@@ -156,7 +156,7 @@ describe("Non-Negotiable Selector Tests", () => {
       dispatch({ tracking: { updated: 2 } });
 
       // Should return the new value and trigger recomputation
-      const updatedValue = selectUpdated();
+      let updatedValue = selectUpdated();
       expect(updatedValue).toBe(2);
       expect(trackingSpy).toHaveBeenCalledTimes(1); // Should recompute base selector
       expect(updatedSpy).toHaveBeenCalledTimes(1); // Should recompute derived selector
@@ -172,6 +172,40 @@ describe("Non-Negotiable Selector Tests", () => {
       expect(lastUpdatedValue).toBe(2);
       expect(trackingSpy).toHaveBeenCalledTimes(1); // global state change will trigger base selector
       expect(updatedSpy).toHaveBeenCalledTimes(0); // Should not recompute derived selector
+
+      updatePath<number>(["data", 2], value => value + 10);
+      expect(store.getState().data[2]).toBe(18);
+      const selectData = select(state => state.data);
+      expect(selectData()).toEqual([6, 7, 18, 9, 10]);
+
+      // Should not recompute, still return the last value
+      expect(trackingSpy).toHaveBeenCalledTimes(1);
+      expect(updatedSpy).toHaveBeenCalledTimes(0); // Should not recompute derived selector
+
+      // add new value field to tracking
+      updatePath<Set<string>>(["tracking", "newField"], newField => {
+        return new Set(["newValue1", "newValue2", "newValue3"]);
+      });
+
+      expect(store.getState().tracking).toEqual({
+        updated: 2,
+        newField: new Set(["newValue1", "newValue2", "newValue3"]),
+      });
+
+      updatedValue = selectUpdated();
+
+      expect(updatedValue).toBe(2);
+      //expect(trackingSpy).toHaveBeenCalledTimes(1); // global state change will trigger base selector
+      //expect(updatedSpy).toHaveBeenCalledTimes(0); // Should not recompute derived selector
+
+      updatePath<Set<string>>(["tracking", "newField"], newField => {
+        newField.delete("newValue2");
+        return newField;
+      });
+      expect(store.getState().tracking).toEqual({
+        updated: 2,
+        newField: new Set(["newValue1", "newValue3"]),
+      });
     });
   });
 });

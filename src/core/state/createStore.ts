@@ -18,7 +18,6 @@ import { deepEqual, getPath, isDevMode } from "../utils/index";
 import type {
   ActionPayload,
   CleanupOptions,
-  historyChangePluginOptions,
   Listener,
   PersistedState,
   ReadOnlyStore,
@@ -127,16 +126,6 @@ export function createStore<S extends object>(
         }] Failed to persist state. Check storage availability or configuration.`
       );
     }
-  }
-
-  function loadState(): Partial<S> | null {
-    const state = persistenceManager.loadState(
-      persistKey,
-      staleAge,
-      pluginManager,
-      storeInstance
-    );
-    return state;
   }
 
   /* Freeze helper – prevents accidental mutation in dev
@@ -282,7 +271,8 @@ export function createStore<S extends object>(
               currentPayload,
               prevStateForMiddleware, // Pass the initially captured prevState
               nextMiddleware,
-              storeInstance.getState
+              storeInstance.getState,
+              storeInstance.reset
             );
             // If the middleware returns a promise, await it
             if (result && typeof result.then === "function") {
@@ -937,9 +927,15 @@ export function createStore<S extends object>(
     cleanupStaleStates(staleAge, cookiePrefix);
   }
 
-  const savedState = loadState();
+  const savedState = persistenceManager.loadState(
+    persistKey,
+    staleAge,
+    pluginManager,
+    storeInstance
+  );
   if (savedState) {
-    state = { ...state, ...savedState };
+    //state = { ...state, ...savedState };
+    _internalDispatch(savedState as ActionPayload<S>, false);
   }
 
   // Initialize history with the current state
