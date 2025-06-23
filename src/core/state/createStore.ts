@@ -1,8 +1,8 @@
 import * as immer from "immer";
 import { Draft } from "immer";
+import { PluginManager } from "../../plugins/pluginManager";
 import {
   MiddlewareError,
-  PersistenceError,
   StoreError,
   SyncError,
   TransactionError,
@@ -15,6 +15,10 @@ import {
 } from "../selectors";
 import { getClientSessionId } from "../storage/index";
 import { deepEqual, getPath, isDevMode } from "../utils/index";
+import { HistoryManager } from "./HistoryManager";
+import { PersistenceManager } from "./persistenceManager";
+import { storeRegistry } from "./storeRegistry";
+import { TypeRegistry } from "./typeRegistry";
 import type {
   ActionPayload,
   CleanupOptions,
@@ -27,12 +31,10 @@ import type {
 } from "./types";
 import { StorageType } from "./types";
 import { cleanupStaleStates } from "./utils";
-import { TypeRegistry } from "./typeRegistry";
-import { storeRegistry } from "./storeRegistry";
-import { PluginManager } from "../../plugins/pluginManager";
-import { PersistenceManager } from "./persistenceManager";
-import { HistoryManager } from "./HistoryManager";
+
+// Enable Immer features for better performance and functionality
 immer.enableMapSet();
+immer.enablePatches();
 
 /**
  * Creates a new store

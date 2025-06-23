@@ -52,6 +52,9 @@
       "optional": true
     }
   },
+  "optionalDependencies": {
+    "react": ">=16.8.0"
+  },
   "devDependencies": {
     "@rollup/plugin-node-resolve": "^15.0.0",
     "@rollup/plugin-typescript": "^11.0.0",

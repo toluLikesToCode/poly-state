@@ -1,9 +1,5 @@
 /**
- * Universal Store - C// Re-export plugins when you add them
-export * from './plugins';
-
-// Note: Removed default export to avoid mixing named and default exports
-// Use: import { createStore } from '@tolulikescode/universal-store'odule
+ * Universal Store - Core Module
  *
  * @remarks
  * This is the main entry point for the universal store package.
@@ -24,10 +20,7 @@ export * from './plugins';
 // Re-export everything from core
 export * from "./core";
 
-// Re-export plugins Note: Add plugin later
+// Re-export plugins
 export * from "./plugins";
 
 export * from "./shared";
-
-// Default export for convenience
-export { createStore as default } from "./core/state/createStore";

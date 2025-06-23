@@ -12,7 +12,7 @@
       "jsx": true
     }
   },
-  "plugins": ["@typescript-eslint"],
+  "plugins": ["@typescript-eslint", "react-hooks"],
   "rules": {
     "@typescript-eslint/no-unused-vars": [
       "error",
