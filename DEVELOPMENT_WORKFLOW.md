@@ -1,6 +1,7 @@
 # Development Workflow Guide
 
-This guide outlines the recommended workflows for using the Universal Store package in external projects during development and testing phases, without publishing to npm.
+This guide outlines the recommended workflows for using the Universal Store package in external
+projects during development and testing phases, without publishing to npm.
 
 ## Table of Contents
 
@@ -15,8 +16,8 @@ This guide outlines the recommended workflows for using the Universal Store pack
 
 The Universal Store package supports two main usage patterns:
 
-- **Vanilla TypeScript**: Import from `@tolulikescode/universal-store`
-- **React Integration**: Import from `@tolulikescode/universal-store/react`
+- **Vanilla TypeScript**: Import from `open-store`
+- **React Integration**: Import from `open-store/react`
 
 During development, you have two primary options for testing your package in external projects:
 
@@ -55,7 +56,7 @@ npm link
 **What this does:**
 
 - Creates a symlink in your global npm directory pointing to your package
-- Makes `@tolulikescode/universal-store` available globally for linking
+- Makes `open-store` available globally for linking
 
 #### 2. Link in External Projects
 
@@ -64,12 +65,12 @@ npm link
 cd /path/to/your/external/project
 
 # Link the package
-npm link @tolulikescode/universal-store
+npm link open-store
 ```
 
 **What this does:**
 
-- Creates a symlink in `node_modules/@tolulikescode/universal-store` pointing to your package
+- Creates a symlink in `node_modules/open-store` pointing to your package
 - The external project now uses your local development version
 
 ### Development Iteration Cycle
@@ -113,7 +114,7 @@ npm start  # or npm run dev, yarn dev, etc.
 
 ```typescript
 // In your external project
-import { createStore, StoreConfig } from "@tolulikescode/universal-store";
+import { createStore, StoreConfig } from "open-store";
 
 interface AppState {
   count: number;
@@ -146,7 +147,7 @@ store.setState({ count: store.getState().count + 1 });
 ```tsx
 // App.tsx - Root component
 import React from "react";
-import { StoreProvider } from "@tolulikescode/universal-store/react";
+import { StoreProvider } from "open-store/react";
 import { store } from "./store";
 import Counter from "./Counter";
 
@@ -167,7 +168,7 @@ export default App;
 ```tsx
 // Counter.tsx - Component using the store
 import React from "react";
-import { useStore } from "@tolulikescode/universal-store/react";
+import { useStore } from "open-store/react";
 
 interface AppState {
   count: number;
@@ -202,13 +203,13 @@ When you're finished with development:
 
 ```bash
 # In your external project
-npm unlink @tolulikescode/universal-store
+npm unlink open-store
 
 # Reinstall regular dependencies
 npm install
 
 # Optional: Remove global link
-npm unlink -g @tolulikescode/universal-store
+npm unlink -g open-store
 ```
 
 ---
@@ -288,7 +289,7 @@ npm pack
 cd /path/to/your/external/project
 
 # Remove old version
-npm uninstall @tolulikescode/universal-store
+npm uninstall open-store
 
 # Install new version
 npm install /Users/toluladegbehingbe/projects/myStore/tolulikescode-universal-store-1.0.1.tgz
@@ -366,7 +367,7 @@ package/
 
 ```bash
 # Check if link exists
-ls -la node_modules/@tolulikescode/universal-store
+ls -la node_modules/open-store
 # Should show: ... -> /Users/toluadegbehingbe/projects/myStore
 
 # Restart TypeScript server (VS Code)
@@ -381,8 +382,8 @@ npm run dev  # Should be watching for changes
 
 ```bash
 # Re-link the package
-npm unlink @tolulikescode/universal-store
-npm link @tolulikescode/universal-store
+npm unlink open-store
+npm link open-store
 
 # Check global links
 npm ls -g --depth=0 | grep universal-store
@@ -469,10 +470,10 @@ npx tsc --noEmit
 
    ```typescript
    // Test vanilla
-   import { createStore } from "@tolulikescode/universal-store";
+   import { createStore } from "open-store";
 
    // Test React
-   import { useStore } from "@tolulikescode/universal-store/react";
+   import { useStore } from "open-store/react";
    ```
 
 4. **Keep external project's dev server running**
@@ -513,8 +514,8 @@ npx tsc --noEmit
 
 1. **Maintain both entry points**
 
-   - Test vanilla TypeScript usage: `import from '@tolulikescode/universal-store'`
-   - Test React usage: `import from '@tolulikescode/universal-store/react'`
+   - Test vanilla TypeScript usage: `import from 'open-store'`
+   - Test React usage: `import from 'open-store/react'`
 
 2. **Use proper TypeScript configuration**
 
@@ -554,13 +555,13 @@ npx tsc --noEmit
 npm run build && npm link
 
 # External project setup (one time)
-npm link @tolulikescode/universal-store
+npm link open-store
 
 # Development (daily)
 npm run dev  # In package directory
 
 # Cleanup
-npm unlink @tolulikescode/universal-store  # In external project
+npm unlink open-store  # In external project
 ```
 
 ### NPM Pack Workflow
@@ -574,8 +575,9 @@ npm install /path/to/package.tgz
 
 # Update after changes
 npm version patch && npm pack
-npm uninstall @tolulikescode/universal-store
+npm uninstall open-store
 npm install /path/to/new-package.tgz
 ```
 
-This workflow ensures you can efficiently develop and test your Universal Store package while maintaining high quality and production readiness.
+This workflow ensures you can efficiently develop and test your Universal Store package while
+maintaining high quality and production readiness.

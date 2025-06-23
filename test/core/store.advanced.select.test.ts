@@ -95,6 +95,87 @@ interface AppState {
   };
 }
 
+interface SmallState {
+  data: number[];
+  tracking: {
+    updated: number;
+  };
+}
+
+describe("Non-Negotiable Selector Tests", () => {
+  let store: Store<SmallState>;
+  let initialState: SmallState;
+
+  beforeEach(() => {
+    // Reset mock timers for each test
+    vi.clearAllMocks();
+    vi.clearAllTimers();
+
+    initialState = {
+      data: [1, 2, 3, 4, 5],
+      tracking: {
+        updated: 1,
+      },
+    };
+
+    store = createStore(initialState);
+  });
+
+  afterEach(() => {
+    vi.clearAllTimers();
+    store.destroy();
+  });
+
+  describe("Never return stale data", () => {
+    it("should not return stale data", () => {
+      const { select, dispatch } = store;
+
+      const trackingSpy = vi.fn();
+      const updatedSpy = vi.fn();
+
+      const selectTracking = select(state => {
+        trackingSpy();
+        return state.tracking;
+      });
+
+      const selectUpdated = select(selectTracking, tracking => {
+        updatedSpy();
+        return tracking.updated;
+      });
+
+      const initialValue = selectUpdated();
+      expect(initialValue).toBe(1);
+      expect(trackingSpy).toHaveBeenCalledTimes(1);
+      expect(updatedSpy).toHaveBeenCalledTimes(1);
+
+      // Reset spies
+      trackingSpy.mockClear();
+      updatedSpy.mockClear();
+
+      // Simulate a state change
+      dispatch({ tracking: { updated: 2 } });
+
+      // Should return the new value and trigger recomputation
+      const updatedValue = selectUpdated();
+      expect(updatedValue).toBe(2);
+      expect(trackingSpy).toHaveBeenCalledTimes(1); // Should recompute base selector
+      expect(updatedSpy).toHaveBeenCalledTimes(1); // Should recompute derived selector
+
+      trackingSpy.mockClear();
+      updatedSpy.mockClear();
+
+      // dispatch an unrelated action
+      dispatch({ data: [6, 7, 8, 9, 10] });
+
+      // Should not recompute, still return the last value
+      const lastUpdatedValue = selectUpdated();
+      expect(lastUpdatedValue).toBe(2);
+      expect(trackingSpy).toHaveBeenCalledTimes(1); // global state change will trigger base selector
+      expect(updatedSpy).toHaveBeenCalledTimes(0); // Should not recompute derived selector
+    });
+  });
+});
+
 describe("Advanced Selector Operations", () => {
   let store: Store<AppState>;
   let initialState: AppState;

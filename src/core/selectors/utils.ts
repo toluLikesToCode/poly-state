@@ -93,12 +93,12 @@ export function haveInputsChanged<T extends readonly unknown[]>(
 
   // Check each input using smart equality
   for (let i = 0; i < currentInputs.length; i++) {
-    if (smartEqual(previousInputs[i], currentInputs[i])) {
-      return true;
+    if (!smartEqual(previousInputs[i], currentInputs[i])) {
+      return true; // Found a difference, inputs have changed
     }
   }
 
-  return false;
+  return false; // All inputs are equal, no change
 }
 
 /**
