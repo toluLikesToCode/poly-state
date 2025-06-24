@@ -47,16 +47,10 @@
   "keywords": ["state-management", "typescript", "react", "store", "immutable", "persistence", "undo-redo"],
   "author": "ToluLikesToCode",
   "license": "MIT",
-  "peerDependencies": {
-    "react": ">=16.8.0"
-  },
   "peerDependenciesMeta": {
     "react": {
       "optional": true
     }
-  },
-  "optionalDependencies": {
-    "react": ">=16.8.0"
   },
   "devDependencies": {
     "@rollup/plugin-node-resolve": "^15.0.0",
@@ -74,8 +68,6 @@
     "eslint": "^8.0.0",
     "jsdom": "^26.1.0",
     "prettier": "^3.0.0",
-    "react": "^18.0.0",
-    "react-dom": "^18.3.1",
     "rollup": "^3.0.0",
     "rollup-plugin-dts": "^5.0.0",
     "tslib": "^2.8.1",
