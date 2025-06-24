@@ -33,7 +33,3 @@ CONTRIBUTING.md
 .nyc_output/
 .coverage/
 
-# Lock files
-package-lock.json
-yarn.lock
-pnpm-lock.yaml

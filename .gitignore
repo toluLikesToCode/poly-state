@@ -133,11 +133,6 @@ logs
 ehthumbs.db
 Thumbs.db
 
-# Package managers
-package-lock.json
-yarn.lock
-pnpm-lock.yaml
-
 # Build artifacts
 lib/
 es/
