@@ -1,7 +1,7 @@
 name: Feature Request
 description: Suggest a new feature for Universal Store
-title: "[Feature]: "
-labels: ["enhancement", "needs-triage"]
+title: '[Feature]: '
+labels: ['enhancement', 'needs-triage']
 body:
   - type: markdown
     attributes:
@@ -35,7 +35,7 @@ body:
     attributes:
       label: Proposed Solution
       description: Describe the solution you'd like to see
-      placeholder: "I would like to see..."
+      placeholder: 'I would like to see...'
     validations:
       required: true
 
@@ -60,7 +60,7 @@ body:
     attributes:
       label: Alternative Solutions
       description: Describe alternatives you've considered
-      placeholder: "Alternatively, we could..."
+      placeholder: 'Alternatively, we could...'
     validations:
       required: false
 
@@ -92,7 +92,7 @@ body:
     attributes:
       label: Implementation Ideas
       description: Do you have ideas on how this could be implemented?
-      placeholder: "This could be implemented by..."
+      placeholder: 'This could be implemented by...'
     validations:
       required: false
 
@@ -101,6 +101,6 @@ body:
     attributes:
       label: Additional Context
       description: Any additional information or context
-      placeholder: "Additional context..."
+      placeholder: 'Additional context...'
     validations:
       required: false

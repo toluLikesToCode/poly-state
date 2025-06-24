@@ -1,10 +1,6 @@
-import type { Draft } from "immer";
-import { ErrorContext, StoreError, ValidationError } from "../../shared/errors";
-import {
-  DependencyListener,
-  DependencySubscriptionOptions,
-  Selector,
-} from "../selectors/types";
+import type {Draft} from 'immer'
+import {ErrorContext, StoreError, ValidationError} from '../../shared/errors'
+import {DependencyListener, DependencySubscriptionOptions, Selector} from '../selectors/types'
 
 /**
  * Type definition for custom serialization/deserialization of complex objects
@@ -16,33 +12,33 @@ export interface TypeDefinition<T> {
    * @param value - The value to check
    * @returns True if the value is of this type
    */
-  isType: (value: any) => boolean;
+  isType: (value: any) => boolean
 
   /**
    * Converts the value to a serializable form
    * @param value - The value to serialize
    * @returns The serialized representation
    */
-  serialize: (value: T) => any;
+  serialize: (value: T) => any
 
   /**
    * Converts the serialized form back to the original type
    * @param value - The serialized value to deserialize
    * @returns The deserialized object
    */
-  deserialize: (value: any) => T;
+  deserialize: (value: any) => T
 
   /**
    * Type name for debugging and identification
    */
-  typeName: string;
+  typeName: string
 }
 
 /**
  * Function that receives state updates
  * @typeParam S - The type of the state
  */
-export type Listener<S extends object> = (newState: S, prevState?: S) => void;
+export type Listener<S extends object> = (newState: S, prevState?: S) => void
 
 /**
  * Function that intercepts and potentially modifies state updates
@@ -54,16 +50,16 @@ export type Middleware<S extends object> = (
   dispatch: (action: ActionPayload<S>) => void,
   getState: () => S,
   reset: () => void
-) => void | Promise<void>;
+) => void | Promise<void>
 
 /**
  * Dispatch function for the store with improved return type handling
  * @typeParam S – the shape of the state
  */
 export type Dispatch<S extends object> = {
-  <R>(action: Thunk<S, R>): R extends Promise<any> ? Promise<R> : R;
-  (action: ActionPayload<S>): void;
-};
+  <R>(action: Thunk<S, R>): R extends Promise<any> ? Promise<R> : R
+  (action: ActionPayload<S>): void
+}
 
 /**
  * Thunk for async/sync logic
@@ -73,66 +69,63 @@ export type Dispatch<S extends object> = {
 export type Thunk<S extends object, R = void> = (
   dispatch: Dispatch<S>,
   getState: () => S,
-  updatePath: <V = any>(
-    path: (string | number)[],
-    updater: (currentValue: V) => V
-  ) => void,
+  updatePath: <V = any>(path: (string | number)[], updater: (currentValue: V) => V) => void,
   transaction: (recipe: (draft: Draft<S>) => void) => boolean,
   batch: (fn: () => void) => void
-) => R | Promise<R>;
+) => R | Promise<R>
 
 /**
  * Direct state‐update payload
  * Only keys present on S are allowed
  */
 export type ActionPayload<S extends object> = {
-  [K in keyof S]?: S[K];
-};
+  [K in keyof S]?: S[K]
+}
 
 /**
  * Union of a payload update or a thunk
  */
-export type Action<S extends object> = ActionPayload<S> | Thunk<S, any>;
+export type Action<S extends object> = ActionPayload<S> | Thunk<S, any>
 
 /**
  * Storage type to use for state persistence
  */
 export enum StorageType {
-  Local = "local",
-  Session = "session",
-  Cookie = "cookie",
-  None = "none",
+  Local = 'local',
+  Session = 'session',
+  Cookie = 'cookie',
+  None = 'none',
 }
 
 /**
  * Options for cookie-based storage
  */
 export interface CookieStorageOptions {
-  expires?: number;
-  path?: string;
-  domain?: string;
-  secure?: boolean;
-  sameSite?: "Strict" | "Lax" | "None";
+  expires?: number
+  path?: string
+  domain?: string
+  secure?: boolean
+  sameSite?: 'Strict' | 'Lax' | 'None'
 }
 
 export interface historyChangePluginOptions<S extends object> {
-  operation: "undo" | "redo";
-  steps: number;
-  store: Store<S>;
-  oldState: S;
-  newState: S;
-  persistFn?: (state: S) => void; // Optional function to persist state after history change
-  notifyFn?: (prevState: S, actionApplied?: ActionPayload<S> | null) => void; // Optional function to notify about history change
+  operation: 'undo' | 'redo'
+  steps: number
+  store: Store<S>
+  oldState: S
+  newState: S
+  persistFn?: (state: S) => void // Optional function to persist state after history change
+  notifyFn?: (prevState: S, actionApplied?: ActionPayload<S> | null) => void // Optional function to notify about history change
 }
 
 export interface Plugin<S extends object> {
-  name: string;
+  name: string
   /**
    * Called immediately after the store is created.
    * @param store - The newly created store instance.
    * @throws Error if initialization fails, this will fail fast and prevent the store from being used.
    */
-  onStoreCreate?: (store: Store<S>) => void;
+  onStoreCreate?: (store: Store<S>) => void
 
   /**
    * Intercepts each dispatched action before it reaches the reducer.
@@ -144,11 +137,7 @@ export interface Plugin<S extends object> {
    * @remarks This is useful for logging, validation, or modifying actions before they reach the reducer.
    * @throws MiddlewareError if the action is invalid or cannot be processed. This error is handled internally by the store and logged.
    */
-  beforeStateChange?: (
-    action: ActionPayload<S>,
-    prevState: S,
-    store: Store<S>
-  ) => ActionPayload<S> | void; // Can transform action
+  beforeStateChange?: (action: ActionPayload<S>, prevState: S, store: Store<S>) => ActionPayload<S> | void // Can transform action
 
   /**
    * Invoked after the store's state has been updated.
@@ -158,12 +147,7 @@ export interface Plugin<S extends object> {
    * @param store - The store instance whose state changed.
    * @throws MiddlewareError if the action is invalid or cannot be processed. This error is handled internally by the store and logged.
    */
-  onStateChange?: (
-    newState: S,
-    prevState: S,
-    action: ActionPayload<S> | null,
-    store: Store<S>
-  ) => void;
+  onStateChange?: (newState: S, prevState: S, action: ActionPayload<S> | null, store: Store<S>) => void
 
   /**
    * Called when the store is being destroyed.
@@ -171,7 +155,7 @@ export interface Plugin<S extends object> {
    * @param store - The store instance being destroyed.
    * @throws MiddlewareError if the action is invalid or cannot be processed. This error is handled internally by the store and logged.
    */
-  onDestroy?: (store: Store<S>) => void;
+  onDestroy?: (store: Store<S>) => void
 
   /**
    * Called when an error occurs in the store or other plugins
@@ -180,7 +164,7 @@ export interface Plugin<S extends object> {
    * @param store - The store instance
    * @remarks Prevents infinite recursion by not calling handleError again
    */
-  onError?: (error: StoreError, context: ErrorContext, store: Store<S>) => void;
+  onError?: (error: StoreError, context: ErrorContext, store: Store<S>) => void
 
   /**
    * Called before state is persisted to storage
@@ -190,11 +174,7 @@ export interface Plugin<S extends object> {
    * @returns Transformed state to persist, or void to use original
    * @throws MiddlewareError if the state is invalid or cannot be processed. It is handled internally by the store and logged. The store will proceed with the next plugins if available.
    */
-  beforePersist?: (
-    state: S,
-    storageType: StorageType,
-    store: Store<S>
-  ) => S | void;
+  beforePersist?: (state: S, storageType: StorageType, store: Store<S>) => S | void
 
   /**
    * Called after state is successfully persisted
@@ -203,7 +183,7 @@ export interface Plugin<S extends object> {
    * @param store - The store instance
    * @throws MiddlewareError if the state is invalid or cannot be processed. It is handled internally by the store and logged. The store will proceed with the next plugins if available.
    */
-  onPersisted?: (state: S, storageType: StorageType, store: Store<S>) => void;
+  onPersisted?: (state: S, storageType: StorageType, store: Store<S>) => void
 
   /**
    * Called when state is loaded from storage
@@ -213,11 +193,7 @@ export interface Plugin<S extends object> {
    * @returns Transformed state to use, or void to use original
    * @throws MiddlewareError if the state is invalid or cannot be processed. It is handled internally by the store and logged. The store will proceed with the next plugins if available.
    */
-  onStateLoaded?: (
-    loadedState: Partial<S>,
-    storageType: StorageType,
-    store: Store<S>
-  ) => Partial<S> | void;
+  onStateLoaded?: (loadedState: Partial<S>, storageType: StorageType, store: Store<S>) => Partial<S> | void
 
   /**
    * Called when cross-tab sync occurs
@@ -227,11 +203,7 @@ export interface Plugin<S extends object> {
    * @remarks If a plugin fails during sync it will not block the sync process, the store will proceed with the next plugins if available.
    * @returns Transformed state to apply, or void to use original
    */
-  onCrossTabSync?: (
-    syncedState: S,
-    sourceSessionId: string,
-    store: Store<S>
-  ) => S | void;
+  onCrossTabSync?: (syncedState: S, sourceSessionId: string, store: Store<S>) => S | void
 
   /**
    * Called before undo/redo operations
@@ -243,9 +215,7 @@ export interface Plugin<S extends object> {
    * @returns False to prevent the operation, true/void to allow
    * @throws MiddlewareError if the operation is invalid or cannot be processed. It is handled internally by the store and logged. The store will proceed with the next plugins if available. The store will assume true if the plugin fails.
    */
-  beforeHistoryChange?: (
-    options: historyChangePluginOptions<S>
-  ) => boolean | void;
+  beforeHistoryChange?: (options: historyChangePluginOptions<S>) => boolean | void
 
   /**
    * Called after undo/redo operations complete
@@ -256,14 +226,14 @@ export interface Plugin<S extends object> {
    * @param newState - State after the operation
    * @throws MiddlewareError if the operation is invalid or cannot be processed. It is handled internally by the store and logged. The store will proceed with the next plugins if available. The store will assume true if the plugin fails.
    */
-  onHistoryChanged?: (options: historyChangePluginOptions<S>) => void;
+  onHistoryChanged?: (options: historyChangePluginOptions<S>) => void
 
   /**
    * Called when a batch operation begins
    * @param store - The store instance
    * @throws MiddlewareError if the batch cannot be started. It is handled internally by the store and logged. The store will proceed with the next plugins if available.
    */
-  onBatchStart?: (store: Store<S>) => void;
+  onBatchStart?: (store: Store<S>) => void
 
   /**
    * Called when a batch operation completes
@@ -272,18 +242,14 @@ export interface Plugin<S extends object> {
    * @param store - The store instance
    * @throws MiddlewareError if the batch cannot be started. It is handled internally by the store and logged. The store will proceed with the next plugins if available.
    */
-  onBatchEnd?: (
-    actions: ActionPayload<S>[],
-    finalState: S,
-    store: Store<S>
-  ) => void;
+  onBatchEnd?: (actions: ActionPayload<S>[], finalState: S, store: Store<S>) => void
 
   /**
    * Called when a transaction begins
    * @param store - The store instance
    * @throws MiddlewareError if the batch cannot be started. It is handled internally by the store and logged. The store will proceed with the next plugins if available.
    */
-  onTransactionStart?: (store: Store<S>) => void;
+  onTransactionStart?: (store: Store<S>) => void
 
   /**
    * Called when a transaction completes (success or failure)
@@ -293,38 +259,33 @@ export interface Plugin<S extends object> {
    * @param store - The store instance
    * @throws MiddlewareError if the batch cannot be started. It is handled internally by the store and logged. The store will proceed with the next plugins if available.
    */
-  onTransactionEnd?: (
-    success: boolean,
-    store: Store<S>,
-    changes?: Partial<S>,
-    error?: Error
-  ) => void;
+  onTransactionEnd?: (success: boolean, store: Store<S>, changes?: Partial<S>, error?: Error) => void
 }
 
 /**
  * Metadata stored with persisted state
  */
 export interface StateMetadata {
-  lastUpdated: number;
-  sessionId: string | null;
-  storeName?: string;
+  lastUpdated: number
+  sessionId: string | null
+  storeName?: string
 }
 
 /**
  * Wrapper for state with metadata
  */
 export interface PersistedState<S extends object> {
-  data: S;
-  meta: StateMetadata;
+  data: S
+  meta: StateMetadata
 }
 
 /**
  * Additional cleanup options for store
  */
 export interface CleanupOptions {
-  removePersistedState?: boolean;
-  clearHistory?: boolean;
-  resetRegistry?: boolean; // Reset the global store registry
+  removePersistedState?: boolean
+  clearHistory?: boolean
+  resetRegistry?: boolean // Reset the global store registry
 }
 
 /**
@@ -332,19 +293,19 @@ export interface CleanupOptions {
  * @typeParam S - The type of the state
  */
 export interface StoreOptions<S extends object> {
-  persistKey?: string;
-  storageType?: StorageType;
-  cookieOptions?: CookieStorageOptions;
-  cookiePrefix?: string; // For improved cookie cleanup
-  syncAcrossTabs?: boolean;
-  middleware?: Middleware<S>[];
-  historyLimit?: number;
-  name?: string;
-  staleAge?: number;
-  cleanupStaleStatesOnLoad?: boolean; // Renamed for clarity
-  cleanupOptions?: CleanupOptions;
-  plugins?: Plugin<S>[];
-  onError?: (error: StoreError) => void; // Centralized error handler
+  persistKey?: string
+  storageType?: StorageType
+  cookieOptions?: CookieStorageOptions
+  cookiePrefix?: string // For improved cookie cleanup
+  syncAcrossTabs?: boolean
+  middleware?: Middleware<S>[]
+  historyLimit?: number
+  name?: string
+  staleAge?: number
+  cleanupStaleStatesOnLoad?: boolean // Renamed for clarity
+  cleanupOptions?: CleanupOptions
+  plugins?: Plugin<S>[]
+  onError?: (error: StoreError) => void // Centralized error handler
 }
 
 /**
@@ -382,7 +343,7 @@ export interface ReadOnlyStore<S extends object> {
    * @see {@link ReadOnlyStore | ReadOnlyStore} for computed state access
    * @see {@link Store.dispatch} for state updates
    */
-  getState: () => S;
+  getState: () => S
 
   /**
    * Subscribes to state changes in the store.
@@ -407,7 +368,7 @@ export interface ReadOnlyStore<S extends object> {
    *
    * @see {@link Listener} for the listener function signature
    */
-  subscribe: (listener: Listener<S>) => () => void;
+  subscribe: (listener: Listener<S>) => () => void
 
   /**
    * Subscribe to changes in a specific part of the state using a selector.
@@ -447,7 +408,7 @@ export interface ReadOnlyStore<S extends object> {
     selector: Selector<S, T>,
     listener: DependencyListener<T>,
     options?: DependencySubscriptionOptions
-  ) => () => void;
+  ) => () => void
 
   /**
    * Subscribe to changes in multiple state values using multiple selectors.
@@ -493,14 +454,14 @@ export interface ReadOnlyStore<S extends object> {
     selectors: readonly [...P],
     listener: (
       newValues: {
-        [K in keyof P]: P[K] extends Selector<S, infer RT> ? RT : never;
+        [K in keyof P]: P[K] extends Selector<S, infer RT> ? RT : never
       },
       oldValues: {
-        [K in keyof P]: P[K] extends Selector<S, infer RT> ? RT : never;
+        [K in keyof P]: P[K] extends Selector<S, infer RT> ? RT : never
       }
     ) => void,
     options?: DependencySubscriptionOptions
-  ) => () => void;
+  ) => () => void
 
   /**
    * Subscribe to changes in specific state paths using dot notation.
@@ -543,7 +504,7 @@ export interface ReadOnlyStore<S extends object> {
     path: string,
     listener: DependencyListener<T>,
     options?: DependencySubscriptionOptions
-  ) => () => void;
+  ) => () => void
 
   /**
    * Creates a memoized selector function for deriving computed values from the store state.
@@ -590,12 +551,12 @@ export interface ReadOnlyStore<S extends object> {
           ...P,
           (
             ...results: {
-              [K in keyof P]: P[K] extends Selector<S, infer RT> ? RT : never;
+              [K in keyof P]: P[K] extends Selector<S, infer RT> ? RT : never
             }
-          ) => R
+          ) => R,
         ]
       | [Selector<S, R>]
-  ) => (() => R) & { lastValue?: R };
+  ) => (() => R) & {lastValue?: R}
 
   /**
    * Gets the name of the store if one was provided during creation.
@@ -612,7 +573,7 @@ export interface ReadOnlyStore<S extends object> {
    * console.log(store.getName()); // 'UserStore'
    * ```
    */
-  getName: () => string | undefined;
+  getName: () => string | undefined
 
   /**
    * Gets the unique session identifier for this store instance.
@@ -632,7 +593,7 @@ export interface ReadOnlyStore<S extends object> {
    *
    * @see {@link StoreOptions.syncAcrossTabs} for cross-tab synchronization
    */
-  getSessionId: () => string | null;
+  getSessionId: () => string | null
 
   /**
    * Gets the current history of state changes.
@@ -653,10 +614,10 @@ export interface ReadOnlyStore<S extends object> {
    * ```
    */
   getHistory: () => {
-    history: readonly S[];
-    currentIndex: number;
-    initialState: Readonly<S> | null;
-  };
+    history: readonly S[]
+    currentIndex: number
+    initialState: Readonly<S> | null
+  }
 }
 
 /**
@@ -727,7 +688,7 @@ export interface Store<S extends object> extends ReadOnlyStore<S> {
    * @see {@link Thunk} for async/sync logic functions
    * @see {@link Dispatch} for the dispatch function type
    */
-  dispatch: Dispatch<S>;
+  dispatch: Dispatch<S>
 
   /**
    * Updates the state with partial changes (alias for dispatching a partial state).
@@ -750,7 +711,7 @@ export interface Store<S extends object> extends ReadOnlyStore<S> {
    * store.dispatch({ count: 42 });
    * ```
    */
-  setState: (newState: Partial<S>) => void;
+  setState: (newState: Partial<S>) => void
 
   /**
    * Resets the store to its initial state.
@@ -769,7 +730,7 @@ export interface Store<S extends object> extends ReadOnlyStore<S> {
    *
    * @see {@link Store.destroy} for complete store cleanup
    */
-  reset: () => void;
+  reset: () => void
 
   /**
    * Reverts the store state to a previous point in history.
@@ -797,7 +758,7 @@ export interface Store<S extends object> extends ReadOnlyStore<S> {
    * @see {@link Store.redo} for forward history navigation
    * @see {@link StoreOptions.historyLimit} for enabling history tracking
    */
-  undo: (steps?: number) => boolean;
+  undo: (steps?: number) => boolean
 
   /**
    * Moves forward in the store's history to a more recent state.
@@ -824,7 +785,7 @@ export interface Store<S extends object> extends ReadOnlyStore<S> {
    * @see {@link Store.undo} for backward history navigation
    * @see {@link StoreOptions.historyLimit} for enabling history tracking
    */
-  redo: (steps?: number) => boolean;
+  redo: (steps?: number) => boolean
 
   /**
    * Completely destroys the store and performs cleanup operations.
@@ -855,7 +816,7 @@ export interface Store<S extends object> extends ReadOnlyStore<S> {
    * @see {@link CleanupOptions} for available cleanup options
    * @see {@link Store.reset} for resetting state without destroying the store
    */
-  destroy: (options?: CleanupOptions) => void;
+  destroy: (options?: CleanupOptions) => void
 
   /**
    * Updates a value at a specific path in the state using an updater function.
@@ -894,10 +855,7 @@ export interface Store<S extends object> extends ReadOnlyStore<S> {
    * @see {@link https://immerjs.github.io/immer/produce | Immer produce documentation}
    * @see {@link transaction} for multiple related updates
    */
-  updatePath: <V = any>(
-    path: (string | number)[],
-    updater: (currentValue: V) => V
-  ) => void;
+  updatePath: <V = any>(path: (string | number)[], updater: (currentValue: V) => V) => void
 
   /**
    * Batches multiple state updates into a single notification to subscribers.
@@ -939,7 +897,7 @@ export interface Store<S extends object> extends ReadOnlyStore<S> {
    *
    * @see {@link Store.transaction} for atomic updates with rollback capabilities
    */
-  batch: (fn: () => void) => void;
+  batch: (fn: () => void) => void
 
   /**
    * Executes a transaction function that can safely mutate a draft copy of the state.
@@ -998,7 +956,7 @@ export interface Store<S extends object> extends ReadOnlyStore<S> {
    * @see {@link batch} for batching multiple state updates
    */
 
-  transaction: (recipe: (draft: Draft<S>) => void) => boolean;
+  transaction: (recipe: (draft: Draft<S>) => void) => boolean
 
   /**
    * Creates a read-only view of the store that prevents accidental mutations.
@@ -1030,7 +988,7 @@ export interface Store<S extends object> extends ReadOnlyStore<S> {
    *
    * @see {@link ReadOnlyStore} for the read-only interface definition
    */
-  asReadOnly: () => ReadOnlyStore<S>;
+  asReadOnly: () => ReadOnlyStore<S>
 
   /**
    * Creates a parameterized selector that accepts runtime parameters for dynamic state selection.
@@ -1098,10 +1056,10 @@ export interface Store<S extends object> extends ReadOnlyStore<S> {
     inputSelectors: readonly [...P],
     projector: (params: Props) => (
       ...results: {
-        [K in keyof P]: P[K] extends Selector<S, infer RT> ? RT : never;
+        [K in keyof P]: P[K] extends Selector<S, infer RT> ? RT : never
       }
     ) => R
-  ) => (params: Props) => (() => R) & { lastValue?: R };
+  ) => (params: Props) => (() => R) & {lastValue?: R}
 
   /**
    * Internal method for Redux DevTools to set state directly without going through dispatch.
@@ -1110,7 +1068,7 @@ export interface Store<S extends object> extends ReadOnlyStore<S> {
    * @param newState - The new state to set
    * @param isTimeTravel - Whether this is a time travel operation (defaults to true)
    */
-  _setStateForDevTools?: (newState: S, isTimeTravel?: boolean) => void;
+  _setStateForDevTools?: (newState: S, isTimeTravel?: boolean) => void
 }
 
 /**
@@ -1130,9 +1088,7 @@ export interface Store<S extends object> extends ReadOnlyStore<S> {
  * ```
  */
 export interface ValidatorFn<S extends object> {
-  (state: S, action: ActionPayload<S>, prevState: S):
-    | boolean
-    | Promise<boolean>;
+  (state: S, action: ActionPayload<S>, prevState: S): boolean | Promise<boolean>
 }
 
 /**
@@ -1150,5 +1106,5 @@ export interface ValidatorFn<S extends object> {
  * ```
  */
 export interface ValidationErrorHandler<S extends object> {
-  (error: ValidationError, action: ActionPayload<S>): void;
+  (error: ValidationError, action: ActionPayload<S>): void
 }

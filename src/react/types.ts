@@ -16,14 +16,10 @@
  * ```
  */
 
-import type { ReactNode, ComponentType, DependencyList } from "react";
-import type { Store, ReadOnlyStore, Thunk } from "../core/state/index";
-import type {
-  Selector,
-  DependencyListener,
-  DependencySubscriptionOptions,
-} from "../core/selectors/index";
-import type { Draft } from "immer";
+import type {ReactNode, ComponentType, DependencyList} from 'react'
+import type {Store, ReadOnlyStore, Thunk} from '../core/state/index'
+import type {Selector, DependencyListener, DependencySubscriptionOptions} from '../core/selectors/index'
+import type {Draft} from 'immer'
 
 /**
  * Context value containing the store instance
@@ -32,7 +28,7 @@ import type { Draft } from "immer";
  */
 export interface StoreContextValue<S extends object> {
   /** The store instance providing state management capabilities */
-  store: Store<S>;
+  store: Store<S>
 }
 
 /**
@@ -48,7 +44,7 @@ export interface StoreContextValue<S extends object> {
  * const unsubscribe = store.subscribe(() => console.log('State changed'));
  * ```
  */
-export type UseStoreHook<S extends object> = () => Store<S>;
+export type UseStoreHook<S extends object> = () => Store<S>
 
 /**
  * Hook that selects and subscribes to specific parts of the state
@@ -65,9 +61,7 @@ export type UseStoreHook<S extends object> = () => Store<S>;
  * const todoCount = useSelector(state => state.todos.length);
  * ```
  */
-export type UseSelectorHook<S extends object> = <R>(
-  selector: Selector<S, R>
-) => R;
+export type UseSelectorHook<S extends object> = <R>(selector: Selector<S, R>) => R
 
 /**
  * Hook that provides the dispatch function for updating state
@@ -90,7 +84,7 @@ export type UseSelectorHook<S extends object> = <R>(
  * });
  * ```
  */
-export type UseDispatchHook<S extends object> = () => Store<S>["dispatch"];
+export type UseDispatchHook<S extends object> = () => Store<S>['dispatch']
 
 /**
  * Hook that provides access to the complete store state
@@ -104,7 +98,7 @@ export type UseDispatchHook<S extends object> = () => Store<S>["dispatch"];
  * console.log(state.count, state.user.name, state.todos);
  * ```
  */
-export type UseStoreStateHook<S extends object> = () => S;
+export type UseStoreStateHook<S extends object> = () => S
 
 /**
  * Hook that subscribes to changes in a specific selected value
@@ -131,7 +125,7 @@ export type UseSubscribeToHook<S extends object> = <R>(
   selector: Selector<S, R>,
   listener: DependencyListener<R>,
   options?: DependencySubscriptionOptions
-) => void;
+) => void
 
 /**
  * Hook that subscribes to changes at a specific state path
@@ -163,7 +157,7 @@ export type UseSubscribeToPathHook = <T = any>(
   path: string,
   listener: DependencyListener<T>,
   options?: DependencySubscriptionOptions
-) => void;
+) => void
 
 /**
  * Hook that accesses a specific value by path and subscribes to its changes
@@ -180,7 +174,7 @@ export type UseSubscribeToPathHook = <T = any>(
  * const userAge = useStoreValue<number>('user.profile.age');
  * ```
  */
-export type UseStoreValueHook = <T = any>(path: string) => T;
+export type UseStoreValueHook = <T = any>(path: string) => T
 
 /**
  * Hook that provides a transaction function for atomic state updates
@@ -209,9 +203,7 @@ export type UseStoreValueHook = <T = any>(path: string) => T;
  * };
  * ```
  */
-export type UseTransactionHook<S extends object> = () => (
-  recipe: (draft: Draft<S>) => void
-) => boolean;
+export type UseTransactionHook<S extends object> = () => (recipe: (draft: Draft<S>) => void) => boolean
 
 /**
  * Hook that provides a batch function for grouping multiple updates
@@ -241,7 +233,7 @@ export type UseTransactionHook<S extends object> = () => (
  * };
  * ```
  */
-export type UseBatchHook = () => (fn: () => void) => void;
+export type UseBatchHook = () => (fn: () => void) => void
 
 /**
  * Hook that provides a function for updating values at specific paths
@@ -265,10 +257,7 @@ export type UseBatchHook = () => (fn: () => void) => void;
  * };
  * ```
  */
-export type UseUpdatePathHook = () => <V = any>(
-  path: (string | number)[],
-  updater: (currentValue: V) => V
-) => void;
+export type UseUpdatePathHook = () => <V = any>(path: (string | number)[], updater: (currentValue: V) => V) => void
 
 /**
  * Store history state information
@@ -277,19 +266,19 @@ export type UseUpdatePathHook = () => <V = any>(
  */
 export interface StoreHistoryState<S extends object> {
   /** Array of historical states */
-  history: readonly S[];
+  history: readonly S[]
   /** Current position in history */
-  currentIndex: number;
+  currentIndex: number
   /** The initial state when store was created */
-  initialState: Readonly<S> | null;
+  initialState: Readonly<S> | null
   /** Function to undo one or more steps */
-  undo: (steps?: number) => boolean;
+  undo: (steps?: number) => boolean
   /** Function to redo one or more steps */
-  redo: (steps?: number) => boolean;
+  redo: (steps?: number) => boolean
   /** Whether undo is possible */
-  canUndo: boolean;
+  canUndo: boolean
   /** Whether redo is possible */
-  canRedo: boolean;
+  canRedo: boolean
 }
 
 /**
@@ -316,7 +305,7 @@ export interface StoreHistoryState<S extends object> {
  * );
  * ```
  */
-export type UseStoreHistoryHook<S extends object> = () => StoreHistoryState<S>;
+export type UseStoreHistoryHook<S extends object> = () => StoreHistoryState<S>
 
 /**
  * Hook that executes thunks (sync or async functions)
@@ -346,9 +335,7 @@ export type UseStoreHistoryHook<S extends object> = () => StoreHistoryState<S>;
  * };
  * ```
  */
-export type UseThunkHook<S extends object> = () => <R>(
-  thunk: Thunk<S, R>
-) => R extends Promise<any> ? Promise<R> : R;
+export type UseThunkHook<S extends object> = () => <R>(thunk: Thunk<S, R>) => R extends Promise<any> ? Promise<R> : R
 
 /**
  * Async thunk execution state
@@ -357,11 +344,11 @@ export type UseThunkHook<S extends object> = () => <R>(
  */
 export interface AsyncThunkState<S extends object> {
   /** Function to execute async thunks */
-  execute: <R>(thunk: Thunk<S, Promise<R>>) => Promise<R>;
+  execute: <R>(thunk: Thunk<S, Promise<R>>) => Promise<R>
   /** Whether an async thunk is currently executing */
-  loading: boolean;
+  loading: boolean
   /** Error from the last failed thunk execution */
-  error: Error | null;
+  error: Error | null
 }
 
 /**
@@ -396,7 +383,7 @@ export interface AsyncThunkState<S extends object> {
  * if (error) return <ErrorMessage error={error} />;
  * ```
  */
-export type UseAsyncThunkHook<S extends object> = () => AsyncThunkState<S>;
+export type UseAsyncThunkHook<S extends object> = () => AsyncThunkState<S>
 
 /**
  * Hook that runs side effects when selected state values change
@@ -443,7 +430,7 @@ export type UseStoreEffectHook<S extends object> = <R>(
   selector: Selector<S, R>,
   effect: (value: R, prevValue: R | undefined) => void | (() => void),
   deps?: DependencyList
-) => void;
+) => void
 
 /**
  * Complete collection of all React hooks provided by the store context
@@ -452,33 +439,33 @@ export type UseStoreEffectHook<S extends object> = <R>(
  */
 export interface StoreHooks<S extends object> {
   /** Hook to access the raw store instance with full capabilities */
-  useStore: UseStoreHook<S>;
+  useStore: UseStoreHook<S>
   /** Hook to select and subscribe to specific parts of the state */
-  useSelector: UseSelectorHook<S>;
+  useSelector: UseSelectorHook<S>
   /** Hook to get the dispatch function for updating state */
-  useDispatch: UseDispatchHook<S>;
+  useDispatch: UseDispatchHook<S>
   /** Hook to access the complete store state */
-  useStoreState: UseStoreStateHook<S>;
+  useStoreState: UseStoreStateHook<S>
   /** Hook to subscribe to changes in a specific selected value */
-  useSubscribeTo: UseSubscribeToHook<S>;
+  useSubscribeTo: UseSubscribeToHook<S>
   /** Hook to subscribe to changes at a specific state path */
-  useSubscribeToPath: UseSubscribeToPathHook;
+  useSubscribeToPath: UseSubscribeToPathHook
   /** Hook to access a specific value by path and subscribe to its changes */
-  useStoreValue: UseStoreValueHook;
+  useStoreValue: UseStoreValueHook
   /** Hook to get a transaction function for atomic state updates */
-  useTransaction: UseTransactionHook<S>;
+  useTransaction: UseTransactionHook<S>
   /** Hook to get a batch function for grouping multiple updates */
-  useBatch: UseBatchHook;
+  useBatch: UseBatchHook
   /** Hook to get a function for updating values at specific paths */
-  useUpdatePath: UseUpdatePathHook;
+  useUpdatePath: UseUpdatePathHook
   /** Hook to access store history and undo/redo functionality */
-  useStoreHistory: UseStoreHistoryHook<S>;
+  useStoreHistory: UseStoreHistoryHook<S>
   /** Hook to execute thunks (sync or async functions) */
-  useThunk: UseThunkHook<S>;
+  useThunk: UseThunkHook<S>
   /** Hook for executing async thunks with loading and error state management */
-  useAsyncThunk: UseAsyncThunkHook<S>;
+  useAsyncThunk: UseAsyncThunkHook<S>
   /** Hook to run side effects when selected state values change */
-  useStoreEffect: UseStoreEffectHook<S>;
+  useStoreEffect: UseStoreEffectHook<S>
 }
 
 /**
@@ -520,7 +507,7 @@ export interface StoreHooks<S extends object> {
  */
 export interface StoreContextResult<S extends object> extends StoreHooks<S> {
   /** React context for the store */
-  StoreContext: React.Context<StoreContextValue<S> | null>;
+  StoreContext: React.Context<StoreContextValue<S> | null>
 
   /**
    * Provider component that makes the store available to child components
@@ -538,7 +525,7 @@ export interface StoreContextResult<S extends object> extends StoreHooks<S> {
    * }
    * ```
    */
-  StoreProvider: React.FC<{ children: ReactNode }>;
+  StoreProvider: React.FC<{children: ReactNode}>
 }
 
 /**
@@ -549,8 +536,8 @@ export interface StoreContextResult<S extends object> extends StoreHooks<S> {
  */
 export type WithStoreProps<S extends object, P extends object = {}> = P & {
   /** Read-only store instance injected by the HOC */
-  store: ReadOnlyStore<S>;
-};
+  store: ReadOnlyStore<S>
+}
 
 /**
  * Higher-Order Component type for {@link withStore}
@@ -560,7 +547,7 @@ export type WithStoreProps<S extends object, P extends object = {}> = P & {
  */
 export type WithStoreHOC<S extends object, P extends object> = (
   Component: ComponentType<WithStoreProps<S, P>>
-) => React.FC<P>;
+) => React.FC<P>
 
 /**
  * Configuration options for creating React integration
@@ -569,11 +556,11 @@ export type WithStoreHOC<S extends object, P extends object> = (
  */
 export interface CreateStoreContextOptions<S extends object> {
   /** The store instance to create React integration for */
-  store: Store<S>;
+  store: Store<S>
   /** Optional display name for the provider component */
-  displayName?: string;
+  displayName?: string
   /** Whether to enable development mode features */
-  devMode?: boolean;
+  devMode?: boolean
 }
 
 /**
@@ -583,17 +570,15 @@ export interface CreateStoreContextOptions<S extends object> {
  * @returns True if the value is a StoreContextResult
  * @public
  */
-export function isStoreContextResult<S extends object>(
-  value: any
-): value is StoreContextResult<S> {
+export function isStoreContextResult<S extends object>(value: any): value is StoreContextResult<S> {
   return (
     value &&
-    typeof value === "object" &&
-    "StoreProvider" in value &&
-    "useStore" in value &&
-    "useSelector" in value &&
-    "useDispatch" in value
-  );
+    typeof value === 'object' &&
+    'StoreProvider' in value &&
+    'useStore' in value &&
+    'useSelector' in value &&
+    'useDispatch' in value
+  )
 }
 
 /**
@@ -601,13 +586,11 @@ export function isStoreContextResult<S extends object>(
  * @template T - The StoreContextResult type
  * @public
  */
-export type ExtractStoreState<T> = T extends StoreContextResult<infer S>
-  ? S
-  : never;
+export type ExtractStoreState<T> = T extends StoreContextResult<infer S> ? S : never
 
 /**
  * Utility type for extracting the state type from a store instance
  * @template T - The Store type
  * @public
  */
-export type ExtractStateFromStore<T> = T extends Store<infer S> ? S : never;
+export type ExtractStateFromStore<T> = T extends Store<infer S> ? S : never

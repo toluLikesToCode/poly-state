@@ -1,8 +1,5 @@
 {
-  "extends": [
-    "@typescript-eslint/recommended",
-    "@typescript-eslint/recommended-requiring-type-checking"
-  ],
+  "extends": ["eslint:recommended", "@typescript-eslint/recommended"],
   "parser": "@typescript-eslint/parser",
   "parserOptions": {
     "project": "./tsconfig.json",
@@ -14,10 +11,7 @@
   },
   "plugins": ["@typescript-eslint", "react-hooks"],
   "rules": {
-    "@typescript-eslint/no-unused-vars": [
-      "error",
-      { "argsIgnorePattern": "^_" }
-    ],
+    "@typescript-eslint/no-unused-vars": ["error", {"argsIgnorePattern": "^_"}],
     "@typescript-eslint/explicit-function-return-type": "off",
     "@typescript-eslint/explicit-module-boundary-types": "off",
     "@typescript-eslint/no-explicit-any": "warn",
@@ -27,7 +21,7 @@
     "prefer-const": "error",
     "no-var": "error",
     "object-shorthand": "error",
-    "prefer-destructuring": ["error", { "object": true, "array": false }]
+    "prefer-destructuring": ["error", {"object": true, "array": false}]
   },
   "env": {
     "node": true,
@@ -58,12 +52,5 @@
       }
     }
   ],
-  "ignorePatterns": [
-    "dist/",
-    "node_modules/",
-    "coverage/",
-    "examples/",
-    "*.config.js",
-    "*.config.ts"
-  ]
+  "ignorePatterns": ["dist/", "node_modules/", "coverage/", "examples/", "*.config.js", "*.config.ts"]
 }

@@ -5,11 +5,5 @@
     "declarationMap": true,
     "emitDeclarationOnly": false
   },
-  "exclude": [
-    "node_modules",
-    "dist",
-    "**/*.test.ts",
-    "**/*.test.tsx",
-    "**/*.stories.ts"
-  ]
+  "exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.test.tsx", "**/*.stories.ts"]
 }

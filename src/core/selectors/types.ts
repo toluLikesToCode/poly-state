@@ -6,14 +6,14 @@
  * subscriptions, and parameterized selectors with optimal performance.
  */
 
-import type { Store } from "../state/index";
+import type {Store} from '../state/index'
 
 /**
  * Function that computes a derived state value
  * @typeParam S - The type of the main state
  * @typeParam R - The type of the derived value
  */
-export type Selector<S extends object, R = unknown> = (state: S) => R;
+export type Selector<S extends object, R = unknown> = (state: S) => R
 
 /**
  * A memoized selector function with enhanced caching and cleanup capabilities.
@@ -36,7 +36,7 @@ export interface MemoizedSelector<R> {
    *
    * @returns The computed selector result
    */
-  (): R;
+  (): R
 
   /**
    * Optional cleanup function for resource management.
@@ -46,7 +46,7 @@ export interface MemoizedSelector<R> {
    * subscriptions, timers, or other resources. This prevents memory leaks
    * in long-running applications.
    */
-  _cleanup?: () => void;
+  _cleanup?: () => void
 
   /**
    * Timestamp of the last time this selector was accessed.
@@ -56,7 +56,7 @@ export interface MemoizedSelector<R> {
    * garbage collected. Selectors that haven't been accessed within the
    * inactive threshold are automatically cleaned up.
    */
-  _lastAccessed?: number;
+  _lastAccessed?: number
 
   /**
    * Whether this selector is currently active and should be retained.
@@ -65,7 +65,7 @@ export interface MemoizedSelector<R> {
    * Active selectors are kept in memory and continue to receive updates.
    * Inactive selectors are eligible for cleanup and removal from the cache.
    */
-  _isActive?: boolean;
+  _isActive?: boolean
 
   /**
    * The last computed result of this selector.
@@ -75,7 +75,7 @@ export interface MemoizedSelector<R> {
    * triggering recomputation. Useful for debugging and subscription systems
    * that need to compare old and new values.
    */
-  lastValue?: R;
+  lastValue?: R
 }
 
 /**
@@ -92,7 +92,7 @@ export interface MemoizedSelector<R> {
  * };
  * ```
  */
-export type DependencyListener<T> = (newValue: T, oldValue: T) => void;
+export type DependencyListener<T> = (newValue: T, oldValue: T) => void
 
 /**
  * Internal tracking information for dependency-based subscriptions.
@@ -112,7 +112,7 @@ export interface DependencySubscription<T> {
    * Used for debugging, error reporting, and subscription management.
    * Generated automatically when the subscription is created.
    */
-  id: string;
+  id: string
 
   /**
    * The memoized selector used to extract the watched value.
@@ -122,7 +122,7 @@ export interface DependencySubscription<T> {
    * provides the current value for change detection. The selector is
    * cleaned up when the subscription is destroyed.
    */
-  selector: MemoizedSelector<T>;
+  selector: MemoizedSelector<T>
 
   /**
    * The callback function invoked when the watched value changes.
@@ -132,7 +132,7 @@ export interface DependencySubscription<T> {
    * The listener execution is wrapped in error handling to prevent
    * subscription failures from affecting the store.
    */
-  listener: DependencyListener<T>;
+  listener: DependencyListener<T>
 
   /**
    * Function used to determine if the watched value has changed.
@@ -142,7 +142,7 @@ export interface DependencySubscription<T> {
    * Immer's structural sharing. Custom equality functions can be
    * provided for specialized comparison logic.
    */
-  equalityFn: <V>(a: V, b: V) => boolean;
+  equalityFn: <V>(a: V, b: V) => boolean
 
   /**
    * Timeout identifier for debounced listener execution.
@@ -152,7 +152,7 @@ export interface DependencySubscription<T> {
    * be cleared if subsequent changes occur before the timeout fires.
    * Undefined when no debouncing is active.
    */
-  debounceTimeoutId?: NodeJS.Timeout;
+  debounceTimeoutId?: NodeJS.Timeout
 
   /**
    * Debounce delay in milliseconds for throttling rapid changes.
@@ -162,7 +162,7 @@ export interface DependencySubscription<T> {
    * once after the specified time has passed since the last change.
    * This prevents expensive operations from running on every change.
    */
-  debounceMs: number;
+  debounceMs: number
 
   /**
    * The last known value for change detection comparison.
@@ -171,7 +171,7 @@ export interface DependencySubscription<T> {
    * Used by the equality function to determine if the watched value
    * has changed. Updated whenever the listener is successfully invoked.
    */
-  lastValue?: T;
+  lastValue?: T
 
   /**
    * Whether this subscription is currently active and receiving updates.
@@ -180,7 +180,7 @@ export interface DependencySubscription<T> {
    * Active subscriptions continue to monitor changes and invoke listeners.
    * Inactive subscriptions stop processing changes and are eligible for cleanup.
    */
-  isActive: boolean;
+  isActive: boolean
 
   /**
    * Store subscription cleanup function for unsubscribing from state changes.
@@ -189,7 +189,7 @@ export interface DependencySubscription<T> {
    * This function unsubscribes the dependency subscription from store updates.
    * Called automatically during subscription cleanup to prevent memory leaks.
    */
-  storeUnsubscribe: (() => void) | null;
+  storeUnsubscribe: (() => void) | null
 
   /**
    * Complete cleanup function for this dependency subscription.
@@ -199,7 +199,7 @@ export interface DependencySubscription<T> {
    * debounce timeouts, store subscriptions, and memoized selectors.
    * Safe to call multiple times.
    */
-  cleanup: () => void;
+  cleanup: () => void
 }
 
 /**
@@ -219,7 +219,7 @@ export interface DependencySubscriptionOptions {
    *
    * @defaultValue false
    */
-  immediate?: boolean;
+  immediate?: boolean
 
   /**
    * Custom equality function to determine if the value has changed.
@@ -243,7 +243,7 @@ export interface DependencySubscriptionOptions {
    * };
    * ```
    */
-  equalityFn?: <T>(a: T, b: T) => boolean;
+  equalityFn?: <T>(a: T, b: T) => boolean
 
   /**
    * Debounce delay in milliseconds for throttling rapid changes.
@@ -261,7 +261,7 @@ export interface DependencySubscriptionOptions {
    * const options = { debounceMs: 300 };
    * ```
    */
-  debounceMs?: number;
+  debounceMs?: number
 }
 
 /**
@@ -283,7 +283,7 @@ export interface ParameterCacheEntry<R, Props> {
    * independent memoization and caching. This provides optimal performance
    * while maintaining flexibility for dynamic parameter usage.
    */
-  selector: MemoizedSelector<R>;
+  selector: MemoizedSelector<R>
 
   /**
    * Timestamp of the last time this cache entry was accessed.
@@ -293,7 +293,7 @@ export interface ParameterCacheEntry<R, Props> {
    * that can be garbage collected. Entries not accessed within the TTL
    * period are automatically removed.
    */
-  lastAccessed: number;
+  lastAccessed: number
 
   /**
    * The parameters associated with this cache entry.
@@ -302,7 +302,7 @@ export interface ParameterCacheEntry<R, Props> {
    * Stored for debugging and potential future use. Helps identify which
    * parameter combinations are being cached and their access patterns.
    */
-  params: Props;
+  params: Props
 }
 
 /**
@@ -323,7 +323,7 @@ export interface SelectorCleanupConfig {
    *
    * @defaultValue 1000 (1 second)
    */
-  readonly CLEANUP_INTERVAL: number;
+  readonly CLEANUP_INTERVAL: number
 
   /**
    * Time threshold for considering selectors inactive.
@@ -335,7 +335,7 @@ export interface SelectorCleanupConfig {
    *
    * @defaultValue 120000 (2 minutes)
    */
-  readonly INACTIVE_THRESHOLD: number;
+  readonly INACTIVE_THRESHOLD: number
 }
 
 /**
@@ -356,7 +356,7 @@ export interface ParameterCacheConfig {
    *
    * @defaultValue 30000 (30 seconds)
    */
-  readonly CLEANUP_INTERVAL: number;
+  readonly CLEANUP_INTERVAL: number
 
   /**
    * Time-to-live for parameter cache entries in milliseconds.
@@ -368,7 +368,7 @@ export interface ParameterCacheConfig {
    *
    * @defaultValue 300000 (5 minutes)
    */
-  readonly CACHE_TTL: number;
+  readonly CACHE_TTL: number
 }
 
 /**
@@ -386,7 +386,7 @@ export interface SelectorManagerStats {
    * Includes all selectors that are currently cached and receiving
    * updates. High numbers might indicate memory usage concerns.
    */
-  activeSelectorCount: number;
+  activeSelectorCount: number
 
   /**
    * Number of currently active dependency subscriptions.
@@ -395,7 +395,7 @@ export interface SelectorManagerStats {
    * Includes all subscriptions that are monitoring state changes.
    * Useful for understanding subscription patterns and potential leaks.
    */
-  dependencySubscriptionCount: number;
+  dependencySubscriptionCount: number
 
   /**
    * Whether the cleanup interval is currently running.
@@ -404,7 +404,7 @@ export interface SelectorManagerStats {
    * Indicates if the automatic cleanup system is active. The cleanup
    * system automatically starts and stops based on selector activity.
    */
-  cleanupIntervalActive: boolean;
+  cleanupIntervalActive: boolean
 
   /**
    * Total number of selectors cleaned up since manager creation.
@@ -413,7 +413,7 @@ export interface SelectorManagerStats {
    * Cumulative count of selectors that have been automatically cleaned
    * up due to inactivity. Useful for understanding cleanup effectiveness.
    */
-  totalSelectorsCleanedUp: number;
+  totalSelectorsCleanedUp: number
 
   /**
    * Total number of dependency subscriptions cleaned up since manager creation.
@@ -422,7 +422,7 @@ export interface SelectorManagerStats {
    * Cumulative count of subscriptions that have been cleaned up either
    * manually or automatically. Helps track subscription lifecycle patterns.
    */
-  totalDependencySubscriptionsCleanedUp: number;
+  totalDependencySubscriptionsCleanedUp: number
 }
 
 /**
@@ -434,10 +434,7 @@ export interface SelectorManagerStats {
  * or input selectors. This provides automatic garbage collection when
  * selectors or stores are no longer referenced.
  */
-export type SelectorCache = WeakMap<
-  Function,
-  WeakMap<any, MemoizedSelector<any>>
->;
+export type SelectorCache = WeakMap<Function, WeakMap<any, MemoizedSelector<any>>>
 
 /**
  * Enhanced cache structure with explicit state type information.
@@ -449,10 +446,7 @@ export type SelectorCache = WeakMap<
  * type information. Used internally by the SelectorManager to ensure
  * type safety across all cache operations.
  */
-export type TypedSelectorCache<S extends object> = WeakMap<
-  Function,
-  WeakMap<any, MemoizedSelector<any>>
->;
+export type TypedSelectorCache<S extends object> = WeakMap<Function, WeakMap<any, MemoizedSelector<any>>>
 
 /**
  * Cache entry metadata for debugging and monitoring.
@@ -468,32 +462,32 @@ export interface SelectorCacheMetadata<R> {
   /**
    * The cached selector instance.
    */
-  selector: MemoizedSelector<R>;
+  selector: MemoizedSelector<R>
 
   /**
    * Timestamp when this cache entry was created.
    */
-  createdAt: number;
+  createdAt: number
 
   /**
    * Number of times this selector has been accessed.
    */
-  accessCount: number;
+  accessCount: number
 
   /**
    * Last access timestamp for TTL calculations.
    */
-  lastAccessedAt: number;
+  lastAccessedAt: number
 
   /**
    * Whether this is a single or multi-selector.
    */
-  selectorType: "single" | "multi" | "parameterized";
+  selectorType: 'single' | 'multi' | 'parameterized'
 
   /**
    * Hash of the selector configuration for debugging.
    */
-  configurationHash?: string;
+  configurationHash?: string
 }
 
 /**
@@ -504,7 +498,7 @@ export interface SelectorCacheMetadata<R> {
  * the selector system. Ensures consistent cleanup behavior across
  * different subscription types.
  */
-export type SubscriptionCleanupFunction = () => void;
+export type SubscriptionCleanupFunction = () => void
 
 /**
  * Selector lifecycle event types for monitoring and debugging.
@@ -518,42 +512,42 @@ export enum SelectorLifecycleEvent {
   /**
    * Selector instance was created and cached.
    */
-  CREATED = "created",
+  CREATED = 'created',
 
   /**
    * Selector was accessed and returned cached result.
    */
-  CACHE_HIT = "cache_hit",
+  CACHE_HIT = 'cache_hit',
 
   /**
    * Selector was accessed but had to recompute result.
    */
-  CACHE_MISS = "cache_miss",
+  CACHE_MISS = 'cache_miss',
 
   /**
    * Selector was marked as inactive due to lack of access.
    */
-  MARKED_INACTIVE = "marked_inactive",
+  MARKED_INACTIVE = 'marked_inactive',
 
   /**
    * Selector was cleaned up and removed from cache.
    */
-  CLEANED_UP = "cleaned_up",
+  CLEANED_UP = 'cleaned_up',
 
   /**
    * Selector was manually destroyed.
    */
-  DESTROYED = "destroyed",
+  DESTROYED = 'destroyed',
 
   /**
    * Parameter cache entry was created for parameterized selector.
    */
-  PARAMETER_CACHE_CREATED = "parameter_cache_created",
+  PARAMETER_CACHE_CREATED = 'parameter_cache_created',
 
   /**
    * Parameter cache entry was removed due to TTL expiration.
    */
-  PARAMETER_CACHE_EXPIRED = "parameter_cache_expired",
+  PARAMETER_CACHE_EXPIRED = 'parameter_cache_expired',
 }
 
 /**
@@ -568,47 +562,47 @@ export interface SelectorPerformanceMetrics {
   /**
    * Total number of selector calls.
    */
-  totalCalls: number;
+  totalCalls: number
 
   /**
    * Number of calls that resulted in cache hits.
    */
-  cacheHits: number;
+  cacheHits: number
 
   /**
    * Number of calls that resulted in cache misses.
    */
-  cacheMisses: number;
+  cacheMisses: number
 
   /**
    * Average execution time for cache hits (microseconds).
    */
-  averageCacheHitTime: number;
+  averageCacheHitTime: number
 
   /**
    * Average execution time for cache misses (microseconds).
    */
-  averageCacheMissTime: number;
+  averageCacheMissTime: number
 
   /**
    * Total time spent in selector computations (microseconds).
    */
-  totalComputationTime: number;
+  totalComputationTime: number
 
   /**
    * Total time spent in equality checking (microseconds).
    */
-  totalEqualityCheckTime: number;
+  totalEqualityCheckTime: number
 
   /**
    * Number of times smart equality was used successfully.
    */
-  smartEqualitySuccesses: number;
+  smartEqualitySuccesses: number
 
   /**
    * Number of times deep equality fallback was required.
    */
-  deepEqualityFallbacks: number;
+  deepEqualityFallbacks: number
 }
 
 /**
@@ -625,39 +619,37 @@ export interface SelectorManagerInternalState<S extends object> {
   /**
    * Primary selector cache using WeakMap structure.
    */
-  selectorCache: TypedSelectorCache<S>;
+  selectorCache: TypedSelectorCache<S>
 
   /**
    * Set of all currently active selectors.
    */
-  activeSelectors: Set<MemoizedSelector<any>>;
+  activeSelectors: Set<MemoizedSelector<any>>
 
   /**
    * Set of all currently active dependency subscriptions.
    */
-  dependencySubscriptions: Set<DependencySubscription<any>>;
+  dependencySubscriptions: Set<DependencySubscription<any>>
 
   /**
    * Background cleanup interval timer.
    */
-  cleanupInterval: NodeJS.Timeout | null;
+  cleanupInterval: NodeJS.Timeout | null
 
   /**
    * Performance metrics collection (when enabled).
    */
-  performanceMetrics?: Map<string, SelectorPerformanceMetrics>;
+  performanceMetrics?: Map<string, SelectorPerformanceMetrics>
 
   /**
    * Debugging metadata collection (when enabled).
    */
-  debugMetadata?: Map<string, SelectorCacheMetadata<any>>;
+  debugMetadata?: Map<string, SelectorCacheMetadata<any>>
 
   /**
    * Lifecycle event listeners for monitoring.
    */
-  lifecycleListeners?: Array<
-    (event: SelectorLifecycleEvent, data: any) => void
-  >;
+  lifecycleListeners?: Array<(event: SelectorLifecycleEvent, data: any) => void>
 }
 
 /**
@@ -670,13 +662,8 @@ export interface SelectorManagerInternalState<S extends object> {
  * Useful for runtime type checking and debugging selector-related issues.
  * Checks for the presence of selector-specific properties.
  */
-export function isMemoizedSelector<R>(
-  value: any
-): value is MemoizedSelector<R> {
-  return (
-    typeof value === "function" &&
-    (value._isActive !== undefined || value._lastAccessed !== undefined)
-  );
+export function isMemoizedSelector<R>(value: any): value is MemoizedSelector<R> {
+  return typeof value === 'function' && (value._isActive !== undefined || value._lastAccessed !== undefined)
 }
 
 /**
@@ -689,16 +676,14 @@ export function isMemoizedSelector<R>(
  * Useful for runtime type checking and debugging subscription-related issues.
  * Checks for the presence of subscription-specific properties.
  */
-export function isDependencySubscription<T>(
-  value: any
-): value is DependencySubscription<T> {
+export function isDependencySubscription<T>(value: any): value is DependencySubscription<T> {
   return (
-    typeof value === "object" &&
+    typeof value === 'object' &&
     value !== null &&
-    typeof value.id === "string" &&
-    typeof value.cleanup === "function" &&
-    typeof value.isActive === "boolean"
-  );
+    typeof value.id === 'string' &&
+    typeof value.cleanup === 'function' &&
+    typeof value.isActive === 'boolean'
+  )
 }
 
 /**
@@ -711,12 +696,7 @@ export function isDependencySubscription<T>(
  * This utility type helps with complex selector compositions and type inference
  * in advanced selector patterns. Used internally by the selector system.
  */
-export type SelectorReturnType<S extends object, T> = T extends Selector<
-  S,
-  infer R
->
-  ? R
-  : never;
+export type SelectorReturnType<S extends object, T> = T extends Selector<S, infer R> ? R : never
 
 /**
  * Utility type for creating a tuple of selector return types.
@@ -728,12 +708,9 @@ export type SelectorReturnType<S extends object, T> = T extends Selector<
  * Converts an array of selector functions into a tuple of their return types.
  * Used for type inference in multi-selector compositions and parameterized selectors.
  */
-export type SelectorResults<
-  S extends object,
-  P extends readonly Selector<S, any>[]
-> = {
-  readonly [K in keyof P]: P[K] extends Selector<S, infer RT> ? RT : never;
-};
+export type SelectorResults<S extends object, P extends readonly Selector<S, any>[]> = {
+  readonly [K in keyof P]: P[K] extends Selector<S, infer RT> ? RT : never
+}
 
 /**
  * Function signature for parameterized selector projector functions.
@@ -748,12 +725,9 @@ export type SelectorResults<
  * The projector takes parameters and returns a combiner function that
  * operates on the input selector results.
  */
-export type ParameterizedProjector<
-  Props,
-  S extends object,
-  P extends readonly Selector<S, any>[],
-  R
-> = (params: Props) => (...results: SelectorResults<S, P>) => R;
+export type ParameterizedProjector<Props, S extends object, P extends readonly Selector<S, any>[], R> = (
+  params: Props
+) => (...results: SelectorResults<S, P>) => R
 
 /**
  * Return type for parameterized selectors with enhanced caching.
@@ -766,9 +740,7 @@ export type ParameterizedProjector<
  * returns a memoized selector. Each parameter combination gets its own
  * cached selector instance for optimal performance.
  */
-export type ParameterizedSelector<Props, R> = (
-  params: Props
-) => (() => R) & { lastValue?: R };
+export type ParameterizedSelector<Props, R> = (params: Props) => (() => R) & {lastValue?: R}
 
 /**
  * Internal cache structure for tracking selector instances.
@@ -780,10 +752,7 @@ export type ParameterizedSelector<Props, R> = (
  * automatic garbage collection. The two-level structure allows caching
  * based on both the selector function and its input dependencies.
  */
-export type SelectorCacheStructure<S extends object> = WeakMap<
-  Function,
-  WeakMap<any, MemoizedSelector<any>>
->;
+export type SelectorCacheStructure<S extends object> = WeakMap<Function, WeakMap<any, MemoizedSelector<any>>>
 
 /**
  * Set of active selectors being tracked by the manager.
@@ -793,7 +762,7 @@ export type SelectorCacheStructure<S extends object> = WeakMap<
  * management. Selectors are automatically added when created and removed
  * when cleaned up or destroyed.
  */
-export type ActiveSelectorsSet = Set<MemoizedSelector<any>>;
+export type ActiveSelectorsSet = Set<MemoizedSelector<any>>
 
 /**
  * Set of active dependency subscriptions being tracked by the manager.
@@ -803,9 +772,7 @@ export type ActiveSelectorsSet = Set<MemoizedSelector<any>>;
  * and lifecycle management. Subscriptions are automatically managed through
  * their lifecycle from creation to cleanup.
  */
-export type DependencySubscriptionsSet<S extends object> = Set<
-  DependencySubscription<any>
->;
+export type DependencySubscriptionsSet<S extends object> = Set<DependencySubscription<any>>
 
 /**
  * Smart equality comparison function signature.
@@ -820,7 +787,7 @@ export type DependencySubscriptionsSet<S extends object> = Set<
  * leverages Immer's structural sharing while falling back to deep equality
  * when necessary for complex nested structures.
  */
-export type SmartEqualityFunction<T = any> = (a: T, b: T) => boolean;
+export type SmartEqualityFunction<T = any> = (a: T, b: T) => boolean
 
 /**
  * Enhanced input change detection function signature.
@@ -837,7 +804,7 @@ export type SmartEqualityFunction<T = any> = (a: T, b: T) => boolean;
 export type InputChangeDetectionFunction<T extends readonly unknown[]> = (
   previousInputs: T | undefined,
   currentInputs: T
-) => boolean;
+) => boolean
 
 /**
  * Type guard function for checking if a value is a simple primitive.
@@ -850,7 +817,7 @@ export type InputChangeDetectionFunction<T extends readonly unknown[]> = (
  * Used to optimize equality checking by avoiding expensive deep comparisons
  * for primitive values that can use strict equality.
  */
-export type SimpleValueChecker = (value: any) => boolean;
+export type SimpleValueChecker = (value: any) => boolean
 
 /**
  * Type guard function for checking if a value is a plain object.
@@ -863,7 +830,7 @@ export type SimpleValueChecker = (value: any) => boolean;
  * Object.create(null), excluding arrays, functions, classes, etc.
  * Used to optimize equality checking strategies.
  */
-export type PlainObjectChecker = (value: any) => boolean;
+export type PlainObjectChecker = (value: any) => boolean
 
 /**
  * Private method signature for creating single selectors.
@@ -877,9 +844,7 @@ export type PlainObjectChecker = (value: any) => boolean;
  * Internal method that creates optimized single selectors leveraging
  * Immer's structural sharing for state reference equality checks.
  */
-export type CreateSingleSelectorMethod<S extends object> = <R>(
-  selectorFn: Selector<S, R>
-) => MemoizedSelector<R>;
+export type CreateSingleSelectorMethod<S extends object> = <R>(selectorFn: Selector<S, R>) => MemoizedSelector<R>
 
 /**
  * Private method signature for creating multi-selectors.
@@ -895,13 +860,10 @@ export type CreateSingleSelectorMethod<S extends object> = <R>(
  * Internal method that creates optimized multi-selectors with enhanced
  * input change detection using Immer-aware equality functions.
  */
-export type CreateMultiSelectorMethod<S extends object> = <
-  R,
-  P extends Selector<S, any>[]
->(
+export type CreateMultiSelectorMethod<S extends object> = <R, P extends Selector<S, any>[]>(
   inputSelectors: P,
   projector: (...results: any[]) => R
-) => MemoizedSelector<R>;
+) => MemoizedSelector<R>
 
 /**
  * Private method signature for creating multi-selectors with specific combiner functions.
@@ -918,13 +880,10 @@ export type CreateMultiSelectorMethod<S extends object> = <
  * selector instances for specific parameter combinations. Includes
  * state reference caching and enhanced input change detection.
  */
-export type CreateMultiSelectorWithCombinerMethod<S extends object> = <
-  R,
-  P extends Selector<S, any>[]
->(
+export type CreateMultiSelectorWithCombinerMethod<S extends object> = <R, P extends Selector<S, any>[]>(
   inputSelectors: readonly [...P],
   combiner: (...results: any[]) => R
-) => MemoizedSelector<R>;
+) => MemoizedSelector<R>
 
 /**
  * Cleanup management method signature for ensuring cleanup intervals are running.
@@ -934,7 +893,7 @@ export type CreateMultiSelectorWithCombinerMethod<S extends object> = <
  * are active and stops it when no selectors remain. Prevents unnecessary
  * background work when the manager is idle.
  */
-export type EnsureCleanupRunningMethod = () => void;
+export type EnsureCleanupRunningMethod = () => void
 
 /**
  * Individual selector cleanup method signature.
@@ -946,7 +905,7 @@ export type EnsureCleanupRunningMethod = () => void;
  * cleanup function, marking it as inactive, and removing it from active sets.
  * Also handles parameterized selector cache cleanup.
  */
-export type CleanupSelectorMethod = (selector: MemoizedSelector<any>) => void;
+export type CleanupSelectorMethod = (selector: MemoizedSelector<any>) => void
 
 /**
  * Parameter serialization function signature for parameterized selectors.
@@ -960,7 +919,7 @@ export type CleanupSelectorMethod = (selector: MemoizedSelector<any>) => void;
  * for different parameter combinations. Handles complex objects gracefully
  * with fallback strategies for non-serializable values.
  */
-export type ParameterSerializationFunction<Props> = (params: Props) => string;
+export type ParameterSerializationFunction<Props> = (params: Props) => string
 
 /**
  * Cleanup interval management function signature for parameterized selectors.
@@ -970,7 +929,7 @@ export type ParameterSerializationFunction<Props> = (params: Props) => string;
  * cache entries. Automatically starts and stops cleanup based on cache
  * activity to prevent memory leaks while minimizing overhead.
  */
-export type ParameterCleanupManagementFunction = () => void;
+export type ParameterCleanupManagementFunction = () => void
 
 /**
  * Complete interface for the SelectorManager class including all private methods.
@@ -1008,12 +967,12 @@ export interface ISelectorManager<S extends object> {
           ...P,
           (
             ...results: {
-              [K in keyof P]: P[K] extends Selector<S, infer RT> ? RT : never;
+              [K in keyof P]: P[K] extends Selector<S, infer RT> ? RT : never
             }
-          ) => R
+          ) => R,
         ]
       | [Selector<S, R>]
-  ): MemoizedSelector<R>;
+  ): MemoizedSelector<R>
 
   /**
    * Creates a parameterized selector that accepts runtime parameters.
@@ -1033,10 +992,10 @@ export interface ISelectorManager<S extends object> {
     inputSelectors: readonly [...P],
     projector: (params: Props) => (
       ...results: {
-        [K in keyof P]: P[K] extends Selector<S, infer RT> ? RT : never;
+        [K in keyof P]: P[K] extends Selector<S, infer RT> ? RT : never
       }
     ) => R
-  ): (params: Props) => (() => R) & { lastValue?: R };
+  ): (params: Props) => (() => R) & {lastValue?: R}
 
   // --- Dependency Subscriptions ---
 
@@ -1057,7 +1016,7 @@ export interface ISelectorManager<S extends object> {
     selector: Selector<S, T>,
     listener: DependencyListener<T>,
     options?: DependencySubscriptionOptions
-  ): () => void;
+  ): () => void
 
   /**
    * Creates a multi-dependency subscription using multiple selectors.
@@ -1074,12 +1033,9 @@ export interface ISelectorManager<S extends object> {
    */
   createMultiDependencySubscription<P extends Selector<S, any>[]>(
     selectors: readonly [...P],
-    listener: (
-      newValues: SelectorResults<S, P>,
-      oldValues: SelectorResults<S, P>
-    ) => void,
+    listener: (newValues: SelectorResults<S, P>, oldValues: SelectorResults<S, P>) => void,
     options?: DependencySubscriptionOptions
-  ): () => void;
+  ): () => void
 
   /**
    * Creates a path-based subscription using dot notation.
@@ -1098,7 +1054,7 @@ export interface ISelectorManager<S extends object> {
     path: string,
     listener: DependencyListener<T>,
     options?: DependencySubscriptionOptions
-  ): () => void;
+  ): () => void
 
   // --- Cleanup and Management ---
 
@@ -1112,7 +1068,7 @@ export interface ISelectorManager<S extends object> {
    * within the inactive threshold. Useful for memory management in
    * long-running applications.
    */
-  cleanupSelectors(): number;
+  cleanupSelectors(): number
 
   /**
    * Manually cleanup inactive dependency subscriptions.
@@ -1123,7 +1079,7 @@ export interface ISelectorManager<S extends object> {
    * Forces cleanup of subscriptions that may have become inactive but
    * haven't been garbage collected yet. Useful for debugging memory issues.
    */
-  cleanupDependencySubscriptions(): number;
+  cleanupDependencySubscriptions(): number
 
   /**
    * Completely destroys the selector manager and all associated resources.
@@ -1132,7 +1088,7 @@ export interface ISelectorManager<S extends object> {
    * Cleans up all selectors, subscriptions, and intervals. Should be called
    * when the store is destroyed to prevent memory leaks.
    */
-  destroyAll(): void;
+  destroyAll(): void
 
   // --- Debugging and Statistics ---
 
@@ -1145,7 +1101,7 @@ export interface ISelectorManager<S extends object> {
    * Useful for debugging memory leaks and understanding subscription
    * patterns in the application.
    */
-  getDependencySubscriptionCount(): number;
+  getDependencySubscriptionCount(): number
 }
 
 /**
@@ -1188,7 +1144,7 @@ export interface ISelectorManagerInternal<S extends object> {
    *
    * @internal
    */
-  privatecreateSingleSelector: CreateSingleSelectorMethod<S>;
+  privatecreateSingleSelector: CreateSingleSelectorMethod<S>
 
   /**
    * Creates an optimized multi-selector that leverages Immer's structural sharing.
@@ -1217,7 +1173,7 @@ export interface ISelectorManagerInternal<S extends object> {
    *
    * @internal
    */
-  createMultiSelector: CreateMultiSelectorMethod<S>;
+  createMultiSelector: CreateMultiSelectorMethod<S>
 
   /**
    * Creates a multi-selector with a specific combiner function for parameterized selectors.
@@ -1247,7 +1203,7 @@ export interface ISelectorManagerInternal<S extends object> {
    *
    * @internal
    */
-  createMultiSelectorWithCombiner: CreateMultiSelectorWithCombinerMethod<S>;
+  createMultiSelectorWithCombiner: CreateMultiSelectorWithCombinerMethod<S>
 
   // --- Private Helper Methods ---
 
@@ -1286,7 +1242,7 @@ export interface ISelectorManagerInternal<S extends object> {
    *
    * @internal
    */
-  smartEqual: SmartEqualityFunction;
+  smartEqual: SmartEqualityFunction
 
   /**
    * Enhanced input change detection using Immer-optimized equality.
@@ -1322,7 +1278,7 @@ export interface ISelectorManagerInternal<S extends object> {
    *
    * @internal
    */
-  haveInputsChanged: InputChangeDetectionFunction<any>;
+  haveInputsChanged: InputChangeDetectionFunction<any>
 
   /**
    * Checks if a value is a simple primitive or simple object.
@@ -1346,7 +1302,7 @@ export interface ISelectorManagerInternal<S extends object> {
    *
    * @internal
    */
-  isSimpleValue: SimpleValueChecker;
+  isSimpleValue: SimpleValueChecker
 
   /**
    * Checks if a value is a plain object (not an array, Set, Map, etc.).
@@ -1371,7 +1327,7 @@ export interface ISelectorManagerInternal<S extends object> {
    *
    * @internal
    */
-  isPlainObject: PlainObjectChecker;
+  isPlainObject: PlainObjectChecker
 
   /**
    * Ensures the cleanup interval is running when selectors are active.
@@ -1401,7 +1357,7 @@ export interface ISelectorManagerInternal<S extends object> {
    *
    * @internal
    */
-  ensureCleanupRunning: EnsureCleanupRunningMethod;
+  ensureCleanupRunning: EnsureCleanupRunningMethod
 
   /**
    * Cleans up an individual selector instance.
@@ -1433,7 +1389,7 @@ export interface ISelectorManagerInternal<S extends object> {
    *
    * @internal
    */
-  cleanupSelector: CleanupSelectorMethod;
+  cleanupSelector: CleanupSelectorMethod
 
   // --- Dependency Subscriptions ---
 
@@ -1454,7 +1410,7 @@ export interface ISelectorManagerInternal<S extends object> {
     selector: Selector<S, T>,
     listener: DependencyListener<T>,
     options?: DependencySubscriptionOptions
-  ): () => void;
+  ): () => void
 
   /**
    * Creates a multi-dependency subscription using multiple selectors.
@@ -1471,12 +1427,9 @@ export interface ISelectorManagerInternal<S extends object> {
    */
   createMultiDependencySubscription<P extends Selector<S, any>[]>(
     selectors: readonly [...P],
-    listener: (
-      newValues: SelectorResults<S, P>,
-      oldValues: SelectorResults<S, P>
-    ) => void,
+    listener: (newValues: SelectorResults<S, P>, oldValues: SelectorResults<S, P>) => void,
     options?: DependencySubscriptionOptions
-  ): () => void;
+  ): () => void
 
   /**
    * Creates a path-based subscription using dot notation.
@@ -1495,7 +1448,7 @@ export interface ISelectorManagerInternal<S extends object> {
     path: string,
     listener: DependencyListener<T>,
     options?: DependencySubscriptionOptions
-  ): () => void;
+  ): () => void
 
   // --- Cleanup and Management ---
 
@@ -1509,7 +1462,7 @@ export interface ISelectorManagerInternal<S extends object> {
    * within the inactive threshold. Useful for memory management in
    * long-running applications.
    */
-  cleanupSelectors(): number;
+  cleanupSelectors(): number
 
   /**
    * Manually cleanup inactive dependency subscriptions.
@@ -1520,7 +1473,7 @@ export interface ISelectorManagerInternal<S extends object> {
    * Forces cleanup of subscriptions that may have become inactive but
    * haven't been garbage collected yet. Useful for debugging memory issues.
    */
-  cleanupDependencySubscriptions(): number;
+  cleanupDependencySubscriptions(): number
 
   /**
    * Completely destroys the selector manager and all associated resources.
@@ -1529,7 +1482,7 @@ export interface ISelectorManagerInternal<S extends object> {
    * Cleans up all selectors, subscriptions, and intervals. Should be called
    * when the store is destroyed to prevent memory leaks.
    */
-  destroyAll(): void;
+  destroyAll(): void
 
   // --- Debugging and Statistics ---
 
@@ -1542,7 +1495,7 @@ export interface ISelectorManagerInternal<S extends object> {
    * Useful for debugging memory leaks and understanding subscription
    * patterns in the application.
    */
-  getDependencySubscriptionCount(): number;
+  getDependencySubscriptionCount(): number
 
   // --- Private Internal Properties ---
 
@@ -1566,7 +1519,7 @@ export interface ISelectorManagerInternal<S extends object> {
    *
    * @internal
    */
-  selectorCache: SelectorCacheStructure<S>;
+  selectorCache: SelectorCacheStructure<S>
 
   /**
    * Set of currently active memoized selectors.
@@ -1586,7 +1539,7 @@ export interface ISelectorManagerInternal<S extends object> {
    *
    * @internal
    */
-  activeSelectors: ActiveSelectorsSet;
+  activeSelectors: ActiveSelectorsSet
 
   /**
    * Cleanup interval timer for automatic selector management.
@@ -1605,7 +1558,7 @@ export interface ISelectorManagerInternal<S extends object> {
    *
    * @internal
    */
-  cleanupInterval: NodeJS.Timeout | null;
+  cleanupInterval: NodeJS.Timeout | null
 
   /**
    * Set of currently active dependency subscriptions.
@@ -1625,7 +1578,7 @@ export interface ISelectorManagerInternal<S extends object> {
    *
    * @internal
    */
-  dependencySubscriptions: DependencySubscriptionsSet<S>;
+  dependencySubscriptions: DependencySubscriptionsSet<S>
 
   // --- Configuration Constants ---
 
@@ -1643,7 +1596,7 @@ export interface ISelectorManagerInternal<S extends object> {
    *
    * @internal
    */
-  readonly CLEANUP_INTERVAL: number;
+  readonly CLEANUP_INTERVAL: number
 
   /**
    * Time threshold for considering selectors inactive in milliseconds.
@@ -1659,7 +1612,7 @@ export interface ISelectorManagerInternal<S extends object> {
    *
    * @internal
    */
-  readonly INACTIVE_THRESHOLD: number;
+  readonly INACTIVE_THRESHOLD: number
 }
 
 /**
@@ -1704,7 +1657,7 @@ export interface SelectorManagerInternalHelpers<S extends object> {
    *
    * @internal
    */
-  serializeParams<Props>(params: Props): string;
+  serializeParams<Props>(params: Props): string
 
   /**
    * Cleanup interval management for parameterized selector caches.
@@ -1734,7 +1687,7 @@ export interface SelectorManagerInternalHelpers<S extends object> {
    *
    * @internal
    */
-  ensureParameterCleanupRunning(): void;
+  ensureParameterCleanupRunning(): void
 
   /**
    * Enhanced equality checking specifically optimized for selector inputs.
@@ -1770,7 +1723,7 @@ export interface SelectorManagerInternalHelpers<S extends object> {
    *
    * @internal
    */
-  selectorOptimizedEqual<T>(a: T, b: T): boolean;
+  selectorOptimizedEqual<T>(a: T, b: T): boolean
 }
 
 /**
@@ -1784,29 +1737,29 @@ export class SelectorError extends Error {
   constructor(
     message: string,
     public readonly context?: {
-      operation?: string;
-      selectorType?: string;
-      parametersHash?: string;
-      subscriptionId?: string;
-      additionalInfo?: Record<string, any>;
+      operation?: string
+      selectorType?: string
+      parametersHash?: string
+      subscriptionId?: string
+      additionalInfo?: Record<string, any>
     }
   ) {
-    super(message);
-    this.name = "SelectorError";
+    super(message)
+    this.name = 'SelectorError'
   }
 }
 
 export class SelectorCacheError extends SelectorError {
-  constructor(message: string, context?: SelectorError["context"]) {
-    super(message, { ...context, operation: "cache" });
-    this.name = "SelectorCacheError";
+  constructor(message: string, context?: SelectorError['context']) {
+    super(message, {...context, operation: 'cache'})
+    this.name = 'SelectorCacheError'
   }
 }
 
 export class DependencySubscriptionError extends SelectorError {
-  constructor(message: string, context?: SelectorError["context"]) {
-    super(message, { ...context, operation: "dependencySubscription" });
-    this.name = "DependencySubscriptionError";
+  constructor(message: string, context?: SelectorError['context']) {
+    super(message, {...context, operation: 'dependencySubscription'})
+    this.name = 'DependencySubscriptionError'
   }
 }
 
@@ -1827,7 +1780,7 @@ export interface SelectorManagerOptions<S extends object> {
    * Controls automatic cleanup of inactive selectors to prevent memory leaks.
    * Can be customized based on application requirements and memory constraints.
    */
-  cleanupConfig?: Partial<SelectorCleanupConfig>;
+  cleanupConfig?: Partial<SelectorCleanupConfig>
 
   /**
    * Configuration for parameterized selector caching.
@@ -1836,7 +1789,7 @@ export interface SelectorManagerOptions<S extends object> {
    * Controls TTL-based cleanup of parameter cache entries to prevent
    * memory growth from unused parameter combinations.
    */
-  parameterCacheConfig?: Partial<ParameterCacheConfig>;
+  parameterCacheConfig?: Partial<ParameterCacheConfig>
 
   /**
    * Whether to enable detailed debugging and statistics collection.
@@ -1848,7 +1801,7 @@ export interface SelectorManagerOptions<S extends object> {
    *
    * @defaultValue false
    */
-  enableDebugMode?: boolean;
+  enableDebugMode?: boolean
 
   /**
    * Custom error handler for selector-related errors.
@@ -1857,7 +1810,7 @@ export interface SelectorManagerOptions<S extends object> {
    * Allows custom handling of errors that occur during selector operations.
    * If not provided, errors are handled by the store's error handling system.
    */
-  onError?: (error: SelectorError) => void;
+  onError?: (error: SelectorError) => void
 
   /**
    * The store instance this selector manager is associated with.
@@ -1866,7 +1819,7 @@ export interface SelectorManagerOptions<S extends object> {
    * Required for creating subscriptions and accessing store functionality.
    * The selector manager maintains a reference to the store for its operations.
    */
-  store: Store<S>;
+  store: Store<S>
 }
 
 /**
@@ -1879,9 +1832,9 @@ export interface SelectorManagerOptions<S extends object> {
 export const DEFAULT_SELECTOR_CLEANUP_CONFIG: SelectorCleanupConfig = {
   CLEANUP_INTERVAL: 1 * 1000, // 1 second
   INACTIVE_THRESHOLD: 2 * 60 * 1000, // 2 minutes
-} as const;
+} as const
 
 export const DEFAULT_PARAMETER_CACHE_CONFIG: ParameterCacheConfig = {
   CLEANUP_INTERVAL: 30 * 1000, // 30 seconds
   CACHE_TTL: 5 * 60 * 1000, // 5 minutes
-} as const;
+} as const

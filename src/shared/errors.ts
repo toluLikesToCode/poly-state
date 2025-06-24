@@ -1,7 +1,10 @@
 export class StoreError extends Error {
-  constructor(message: string, public context?: any) {
-    super(message);
-    this.name = this.constructor.name;
+  constructor(
+    message: string,
+    public context?: any
+  ) {
+    super(message)
+    this.name = this.constructor.name
   }
 }
 
@@ -15,10 +18,10 @@ export class TransactionError extends StoreError {}
  * Context information for error handling
  */
 export interface ErrorContext {
-  operation: string;
-  pluginName?: string;
-  actionPayload?: any;
-  additionalInfo?: Record<string, any>;
+  operation: string
+  pluginName?: string
+  actionPayload?: any
+  additionalInfo?: Record<string, any>
 }
 
 /**
@@ -31,7 +34,7 @@ export class StorageError extends Error {
     public key?: string,
     public originalError?: unknown
   ) {
-    super(message);
-    this.name = "StorageError";
+    super(message)
+    this.name = 'StorageError'
   }
 }

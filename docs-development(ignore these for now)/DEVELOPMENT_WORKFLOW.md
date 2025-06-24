@@ -114,42 +114,42 @@ npm start  # or npm run dev, yarn dev, etc.
 
 ```typescript
 // In your external project
-import { createStore, StoreConfig } from "open-store";
+import {createStore, StoreConfig} from 'open-store'
 
 interface AppState {
-  count: number;
-  user: { name: string; email: string } | null;
+  count: number
+  user: {name: string; email: string} | null
 }
 
 const initialState: AppState = {
   count: 0,
   user: null,
-};
+}
 
 const config: StoreConfig<AppState> = {
   enableHistory: true,
   maxHistorySize: 50,
-};
+}
 
-const store = createStore(initialState, config);
+const store = createStore(initialState, config)
 
 // Subscribe to changes
 store.subscribe((state, previousState) => {
-  console.log("State changed:", state);
-});
+  console.log('State changed:', state)
+})
 
 // Update state
-store.setState({ count: store.getState().count + 1 });
+store.setState({count: store.getState().count + 1})
 ```
 
 #### React Usage
 
 ```tsx
 // App.tsx - Root component
-import React from "react";
-import { StoreProvider } from "open-store/react";
-import { store } from "./store";
-import Counter from "./Counter";
+import React from 'react'
+import {StoreProvider} from 'open-store/react'
+import {store} from './store'
+import Counter from './Counter'
 
 function App() {
   return (
@@ -159,31 +159,31 @@ function App() {
         <Counter />
       </div>
     </StoreProvider>
-  );
+  )
 }
 
-export default App;
+export default App
 ```
 
 ```tsx
 // Counter.tsx - Component using the store
-import React from "react";
-import { useStore } from "open-store/react";
+import React from 'react'
+import {useStore} from 'open-store/react'
 
 interface AppState {
-  count: number;
+  count: number
 }
 
 function Counter() {
-  const { state, setState } = useStore<AppState>();
+  const {state, setState} = useStore<AppState>()
 
   const increment = () => {
-    setState({ count: state.count + 1 });
-  };
+    setState({count: state.count + 1})
+  }
 
   const decrement = () => {
-    setState({ count: state.count - 1 });
-  };
+    setState({count: state.count - 1})
+  }
 
   return (
     <div>
@@ -191,10 +191,10 @@ function Counter() {
       <button onClick={increment}>+</button>
       <button onClick={decrement}>-</button>
     </div>
-  );
+  )
 }
 
-export default Counter;
+export default Counter
 ```
 
 ### Cleanup NPM Link
@@ -470,10 +470,10 @@ npx tsc --noEmit
 
    ```typescript
    // Test vanilla
-   import { createStore } from "open-store";
+   import {createStore} from 'open-store'
 
    // Test React
-   import { useStore } from "open-store/react";
+   import {useStore} from 'open-store/react'
    ```
 
 4. **Keep external project's dev server running**

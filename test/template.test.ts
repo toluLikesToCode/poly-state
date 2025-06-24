@@ -5,70 +5,70 @@
  * Replace the placeholder content with your actual test cases.
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { createStore, type Store } from "../src/core";
+import {describe, it, expect, beforeEach, afterEach, vi} from 'vitest'
+import {createStore, type Store} from '../src/core'
 // For React tests, also import:
 // import { createStoreContext } from '../src/react/index.js'
 
 interface ExampleState {
-  count: number;
-  name: string;
+  count: number
+  name: string
 }
 
-describe("Feature Name", () => {
-  let store: Store<ExampleState>;
+describe('Feature Name', () => {
+  let store: Store<ExampleState>
 
   beforeEach(() => {
     // Setup before each test
     store = createStore({
       count: 0,
-      name: "test",
-    });
-  });
+      name: 'test',
+    })
+  })
 
   afterEach(() => {
     // Cleanup after each test if needed
-    vi.clearAllMocks();
-  });
+    vi.clearAllMocks()
+  })
 
-  describe("Basic functionality", () => {
-    it("should initialize with correct state", () => {
+  describe('Basic functionality', () => {
+    it('should initialize with correct state', () => {
       expect(store.getState()).toEqual({
         count: 0,
-        name: "test",
-      });
-    });
+        name: 'test',
+      })
+    })
 
-    it("should update state correctly", () => {
-      store.dispatch({ count: 1 });
+    it('should update state correctly', () => {
+      store.dispatch({count: 1})
       expect(store.getState()).toEqual({
         count: 1,
-        name: "test",
-      });
-    });
-  });
+        name: 'test',
+      })
+    })
+  })
 
-  describe("Edge cases", () => {
-    it("should handle edge case scenarios", () => {
+  describe('Edge cases', () => {
+    it('should handle edge case scenarios', () => {
       // Test edge cases - example:
-      store.dispatch({ count: -1 });
-      expect(store.getState().count).toBe(-1);
-    });
-  });
+      store.dispatch({count: -1})
+      expect(store.getState().count).toBe(-1)
+    })
+  })
 
-  describe("Error handling", () => {
-    it("should handle invalid operations gracefully", () => {
+  describe('Error handling', () => {
+    it('should handle invalid operations gracefully', () => {
       // Example of testing error scenarios
-      const initialState = store.getState();
+      const initialState = store.getState()
 
       // This should not crash the store
-      store.dispatch({});
+      store.dispatch({})
 
       // State should remain consistent
-      expect(store.getState()).toEqual(initialState);
-    });
-  });
-});
+      expect(store.getState()).toEqual(initialState)
+    })
+  })
+})
 
 /**
  * Migration Checklist for Existing Tests:

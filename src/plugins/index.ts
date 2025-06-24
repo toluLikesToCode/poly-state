@@ -12,8 +12,8 @@
 
 // Example plugin structure - replace with your actual plugins
 export interface ExamplePlugin {
-  name: string;
-  version: string;
+  name: string
+  version: string
 }
 
 // Export your actual plugins here

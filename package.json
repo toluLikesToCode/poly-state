@@ -30,18 +30,13 @@
     "test:core": "vitest run test/core",
     "test:react": "vitest run test/react",
     "lint": "eslint src --ext .ts,.tsx",
+    "lint:fix": "eslint src --ext .ts,.tsx --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "prepare": "npm run build",
     "clean": "rm -rf dist coverage"
   },
-  "keywords": [
-    "state-management",
-    "typescript",
-    "react",
-    "store",
-    "immutable",
-    "persistence",
-    "undo-redo"
-  ],
+  "keywords": ["state-management", "typescript", "react", "store", "immutable", "persistence", "undo-redo"],
   "author": "ToluLikesToCode",
   "license": "MIT",
   "peerDependencies": {
@@ -69,6 +64,7 @@
     "@vitest/ui": "^3.2.4",
     "eslint": "^8.0.0",
     "jsdom": "^26.1.0",
+    "prettier": "^3.0.0",
     "react": "^18.0.0",
     "react-dom": "^19.1.0",
     "rollup": "^3.0.0",

@@ -18,9 +18,9 @@
  */
 
 // Re-export everything from core
-export * from "./core";
+export * from './core'
 
 // Re-export plugins
-export * from "./plugins";
+export * from './plugins'
 
-export * from "./shared";
+export * from './shared'

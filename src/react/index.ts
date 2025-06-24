@@ -45,25 +45,17 @@ import React, {
   useRef,
   type ReactNode,
   type ComponentType,
-} from "react";
-import type { Store, ReadOnlyStore, Thunk } from "../core/state/index";
-import type {
-  Selector,
-  DependencyListener,
-  DependencySubscriptionOptions,
-} from "../core/selectors/index";
-import type { Draft } from "immer";
-import { getPath } from "../core/utils/path";
+} from 'react'
+import type {Store, ReadOnlyStore, Thunk} from '../core/state/index'
+import type {Selector, DependencyListener, DependencySubscriptionOptions} from '../core/selectors/index'
+import type {Draft} from 'immer'
+import {getPath} from '../core/utils/path'
 
 // Re-export all types for convenience
-export * from "./types";
+export * from './types'
 
 // Import types from the dedicated types file
-import type {
-  StoreContextValue,
-  StoreContextResult,
-  UseSubscribeToHook,
-} from "./types";
+import type {StoreContextValue, StoreContextResult, UseSubscribeToHook} from './types'
 
 /**
  * Creates React context and hooks for a store instance
@@ -109,184 +101,168 @@ import type {
  * @see {@link StoreContextResult} for all available hooks and their documentation
  * @see {@link Store} for the store interface
  */
-export function createStoreContext<S extends object>(
-  store: Store<S>
-): StoreContextResult<S> {
-  const StoreContext = createContext<StoreContextValue<S> | null>(null);
+export function createStoreContext<S extends object>(store: Store<S>): StoreContextResult<S> {
+  const StoreContext = createContext<StoreContextValue<S> | null>(null)
 
-  const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const StoreProvider: React.FC<{children: ReactNode}> = ({children}) => {
     const contextValue = useMemo(
       () => ({
         store: store,
       }),
       []
-    );
+    )
 
-    return React.createElement(
-      StoreContext.Provider,
-      { value: contextValue },
-      children
-    );
-  };
+    return React.createElement(StoreContext.Provider, {value: contextValue}, children)
+  }
 
   const useStore = (): Store<S> => {
-    const context = useContext(StoreContext);
+    const context = useContext(StoreContext)
     if (!context) {
-      throw new Error("useStore must be used within a StoreProvider");
+      throw new Error('useStore must be used within a StoreProvider')
     }
-    return context.store;
-  };
+    return context.store
+  }
 
   const useSelector = <R>(selector: Selector<S, R>): R => {
-    const store = useStore();
-    const [selectedValue, setSelectedValue] = useState<R>(() =>
-      selector(store.getState())
-    );
+    const store = useStore()
+    const [selectedValue, setSelectedValue] = useState<R>(() => selector(store.getState()))
 
     useEffect(() => {
       // Update the value immediately in case the selector or store changed
-      const newValue = selector(store.getState());
-      setSelectedValue(newValue);
+      const newValue = selector(store.getState())
+      setSelectedValue(newValue)
 
       const unsubscribe = store.subscribe(() => {
-        const latestValue = selector(store.getState());
-        setSelectedValue(latestValue);
-      });
+        const latestValue = selector(store.getState())
+        setSelectedValue(latestValue)
+      })
 
-      return unsubscribe;
-    }, [store, selector]);
+      return unsubscribe
+    }, [store, selector])
 
-    return selectedValue;
-  };
+    return selectedValue
+  }
 
-  const useDispatch = (): Store<S>["dispatch"] => {
-    const context = useContext(StoreContext);
+  const useDispatch = (): Store<S>['dispatch'] => {
+    const context = useContext(StoreContext)
     if (!context) {
-      throw new Error("useDispatch must be used within a StoreProvider");
+      throw new Error('useDispatch must be used within a StoreProvider')
     }
 
-    const writableStore = context.store as any as Store<S>;
+    const writableStore = context.store as any as Store<S>
     if (!writableStore.dispatch) {
-      throw new Error("Store does not support dispatching actions");
+      throw new Error('Store does not support dispatching actions')
     }
 
-    return writableStore.dispatch;
-  };
+    return writableStore.dispatch
+  }
 
   const useStoreState = (): S => {
-    const store = useStore();
-    const [state, setState] = useState<S>(() => store.getState());
+    const store = useStore()
+    const [state, setState] = useState<S>(() => store.getState())
 
     useEffect(() => {
       const unsubscribe = store.subscribe(() => {
-        setState(store.getState());
-      });
+        setState(store.getState())
+      })
 
-      return unsubscribe;
-    }, [store]);
+      return unsubscribe
+    }, [store])
 
-    return state;
-  };
+    return state
+  }
 
   const useSubscribeTo: UseSubscribeToHook<S> = <R>(
     selector: Selector<S, R>,
     listener: DependencyListener<R>,
     options?: DependencySubscriptionOptions
   ) => {
-    const store = useStore();
-    const listenerRef = useRef(listener);
-    listenerRef.current = listener;
+    const store = useStore()
+    const listenerRef = useRef(listener)
+    listenerRef.current = listener
 
     useEffect(() => {
-      return store.subscribeTo(
-        selector,
-        (newVal, oldVal) => listenerRef.current(newVal, oldVal),
-        options
-      );
-    }, [store, selector, options?.immediate]);
-  };
+      return store.subscribeTo(selector, (newVal, oldVal) => listenerRef.current(newVal, oldVal), options)
+    }, [store, selector, options?.immediate])
+  }
 
   const useSubscribeToPath = <T = any>(
     path: string,
     listener: DependencyListener<T>,
     options?: DependencySubscriptionOptions
   ) => {
-    const store = useStore();
-    const listenerRef = useRef(listener);
-    listenerRef.current = listener;
+    const store = useStore()
+    const listenerRef = useRef(listener)
+    listenerRef.current = listener
 
     useEffect(() => {
-      return store.subscribeToPath(
-        path,
-        (newVal: T, oldVal: T) => listenerRef.current(newVal, oldVal),
-        options
-      );
-    }, [store, path, options?.immediate]);
-  };
+      return store.subscribeToPath(path, (newVal: T, oldVal: T) => listenerRef.current(newVal, oldVal), options)
+    }, [store, path, options?.immediate])
+  }
 
   const useStoreValue = <T = any>(path: string): T => {
-    const store = useStore();
-    const pathArray = path.split(".");
+    const store = useStore()
+    const pathArray = path.split('.')
     const [value, setValue] = useState<T>(() => {
-      const state = store.getState();
-      return getPath(state, pathArray) as T;
-    });
+      const state = store.getState()
+      return getPath(state, pathArray) as T
+    })
 
     useEffect(() => {
       return store.subscribeToPath(path, (newVal: T) => {
-        setValue(newVal);
-      });
-    }, [store, path]);
+        setValue(newVal)
+      })
+    }, [store, path])
 
-    return value;
-  };
+    return value
+  }
 
   const useTransaction = () => {
-    const store = useStore();
+    const store = useStore()
 
     return useCallback(
       (recipe: (draft: Draft<S>) => void) => {
-        return store.transaction(recipe);
+        return store.transaction(recipe)
       },
       [store]
-    );
-  };
+    )
+  }
 
   const useBatch = () => {
-    const store = useStore();
+    const store = useStore()
 
     return useCallback(
       (fn: () => void) => {
-        store.batch(fn);
+        store.batch(fn)
       },
       [store]
-    );
-  };
+    )
+  }
 
   const useUpdatePath = () => {
-    const store = useStore();
+    const store = useStore()
 
     return useCallback(
       <V = any>(path: (string | number)[], updater: (currentValue: V) => V) => {
-        store.updatePath(path, updater);
+        store.updatePath(path, updater)
       },
       [store]
-    );
-  };
+    )
+  }
 
   const useStoreHistory = () => {
-    const store = useStore();
-    const [historyState, setHistoryState] = useState(() => store.getHistory());
+    const store = useStore()
+    const [historyState, setHistoryState] = useState(() => store.getHistory())
 
     useEffect(() => {
       const unsubscribe = store.subscribe(() => {
-        setHistoryState(store.getHistory());
-      });
-      return unsubscribe;
-    }, [store]);
+        setHistoryState(store.getHistory())
+      })
+      return unsubscribe
+    }, [store])
 
-    const undo = useCallback((steps?: number) => store.undo(steps), [store]);
-    const redo = useCallback((steps?: number) => store.redo(steps), [store]);
+    const undo = useCallback((steps?: number) => store.undo(steps), [store])
+    const redo = useCallback((steps?: number) => store.redo(steps), [store])
 
     return {
       ...historyState,
@@ -294,61 +270,61 @@ export function createStoreContext<S extends object>(
       redo,
       canUndo: historyState.currentIndex > 0,
       canRedo: historyState.currentIndex < historyState.history.length - 1,
-    };
-  };
+    }
+  }
 
   const useThunk = () => {
-    const dispatch = useDispatch();
+    const dispatch = useDispatch()
 
     return useCallback(
       <R>(thunk: Thunk<S, R>) => {
-        return dispatch(thunk);
+        return dispatch(thunk)
       },
       [dispatch]
-    );
-  };
+    )
+  }
 
   const useAsyncThunk = () => {
-    const dispatch = useDispatch();
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<Error | null>(null);
+    const dispatch = useDispatch()
+    const [loading, setLoading] = useState(false)
+    const [error, setError] = useState<Error | null>(null)
 
     const execute = useCallback(
       async <R>(thunk: Thunk<S, Promise<R>>) => {
-        setLoading(true);
-        setError(null);
+        setLoading(true)
+        setError(null)
 
         try {
-          const result = await dispatch(thunk);
-          return result;
+          const result = await dispatch(thunk)
+          return result
         } catch (err) {
-          const error = err instanceof Error ? err : new Error(String(err));
-          setError(error);
-          throw error;
+          const error = err instanceof Error ? err : new Error(String(err))
+          setError(error)
+          throw error
         } finally {
-          setLoading(false);
+          setLoading(false)
         }
       },
       [dispatch]
-    );
+    )
 
-    return { execute, loading, error };
-  };
+    return {execute, loading, error}
+  }
 
   const useStoreEffect = <R>(
     selector: Selector<S, R>,
     effect: (value: R, prevValue: R | undefined) => void | (() => void),
     deps?: React.DependencyList
   ) => {
-    const value = useSelector(selector);
-    const prevValueRef = useRef<R>();
+    const value = useSelector(selector)
+    const prevValueRef = useRef<R>()
 
     useEffect(() => {
-      const cleanup = effect(value, prevValueRef.current);
-      prevValueRef.current = value;
-      return cleanup;
-    }, [value, ...(deps || [])]);
-  };
+      const cleanup = effect(value, prevValueRef.current)
+      prevValueRef.current = value
+      return cleanup
+    }, [value, ...(deps || [])])
+  }
 
   return {
     StoreContext,
@@ -367,7 +343,7 @@ export function createStoreContext<S extends object>(
     useThunk,
     useAsyncThunk,
     useStoreEffect,
-  };
+  }
 }
 
 /**
@@ -412,27 +388,25 @@ export function createStoreContext<S extends object>(
  * @see {@link ReadOnlyStore} for the store interface provided to components
  */
 export function withStore<S extends object, P extends object>(
-  Component: ComponentType<P & { store: ReadOnlyStore<S> }>,
+  Component: ComponentType<P & {store: ReadOnlyStore<S>}>,
   store: Store<S>
 ): React.FC<P> {
-  const { StoreProvider, useStore } = createStoreContext(store);
+  const {StoreProvider, useStore} = createStoreContext(store)
 
   const WrappedComponent: React.FC<P> = props =>
     React.createElement(StoreProvider, {
       children: React.createElement(ConnectedComponent, props),
-    });
+    })
 
   const ConnectedComponent: React.FC<P> = props => {
-    const storeInstance = useStore();
+    const storeInstance = useStore()
     return React.createElement(Component, {
       ...props,
       store: storeInstance.asReadOnly(),
-    } as P & { store: ReadOnlyStore<S> });
-  };
+    } as P & {store: ReadOnlyStore<S>})
+  }
 
-  WrappedComponent.displayName = `withStore(${
-    Component.displayName || Component.name
-  })`;
+  WrappedComponent.displayName = `withStore(${Component.displayName || Component.name})`
 
-  return WrappedComponent;
+  return WrappedComponent
 }

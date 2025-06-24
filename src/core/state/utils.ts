@@ -1,5 +1,5 @@
-import { StoreError, ValidationError } from "../../shared/errors";
-import * as storage from "../storage/index";
+import {StoreError, ValidationError} from '../../shared/errors'
+import * as storage from '../storage/index'
 import {
   ActionPayload,
   Middleware,
@@ -9,42 +9,39 @@ import {
   StoreOptions,
   ValidationErrorHandler,
   ValidatorFn,
-} from "./types";
+} from './types'
 /**
  * Clean up stale persisted states across all storage types
  */
 export function cleanupStaleStates(
   maxAge: number = 30 * 24 * 60 * 60 * 1000,
-  cookiePrefix: string = "__store_" // Default prefix
+  cookiePrefix: string = '__store_' // Default prefix
 ): {
-  local: number;
-  session: number;
-  cookie: number;
+  local: number
+  session: number
+  cookie: number
 } {
-  const now = Date.now();
-  const result = { local: 0, session: 0, cookie: 0 };
+  const now = Date.now()
+  const result = {local: 0, session: 0, cookie: 0}
   const handleError = (e: any, type: string, key: string) => {
     // In a real app, this might use a global error logger
-    console.warn("Error cleaning stale state", type, key, e);
-  };
+    console.warn('Error cleaning stale state', type, key, e)
+  }
 
   // Clean localStorage
   if (storage.isLocalStorageAvailable()) {
     /* iterate backwards so index shifts don’t skip keys */
     for (let i = localStorage.length - 1; i >= 0; i--) {
-      const key = localStorage.key(i);
+      const key = localStorage.key(i)
       if (key) {
         try {
-          const item = storage.getLocalStorage<PersistedState<any>>(
-            key,
-            {} as PersistedState<any>
-          );
+          const item = storage.getLocalStorage<PersistedState<any>>(key, {} as PersistedState<any>)
           if (item && item.meta && now - item.meta.lastUpdated > maxAge) {
-            storage.removeLocalStorage(key);
-            result.local++;
+            storage.removeLocalStorage(key)
+            result.local++
           }
         } catch (e) {
-          handleError(e, "localStorage", key);
+          handleError(e, 'localStorage', key)
         }
       }
     }
@@ -54,47 +51,47 @@ export function cleanupStaleStates(
   if (storage.isSessionStorageAvailable()) {
     /* iterate backwards so index shifts don’t skip keys */
     for (let i = sessionStorage.length - 1; i >= 0; i--) {
-      const key = sessionStorage.key(i);
+      const key = sessionStorage.key(i)
       if (key) {
         try {
-          const rawData = sessionStorage.getItem(key);
+          const rawData = sessionStorage.getItem(key)
           if (rawData) {
-            const item = JSON.parse(rawData) as PersistedState<any>;
+            const item = JSON.parse(rawData) as PersistedState<any>
             if (item && item.meta && now - item.meta.lastUpdated > maxAge) {
-              sessionStorage.removeItem(key);
-              result.session++;
+              sessionStorage.removeItem(key)
+              result.session++
             }
           }
         } catch (e) {
-          handleError(e, "sessionStorage", key);
+          handleError(e, 'sessionStorage', key)
         }
       }
     }
   }
 
   // Clean cookies using prefix
-  if (typeof document !== "undefined" && document.cookie) {
-    const cookies = document.cookie.split(";");
+  if (typeof document !== 'undefined' && document.cookie) {
+    const cookies = document.cookie.split(';')
     for (const cookie of cookies) {
-      const [namePart] = cookie.split("=");
-      const name = namePart.trim();
+      const [namePart] = cookie.split('=')
+      const name = namePart.trim()
       if (name.startsWith(cookiePrefix)) {
         try {
-          const cookieValue = storage.getCookie(name);
+          const cookieValue = storage.getCookie(name)
           if (cookieValue) {
-            const item = JSON.parse(cookieValue) as PersistedState<any>;
+            const item = JSON.parse(cookieValue) as PersistedState<any>
             if (item && item.meta && now - item.meta.lastUpdated > maxAge) {
-              storage.removeCookie(name); // Assuming removeCookie uses appropriate path/domain or this cookie was set with defaults
-              result.cookie++;
+              storage.removeCookie(name) // Assuming removeCookie uses appropriate path/domain or this cookie was set with defaults
+              result.cookie++
             }
           }
         } catch (e) {
-          handleError(e, "cookie", name);
+          handleError(e, 'cookie', name)
         }
       }
     }
   }
-  return result;
+  return result
 }
 
 // --- Built-in Middleware Creators (createLoggerMiddleware, createValidatorMiddleware) ---
@@ -107,30 +104,30 @@ export function cleanupStaleStates(
  * @returns True if `obj` matches the structure and types of `template` exactly
  */
 function strictStructureMatch(obj: any, template: any): boolean {
-  if (typeof obj !== typeof template) return false;
-  if (obj === null || template === null) return obj === template;
+  if (typeof obj !== typeof template) return false
+  if (obj === null || template === null) return obj === template
   if (Array.isArray(obj) || Array.isArray(template)) {
-    if (!Array.isArray(obj) || !Array.isArray(template)) return false;
+    if (!Array.isArray(obj) || !Array.isArray(template)) return false
     // make sure both arrays have the same element type in the first position
     if (obj.length > 0 && template.length > 0) {
-      if (typeof obj[0] !== typeof template[0]) return false;
+      if (typeof obj[0] !== typeof template[0]) return false
     }
-    return true;
+    return true
   }
-  if (typeof obj === "object" && typeof template === "object") {
-    const objKeys = Object.keys(obj);
-    const templateKeys = Object.keys(template);
-    if (objKeys.length !== templateKeys.length) return false;
+  if (typeof obj === 'object' && typeof template === 'object') {
+    const objKeys = Object.keys(obj)
+    const templateKeys = Object.keys(template)
+    if (objKeys.length !== templateKeys.length) return false
     for (const key of templateKeys) {
-      if (!(key in obj)) return false;
-      if (!strictStructureMatch(obj[key], template[key])) return false;
+      if (!(key in obj)) return false
+      if (!strictStructureMatch(obj[key], template[key])) return false
     }
     for (const key of objKeys) {
-      if (!(key in template)) return false;
+      if (!(key in template)) return false
     }
-    return true;
+    return true
   }
-  return true;
+  return true
 }
 
 /**
@@ -262,14 +259,14 @@ export function createLoggerMiddleware<S extends object>(
   logger: (...args: any[]) => void = console.log
 ): Middleware<S> {
   return (action, prevState, dispatchNext, getState) => {
-    logger("State Update: ", {
+    logger('State Update: ', {
       action,
-      prevState: { ...prevState }, // Log copy
-      nextPotentialState: { ...prevState, ...action }, // What it would be if applied directly
-    });
-    dispatchNext(action); // Pass the action to the next middleware or applyState
-    logger("State Update Applied. New state:", { ...getState() });
-  };
+      prevState: {...prevState}, // Log copy
+      nextPotentialState: {...prevState, ...action}, // What it would be if applied directly
+    })
+    dispatchNext(action) // Pass the action to the next middleware or applyState
+    logger('State Update Applied. New state:', {...getState()})
+  }
 }
 
 /**
@@ -544,99 +541,86 @@ export function createValidatorMiddleware<S extends object>(
   validationErrorHandler?: ValidationErrorHandler<S>,
   initialStateTemplate?: S
 ): Middleware<S> {
-  let hasValidatedInitialState = false;
+  let hasValidatedInitialState = false
 
   return (action, prevState, dispatchNext, _getState, reset) => {
     // Validate initial state structure on first run if template provided
     if (!hasValidatedInitialState && initialStateTemplate) {
-      hasValidatedInitialState = true;
+      hasValidatedInitialState = true
 
       if (!strictStructureMatch(prevState, initialStateTemplate)) {
-        const validationError = new ValidationError(
-          "Initial state structure does not match the provided template",
-          {
-            currentState: prevState,
-            expectedTemplate: initialStateTemplate,
-          }
-        );
+        const validationError = new ValidationError('Initial state structure does not match the provided template', {
+          currentState: prevState,
+          expectedTemplate: initialStateTemplate,
+        })
 
         if (validationErrorHandler) {
-          validationErrorHandler(validationError, action);
+          validationErrorHandler(validationError, action)
         } else {
-          console.error(validationError.message, validationError.context);
+          console.error(validationError.message, validationError.context)
         }
 
         // Block the action if initial state validation fails
-        reset(); // Reset state to initial
+        reset() // Reset state to initial
 
         // Don't proceed with the action if initial state is invalid
-        return;
+        return
       }
     }
 
-    const tempNextState = { ...prevState, ...action };
+    const tempNextState = {...prevState, ...action}
 
     try {
-      const validationResult = validator(tempNextState, action, prevState);
+      const validationResult = validator(tempNextState, action, prevState)
 
       // Handle synchronous validator
-      if (typeof validationResult === "boolean") {
+      if (typeof validationResult === 'boolean') {
         if (validationResult) {
-          dispatchNext(action);
+          dispatchNext(action)
         } else {
-          const validationError = new ValidationError(
-            "State validation failed",
-            {
-              action,
-              stateAttempted: tempNextState,
-            }
-          );
-          if (validationErrorHandler)
-            validationErrorHandler(validationError, action);
-          else console.error(validationError.message, validationError.context);
+          const validationError = new ValidationError('State validation failed', {
+            action,
+            stateAttempted: tempNextState,
+          })
+          if (validationErrorHandler) validationErrorHandler(validationError, action)
+          else console.error(validationError.message, validationError.context)
         }
-        return;
+        return
       }
 
       // Handle asynchronous validator
-      if (validationResult && typeof validationResult.then === "function") {
+      if (validationResult && typeof validationResult.then === 'function') {
         return validationResult
           .then((isValid: boolean) => {
             if (isValid) {
-              dispatchNext(action);
+              dispatchNext(action)
             } else {
-              const validationError = new ValidationError(
-                "State validation failed",
-                {
-                  action,
-                  stateAttempted: tempNextState,
-                }
-              );
-              if (validationErrorHandler)
-                validationErrorHandler(validationError, action);
-              else
-                console.error(validationError.message, validationError.context);
+              const validationError = new ValidationError('State validation failed', {
+                action,
+                stateAttempted: tempNextState,
+              })
+              if (validationErrorHandler) validationErrorHandler(validationError, action)
+              else console.error(validationError.message, validationError.context)
             }
           })
           .catch((e: any) => {
-            const validationError = new ValidationError(
-              e.message || "State validation threw an error",
-              { error: e, action, stateAttempted: tempNextState }
-            );
-            if (validationErrorHandler)
-              validationErrorHandler(validationError, action);
-            else
-              console.error(validationError.message, validationError.context);
-          });
+            const validationError = new ValidationError(e.message || 'State validation threw an error', {
+              error: e,
+              action,
+              stateAttempted: tempNextState,
+            })
+            if (validationErrorHandler) validationErrorHandler(validationError, action)
+            else console.error(validationError.message, validationError.context)
+          })
       }
     } catch (e: any) {
-      const validationError = new ValidationError(
-        e.message || "State validation threw an error",
-        { error: e, action, stateAttempted: tempNextState }
-      );
-      if (validationErrorHandler)
-        validationErrorHandler(validationError, action);
-      else console.error(validationError.message, validationError.context);
+      const validationError = new ValidationError(e.message || 'State validation threw an error', {
+        error: e,
+        action,
+        stateAttempted: tempNextState,
+      })
+      if (validationErrorHandler) validationErrorHandler(validationError, action)
+      else console.error(validationError.message, validationError.context)
     }
-  };
+  }
 }
