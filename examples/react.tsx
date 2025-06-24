@@ -2,7 +2,7 @@
  * Example: React Usage
  *
  * This example demonstrates the complete React integration capabilities
- * of the Universal Store, including all available hooks and features.
+ * of the Open Store, including all available hooks and features.
  *
  * Note: The imports below use relative paths for development purposes.
  * In a real application, you would import from the published package:
@@ -234,7 +234,7 @@ const App: React.FC = () => {
           padding: '20px',
           minHeight: '100vh',
         }}>
-        <h1>Universal Store React Example</h1>
+        <h1>Open Store React Example</h1>
         <Counter />
         <hr />
         <UserProfile />

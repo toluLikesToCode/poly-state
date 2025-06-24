@@ -1,8 +1,8 @@
 /**
- * @fileoverview React integration utilities for Universal Store
+ * @fileoverview React integration utilities for Open Store
  *
  * This module provides React hooks and context providers that enable seamless integration
- * of the Universal Store with React applications. It includes hooks for state selection,
+ * of the Open Store with React applications. It includes hooks for state selection,
  * dispatching actions, transactions, path-based operations, and more.
  *
  * @example
@@ -60,7 +60,7 @@ import type {StoreContextValue, StoreContextResult, UseSubscribeToHook} from './
 /**
  * Creates React context and hooks for a store instance
  *
- * This is the main function for integrating Universal Store with React applications.
+ * This is the main function for integrating Open Store with React applications.
  * It creates a complete set of React hooks and context providers that allow components
  * to interact with the store using React patterns.
  *
@@ -71,8 +71,8 @@ import type {StoreContextValue, StoreContextResult, UseSubscribeToHook} from './
  * @example
  * **Basic Usage**
  * ```tsx
- * import { createStore } from 'universal-store';
- * import { createStoreContext } from 'universal-store/react';
+ * import { createStore } from 'open-store';
+ * import { createStoreContext } from 'open-store/react';
  *
  * const store = createStore({ count: 0, user: { name: '' } });
  * const { StoreProvider, useSelector, useDispatch } = createStoreContext(store);
@@ -362,8 +362,8 @@ export function createStoreContext<S extends object>(store: Store<S>): StoreCont
  * @example
  * **Basic Usage**
  * ```tsx
- * import { createStore } from 'universal-store';
- * import { withStore } from 'universal-store/react';
+ * import { createStore } from 'open-store';
+ * import { withStore } from 'open-store/react';
  *
  * interface Props {
  *   title: string;

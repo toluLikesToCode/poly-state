@@ -1,5 +1,5 @@
 name: Feature Request
-description: Suggest a new feature for Universal Store
+description: Suggest a new feature for Open Store
 title: '[Feature]: '
 labels: ['enhancement', 'needs-triage']
 body:
@@ -18,7 +18,7 @@ body:
           required: true
         - label: I have read the documentation
           required: true
-        - label: This feature would benefit the Universal Store community
+        - label: This feature would benefit the Open Store community
           required: true
 
   - type: textarea
@@ -43,7 +43,7 @@ body:
     id: scope
     attributes:
       label: Feature Scope
-      description: Which part of Universal Store does this feature relate to?
+      description: Which part of Open Store does this feature relate to?
       options:
         - Core Store
         - React Integration

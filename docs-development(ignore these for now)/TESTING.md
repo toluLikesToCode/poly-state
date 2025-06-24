@@ -1,4 +1,4 @@
-# Testing Guide for Universal Store
+# Testing Guide for Open Store
 
 This project uses [Vitest](https://vitest.dev) as the test runner. Vitest provides a fast, modern
 testing experience with TypeScript support and React Testing Library integration.

@@ -1,8 +1,8 @@
 /**
- * Universal Store - Core Module
+ * Open Store - Core Module
  *
  * @remarks
- * This is the main entry point for the universal store package.
+ * This is the main entry point for the Open Store package.
  * It exports all core functionality for vanilla TypeScript usage.
  * For React-specific features, import from 'open-store/react'.
  *

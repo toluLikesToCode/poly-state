@@ -1,5 +1,5 @@
 /**
- * Plugins for Universal Store
+ * Plugins for Open Store
  *
  * @remarks
  * This module exports plugin implementations for extending store functionality.

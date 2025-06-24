@@ -1,8 +1,8 @@
 /**
- * @fileoverview React integration type definitions for Universal Store
+ * @fileoverview React integration type definitions for Open Store
  *
  * This module contains all TypeScript type definitions and interfaces for the React
- * integration of Universal Store. These types provide comprehensive IntelliSense
+ * integration of Open Store. These types provide comprehensive IntelliSense
  * support and documentation for developers using the package.
  *
  * @example
@@ -472,16 +472,16 @@ export interface StoreHooks<S extends object> {
  * Complete result object returned by {@link createStoreContext}
  *
  * This interface provides all the React context and hooks needed for full
- * Universal Store integration with React applications.
+ * Open Store integration with React applications.
  *
  * @template S - The shape of the state object
  * @public
  *
  * @example
  * ```tsx
- * import { createStore } from 'universal-store';
- * import { createStoreContext } from 'universal-store/react';
- * import type { StoreContextResult } from 'universal-store/react';
+ * import { createStore } from 'open-store';
+ * import { createStoreContext } from 'open-store/react';
+ * import type { StoreContextResult } from 'open-store/react';
  *
  * interface AppState {
  *   count: number;

@@ -5,11 +5,11 @@
   "description": "Universal state management library for TypeScript and React",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ToluLikesToCode/myStore.git"
+    "url": "git+https://github.com/ToluLikesToCode/open-store.git"
   },
-  "homepage": "https://github.com/ToluLikesToCode/myStore#readme",
+  "homepage": "https://github.com/ToluLikesToCode/open-store#readme",
   "bugs": {
-    "url": "https://github.com/ToluLikesToCode/myStore/issues"
+    "url": "https://github.com/ToluLikesToCode/open-store/issues"
   },
   "main": "dist/index.js",
   "module": "dist/index.esm.js",

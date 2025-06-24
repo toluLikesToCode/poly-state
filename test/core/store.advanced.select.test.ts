@@ -1,5 +1,5 @@
 /**
- * Advanced Selector Tests for Universal Store
+ * Advanced Selector Tests for Open Store
  *
  * Comprehensive test suite covering advanced selector functionality including:
  * - Memoized selectors with performance optimization

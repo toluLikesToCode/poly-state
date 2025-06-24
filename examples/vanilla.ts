@@ -2,7 +2,7 @@
  * Example: Vanilla TypeScript Usage
  *
  * This example demonstrates the complete vanilla TypeScript usage
- * of the Universal Store, showcasing all core features and capabilities.
+ * of the Open Store, showcasing all core features and capabilities.
  *
  * Note: The import below uses a relative path for development purposes.
  * In a real application, you would import from the published package:
@@ -70,7 +70,7 @@ store.dispatch({
 // Add todos
 store.dispatch({
   todos: [
-    {id: 1, text: 'Learn Universal Store', completed: false},
+    {id: 1, text: 'Learn Open Store', completed: false},
     {id: 2, text: 'Build awesome app', completed: false},
   ],
 })

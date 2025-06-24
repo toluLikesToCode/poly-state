@@ -1,15 +1,15 @@
-# Contributing to Universal Store
+# Contributing to Open Store
 
-Thank you for your interest in contributing to Universal Store! This document provides guidelines
-and information for contributors.
+Thank you for your interest in contributing to Open Store! This document provides guidelines and
+information for contributors.
 
 ## Development Setup
 
 1. **Fork and Clone**
 
    ```bash
-   git clone https://github.com/yourusername/universal-store.git
-   cd universal-store
+   git clone https://github.com/yourusername/open-store.git
+   cd open-store
    ```
 
 2. **Install Dependencies**
@@ -165,4 +165,4 @@ If you have questions about contributing:
 - Focus on constructive feedback
 - Help maintain a welcoming environment for all contributors
 
-Thank you for contributing to Universal Store!
+Thank you for contributing to Open Store!

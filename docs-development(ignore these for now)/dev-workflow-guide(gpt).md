@@ -47,7 +47,7 @@ NPM Link creates symbolic links between your local package and test projects. Th
 
 ```bash
 # Navigate to the Open Store directory
-cd /Users/toluadegbehingbe/projects/myStore
+cd /Users/toluadegbehingbe/projects/open-store
 
 # Build the current state
 npm run build
@@ -76,7 +76,7 @@ Now your test project will use your local development version of Open Store.
 
 ```bash
 # In the Open Store directory
-cd /Users/toluadegbehingbe/projects/myStore
+cd /Users/toluadegbehingbe/projects/open-store
 
 # Start building automatically on changes
 npm run dev
@@ -210,7 +210,7 @@ NPM Pack creates a tarball (`.tgz` file) that simulates what would be published 
 
 ```bash
 # Navigate to your package directory
-cd /Users/toluadegbehingbe/projects/myStore
+cd /Users/toluadegbehingbe/projects/open-store
 
 # Clean previous builds
 npm run clean
@@ -222,7 +222,7 @@ npm run build
 npm pack
 ```
 
-**This creates**: `tolulikescode-universal-store-1.0.0.tgz` in your package directory
+**This creates**: `tolulikescode-open-store-1.0.0.tgz` in your package directory
 
 #### 2. Install in External Projects
 
@@ -231,7 +231,7 @@ npm pack
 cd /path/to/your/external/project
 
 # Install the tarball
-npm install /Users/toluladegbehingbe/projects/myStore/tolulikescode-universal-store-1.0.0.tgz
+npm install /Users/toluladegbehingbe/projects/open-store/tolulikescode-open-store-1.0.0.tgz
 ```
 
 ### Testing Iteration Cycle
@@ -240,7 +240,7 @@ npm install /Users/toluladegbehingbe/projects/myStore/tolulikescode-universal-st
 
 ```bash
 # In your package directory
-cd /Users/toluadegbehingbe/projects/myStore
+cd /Users/toluadegbehingbe/projects/open-store
 
 # Edit your source files
 # ...make your changes...
@@ -269,7 +269,7 @@ cd /path/to/your/external/project
 npm uninstall open-store
 
 # Install new version
-npm install /Users/toluladegbehingbe/projects/myStore/tolulikescode-universal-store-1.0.1.tgz
+npm install /Users/toluladegbehingbe/projects/open-store/tolulikescode-open-store-1.0.1.tgz
 ```
 
 ### Pack File Inspection
@@ -278,10 +278,10 @@ You can inspect what's included in your pack:
 
 ```bash
 # View contents without extracting
-tar -tzf tolulikescode-universal-store-1.0.0.tgz
+tar -tzf tolulikescode-open-store-1.0.0.tgz
 
 # Extract to see actual structure
-tar -xzf tolulikescode-universal-store-1.0.0.tgz
+tar -xzf tolulikescode-open-store-1.0.0.tgz
 ```
 
 **Expected contents:**
@@ -345,13 +345,13 @@ package/
 ```bash
 # Check if link exists
 ls -la node_modules/open-store
-# Should show: ... -> /Users/toluadegbehingbe/projects/myStore
+# Should show: ... -> /Users/toluadegbehingbe/projects/open-store
 
 # Restart TypeScript server (VS Code)
 # Cmd+Shift+P → "TypeScript: Restart TS Server"
 
 # Check if dev mode is running
-cd /Users/toluadegbehingbe/projects/myStore
+cd /Users/toluadegbehingbe/projects/open-store
 npm run dev  # Should be watching for changes
 ```
 
@@ -363,7 +363,7 @@ npm unlink open-store
 npm link open-store
 
 # Check global links
-npm ls -g --depth=0 | grep universal-store
+npm ls -g --depth=0 | grep open-store
 ```
 
 #### TypeScript Declaration Issues
@@ -552,5 +552,5 @@ npm uninstall open-store
 npm install /path/to/new-package.tgz
 ```
 
-This workflow ensures you can efficiently develop and test your Universal Store package while
-maintaining high quality and production readiness.
+This workflow ensures you can efficiently develop and test your Open Store package while maintaining
+high quality and production readiness.

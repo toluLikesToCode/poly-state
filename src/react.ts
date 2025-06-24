@@ -1,7 +1,7 @@
 /**
- * # Universal Store - React Integration
+ * # Open Store - React Integration
  *
- * Complete React integration for Universal Store, providing idiomatic React hooks
+ * Complete React integration for Open Store, providing idiomatic React hooks
  * and context providers for state management with full TypeScript support.
  *
  * ## Features

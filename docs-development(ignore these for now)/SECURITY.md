@@ -64,7 +64,7 @@ I try to keep things safe by checking dependencies:
 ## Non-Security Issues?
 
 If you find a regular bug or have a question, please use
-[GitHub Issues](https://github.com/toluLikesToCode/universal-store/issues).
+[GitHub Issues](https://github.com/toluLikesToCode/open-store/issues).
 
 ## Contact
 
