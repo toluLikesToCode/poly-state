@@ -1,161 +1,151 @@
 # Development Workflow Guide
 
-This guide outlines the recommended workflows for using the Universal Store package in external
-projects during development and testing phases, without publishing to npm.
+This guide outlines the recommended workflows for testing the Open Store package in external projects during active development, before npm publication.
+
+> **🚧 Development Status**: This package is currently under active development and has not been published to npm yet. This guide shows you how to test and use it locally while development continues.
 
 ## Table of Contents
 
 - [Overview](#overview)
-- [NPM Link - Development Workflow](#npm-link---development-workflow)
-- [NPM Pack - Testing Workflow](#npm-pack---testing-workflow)
+- [NPM Link - Active Development](#npm-link---active-development)
+- [NPM Pack - Testing Builds](#npm-pack---testing-builds)
 - [Workflow Comparison](#workflow-comparison)
 - [Troubleshooting](#troubleshooting)
-- [Best Practices](#best-practices)
 
 ## Overview
 
-The Universal Store package supports two main usage patterns:
+Open Store is being built to support two main usage patterns:
 
-- **Vanilla TypeScript**: Import from `open-store`
+- **Vanilla TypeScript/JavaScript**: Import from `open-store`
 - **React Integration**: Import from `open-store/react`
 
-During development, you have two primary options for testing your package in external projects:
+Since the package isn't published yet, you have two ways to test it in your projects:
 
-1. **NPM Link**: For active development with real-time updates
-2. **NPM Pack**: For testing production-like installations
+1. **NPM Link**: For real-time development and testing
+2. **NPM Pack**: For production-like testing and validation
 
 ---
 
-## NPM Link - Development Workflow
+## NPM Link - Active Development
 
-**Best for**: Active development, rapid iteration, real-time updates
+**Perfect for**: Actively developing features, fixing bugs, rapid iteration
 
-### What NPM Link Does
+### How It Works
 
-NPM Link creates symbolic links (symlinks) between your package and external projects. This means:
+NPM Link creates symbolic links between your local package and test projects. This means:
 
-- Changes in your package source code are immediately available to linked projects
-- No need to reinstall or copy files manually
-- Perfect for development iteration cycles
+- Changes you make to Open Store are immediately available in linked projects
+- No need to rebuild or reinstall manually
+- Great for testing features as you build them
 
-### Initial Setup
+### Setting Up NPM Link
 
-#### 1. Prepare Your Package
+#### 1. Prepare Open Store
 
 ```bash
-# Navigate to your package directory
+# Navigate to the Open Store directory
 cd /Users/toluadegbehingbe/projects/myStore
 
-# Build the package first
+# Build the current state
 npm run build
 
-# Create a global symlink for your package
+# Create a global link
 npm link
 ```
 
-**What this does:**
+This makes `open-store` available globally for linking to other projects.
 
-- Creates a symlink in your global npm directory pointing to your package
-- Makes `open-store` available globally for linking
-
-#### 2. Link in External Projects
+#### 2. Link to Your Test Project
 
 ```bash
-# Navigate to your external project
-cd /path/to/your/external/project
+# Go to your test project
+cd /path/to/your/test/project
 
-# Link the package
+# Link Open Store
 npm link open-store
 ```
 
-**What this does:**
+Now your test project will use your local development version of Open Store.
 
-- Creates a symlink in `node_modules/open-store` pointing to your package
-- The external project now uses your local development version
+### Development Loop
 
-### Development Iteration Cycle
-
-#### 1. Start Development Mode
+#### 1. Start Watch Mode
 
 ```bash
-# In your package directory
+# In the Open Store directory
 cd /Users/toluadegbehingbe/projects/myStore
 
-# Start rollup in watch mode
+# Start building automatically on changes
 npm run dev
 ```
 
-**This command:**
+This watches your source files and rebuilds automatically when you make changes.
 
-- Watches for changes in `src/` directory
-- Automatically rebuilds when files change
-- Updates both vanilla and React bundles
-- Generates source maps for debugging
-
-#### 2. Work on Your External Project
+#### 2. Work on Your Test Project
 
 ```bash
-# In your external project
-cd /path/to/your/external/project
+# In your test project
+cd /path/to/your/test/project
 
-# Start your project's development server
-npm start  # or npm run dev, yarn dev, etc.
+# Start your development server
+npm start
+# or npm run dev, yarn dev, etc.
 ```
 
-#### 3. Make Changes and See Results
+#### 3. Edit and See Changes
 
-1. **Edit source files** in your package (`/Users/toluadegbehingbe/projects/myStore/src/`)
-2. **Watch rollup rebuild** automatically in the terminal
-3. **Refresh/restart** your external project to see changes
+1. **Make changes** to Open Store source code (`src/` folder)
+2. **Watch the build** complete automatically
+3. **Refresh your test project** to see the changes
 
-### Usage Examples in External Projects
+---
 
-#### Vanilla TypeScript Usage
+## NPM Pack - Testing Builds
+
+**Perfect for**: Testing the final package, validating installation, sharing with others
+
+### Vanilla TypeScript Usage
 
 ```typescript
-// In your external project
-import {createStore, StoreConfig} from 'open-store'
+// In your test project
+import {createStore} from 'open-store'
 
 interface AppState {
   count: number
   user: {name: string; email: string} | null
 }
 
-const initialState: AppState = {
+const store = createStore({
   count: 0,
-  user: null,
-}
+  user: null
+})
 
-const config: StoreConfig<AppState> = {
-  enableHistory: true,
-  maxHistorySize: 50,
-}
-
-const store = createStore(initialState, config)
-
-// Subscribe to changes
-store.subscribe((state, previousState) => {
+// Listen for changes
+store.subscribe((state, prevState) => {
   console.log('State changed:', state)
 })
 
 // Update state
-store.setState({count: store.getState().count + 1})
+store.dispatch({count: store.getState().count + 1})
 ```
 
-#### React Usage
+### React Usage
 
 ```tsx
-// App.tsx - Root component
+// App.tsx - Set up the provider
 import React from 'react'
-import {StoreProvider} from 'open-store/react'
-import {store} from './store'
+import {createStore} from 'open-store'
+import {createStoreContext} from 'open-store/react'
 import Counter from './Counter'
+
+const store = createStore({count: 0})
+const {StoreProvider} = createStoreContext(store)
 
 function App() {
   return (
-    <StoreProvider store={store}>
+    <StoreProvider>
       <div className="app">
-        <h1>My App</h1>
+        <h1>Testing Open Store</h1>
         <Counter />
       </div>
     </StoreProvider>
@@ -166,30 +156,22 @@ export default App
 ```
 
 ```tsx
-// Counter.tsx - Component using the store
+// Counter.tsx - Use the store in components
 import React from 'react'
-import {useStore} from 'open-store/react'
+import {createStoreContext} from 'open-store/react'
 
-interface AppState {
-  count: number
-}
+// You'll need to export this context from your store setup
+const {useSelector, useDispatch} = createStoreContext(store)
 
 function Counter() {
-  const {state, setState} = useStore<AppState>()
-
-  const increment = () => {
-    setState({count: state.count + 1})
-  }
-
-  const decrement = () => {
-    setState({count: state.count - 1})
-  }
+  const count = useSelector(state => state.count)
+  const dispatch = useDispatch()
 
   return (
     <div>
-      <h2>Count: {state.count}</h2>
-      <button onClick={increment}>+</button>
-      <button onClick={decrement}>-</button>
+      <h2>Count: {count}</h2>
+      <button onClick={() => dispatch({count: count + 1})}>+</button>
+      <button onClick={() => dispatch({count: count - 1})}>-</button>
     </div>
   )
 }
@@ -197,26 +179,18 @@ function Counter() {
 export default Counter
 ```
 
-### Cleanup NPM Link
-
-When you're finished with development:
-
-```bash
-# In your external project
-npm unlink open-store
-
-# Reinstall regular dependencies
-npm install
-
-# Optional: Remove global link
-npm unlink -g open-store
-```
-
 ---
 
-## NPM Pack - Testing Workflow
+## Workflow Comparison (Summary Table)
 
-**Best for**: Testing production-like installations, final validation, sharing with team members
+| Aspect                | NPM Link        | NPM Pack           |
+| --------------------- | --------------- | ------------------ |
+| **Best For**          | Development     | Final testing      |
+| **Update Speed**      | Instant         | Manual             |
+| **Setup**             | Medium          | Simple             |
+| **Production-like**   | No              | Yes                |
+| **Debugging**         | Excellent       | Good               |
+| **Team Sharing**      | Complex         | Easy (.tgz file)   |
 
 ### What NPM Pack Does
 
