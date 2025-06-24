@@ -172,10 +172,18 @@ export function createStore<S extends object>(initialState: S, options: StoreOpt
     // Check if this is an updatePath operation that should preserve structural sharing
     if (isInUpdatePath) {
       // For updatePath, directly assign the state to preserve Immer's structural sharing
-      state = newPartialState as S
+
+      //state = newPartialState as S
+      state = immer.produce(state, draft => {
+        Object.assign(draft, newPartialState)
+      }) // Immer will handle structural sharing
     } else {
       // Normal case: merge the partial state
-      state = {...state, ...newPartialState} // Apply the changes
+      //state = {...state, ...newPartialState} // Apply the changes
+      state = immer.produce(state, draft => {
+        // Use Immer to apply changes, ensureing that the partial state is applied immutably
+        Object.assign(draft, newPartialState)
+      })
     }
 
     // --- Notifications and History ---

@@ -317,7 +317,7 @@ describe('Advanced Selector Operations', () => {
             },
           },
         ],
-        categories: ['electronics', 'audio', 'accessories'],
+        categories: ['electronics', 'audio', 'accessories', 'mommy'],
         filters: {
           category: null,
           priceRange: [0, 2000],
@@ -433,12 +433,20 @@ describe('Advanced Selector Operations', () => {
     })
 
     it('should handle complex multi-selector computations', () => {
-      const selectProducts = store.select(state => state.products.items)
-      const selectFilters = store.select(state => state.products.filters)
-      const selectCategories = store.select(state => state.products.categories)
+      const {select} = store
+      const selectProducts = select(state => state.products)
+      // Selectors for items, filters, and categories
+      const selectItemProps = select(selectProducts, products => products.items) // props for items
+      const selectItems = select(selectItemProps, items => items) // items selector
 
-      const selectFilteredProductsWithStats = store.select(
-        selectProducts,
+      const selectFilterProps = select(selectProducts, products => products.filters) // props for filters
+      const selectFilters = select(selectFilterProps, filters => filters) // filters selector
+
+      const selectCategoriesProps = select(selectProducts, products => products.categories) // props for categories
+      const selectCategories = select(selectCategoriesProps, categories => categories) // categories selector
+
+      const selectFilteredProductsWithStats = select(
+        selectItems,
         selectFilters,
         selectCategories,
         (products, filters, categories) => {
@@ -490,31 +498,58 @@ describe('Advanced Selector Operations', () => {
       expect(result.stats.inStockCount).toBe(2)
     })
 
-    it.skip('should only recompute when dependencies change', () => {
-      const selectProducts = store.select(state => state.products.items)
-      const selectFilters = store.select(state => state.products.filters)
+    it('should only recompute when dependencies change', () => {
+      const {select, dispatch} = store
+      const productSpy = vi.fn()
+      const itemsSpy = vi.fn()
+      const filtersSpy = vi.fn()
+      const selectProducts = select(state => {
+        productSpy()
+        return state.products
+      })
+      const selectItemsProps = select(selectProducts, products => products.items)
+      const selectFilterProps = select(selectProducts, products => products.filters)
+      const selectItems = select(selectItemsProps, items => {
+        itemsSpy()
+        return items
+      })
+      const selectFilters = select(selectFilterProps, filters => {
+        filtersSpy()
+        return filters
+      })
 
       const computationSpy = vi.fn()
-      const selectFilteredProducts = store.select(selectProducts, selectFilters, (products, filters) => {
+      const selectFilteredProducts = select(selectItems, selectFilters, (items, filters) => {
         computationSpy()
-        return products.filter(p => !filters.category || p.category === filters.category)
+        return items.filter(p => !filters.category || p.category === filters.category)
       })
 
       // First computation
-      selectFilteredProducts()
+      const firstValue = selectFilteredProducts()
       expect(computationSpy).toHaveBeenCalledTimes(1)
+      expect(productSpy).toHaveBeenCalledTimes(1)
+      expect(itemsSpy).toHaveBeenCalledTimes(1)
+      expect(filtersSpy).toHaveBeenCalledTimes(1)
 
       // Calling again without state change shouldn't recompute
-      selectFilteredProducts()
+      let nextValue = selectFilteredProducts()
       expect(computationSpy).toHaveBeenCalledTimes(1)
+      expect(productSpy).toHaveBeenCalledTimes(1)
+      expect(itemsSpy).toHaveBeenCalledTimes(1)
+      expect(filtersSpy).toHaveBeenCalledTimes(1)
+      expect(nextValue).toEqual(firstValue)
 
       // Change unrelated state shouldn't trigger recomputation
-      store.dispatch({ui: {...store.getState().ui, loading: true}})
-      selectFilteredProducts()
+      dispatch({ui: {...store.getState().ui, loading: true}})
+      nextValue = selectFilteredProducts()
       expect(computationSpy).toHaveBeenCalledTimes(1)
+      expect(productSpy).toHaveBeenCalledTimes(2) // global state change will trigger base selector
+      expect(itemsSpy).toHaveBeenCalledTimes(1)
+      expect(filtersSpy).toHaveBeenCalledTimes(1)
+      expect(nextValue).toEqual(firstValue) // Should return same items
 
       // Change relevant state should trigger recomputation
-      store.dispatch({
+      dispatch({
         products: {
           ...store.getState().products,
           filters: {
@@ -523,8 +558,32 @@ describe('Advanced Selector Operations', () => {
           },
         },
       })
-      selectFilteredProducts()
+      nextValue = selectFilteredProducts()
       expect(computationSpy).toHaveBeenCalledTimes(2)
+      expect(productSpy).toHaveBeenCalledTimes(3) // base selector should recompute
+      expect(itemsSpy).toHaveBeenCalledTimes(1) // Should not recompute derived selector
+      expect(filtersSpy).toHaveBeenCalledTimes(2) // filters selector should recompute
+      expect(nextValue).toEqual(initialState.products.items.filter(p => p.category === 'electronics')) // Should return filtered items
+
+      const itemValues1 = selectItems()
+
+      // update products pagination but not items or filters
+      store.dispatch({
+        products: {
+          ...store.getState().products,
+          pagination: {
+            ...store.getState().products.pagination,
+            page: 2,
+          },
+        },
+      })
+      selectFilteredProducts()
+      expect(computationSpy).toHaveBeenCalledTimes(2) // Should not recompute
+      expect(productSpy).toHaveBeenCalledTimes(4) // base selector should recompute
+      let nextItemValue = selectItems()
+      expect(itemValues1).toEqual(nextItemValue) // Should return same items
+      expect(itemsSpy).toHaveBeenCalledTimes(1) // Should not recompute
+      expect(filtersSpy).toHaveBeenCalledTimes(2) // filters selector should recompute
     })
   })
 
@@ -547,14 +606,16 @@ describe('Advanced Selector Operations', () => {
 
     it('should cache selectors per parameter combination', () => {
       const computationSpy = vi.fn()
+      const {select, selectWith, updatePath, getState} = store
 
-      const selectProductsByCategory = store.selectWith(
-        [state => state.products.items] as const,
-        (category: string) => products => {
-          computationSpy(category)
-          return products.filter(p => p.category === category)
-        }
-      )
+      const selectProducts = select(state => state.products)
+      const selectItemProps = select(selectProducts, products => products.items)
+      const selectItems = select(selectItemProps, items => items)
+
+      const selectProductsByCategory = selectWith([selectItems] as const, (category: string) => items => {
+        computationSpy(category)
+        return items.filter(p => p.category === category)
+      })
 
       const getElectronics = selectProductsByCategory('electronics')
       const getAudio = selectProductsByCategory('audio')
@@ -573,6 +634,26 @@ describe('Advanced Selector Operations', () => {
       const getAccessories = selectProductsByCategory('accessories')
       getAccessories()
       expect(computationSpy).toHaveBeenCalledTimes(3)
+
+      updatePath<AppState['products']['items'][number]['category']>(['products', 'items', 2, 'category'], () => 'mommy')
+      getElectronics()
+      expect(computationSpy).toHaveBeenCalledTimes(4)
+      const getMommy = selectProductsByCategory('mommy')
+      const mommyItems = getMommy()
+      expect(getState().products.items[2].category).toBe('mommy')
+      expect(mommyItems.length).toBe(1)
+
+      expect(getState().users.byId.get(1)?.metadata.isVerified).toBe(true)
+
+      updatePath<AppState['users']['byId']>(['users', 'byId'], users => {
+        const user = users.get(1)
+        if (user) {
+          user.metadata.isVerified = false
+          users.set(1, user)
+        }
+        return users
+      })
+      expect(getState().users.byId.get(1)?.metadata.isVerified).toBe(false)
     })
 
     it('should handle complex parameterized transformations', () => {
@@ -950,12 +1031,22 @@ describe('Advanced Selector Operations', () => {
   })
 
   describe('Selector Performance and Optimization', () => {
-    it.skip('should handle frequent state updates efficiently', () => {
+    it('should handle frequent state updates efficiently', () => {
       const computationSpy = vi.fn()
+      const productSelectorSpy = vi.fn()
+      const itemsSelectorSpy = vi.fn()
+      const selectProducts = store.select(state => {
+        productSelectorSpy()
+        return state.products
+      })
+      const selectItems = store.select(selectProducts, products => {
+        itemsSelectorSpy()
+        return products.items
+      })
 
-      const selectExpensiveComputation = store.select(state => {
+      const selectExpensiveComputation = store.select(selectItems, items => {
         computationSpy()
-        return state.products.items
+        return items
           .filter(p => p.inStock)
           .sort((a, b) => b.ratings.average - a.ratings.average)
           .map(p => ({
@@ -965,19 +1056,29 @@ describe('Advanced Selector Operations', () => {
       })
 
       // First computation
-      selectExpensiveComputation()
+      const firstResult = selectExpensiveComputation()
       expect(computationSpy).toHaveBeenCalledTimes(1)
+      expect(productSelectorSpy).toHaveBeenCalledTimes(1)
+      expect(itemsSelectorSpy).toHaveBeenCalledTimes(1)
+
+      let lastResult: ReturnType<typeof selectExpensiveComputation>
 
       // Multiple calls without state change
       for (let i = 0; i < 10; i++) {
-        selectExpensiveComputation()
+        lastResult = selectExpensiveComputation()
+        expect(lastResult).toEqual(firstResult) // Should return same result
       }
       expect(computationSpy).toHaveBeenCalledTimes(1)
+      expect(productSelectorSpy).toHaveBeenCalledTimes(1)
+      expect(itemsSelectorSpy).toHaveBeenCalledTimes(1)
 
       // Change unrelated state
       store.dispatch({ui: {...store.getState().ui, loading: true}})
-      selectExpensiveComputation()
+      lastResult = selectExpensiveComputation()
+      expect(lastResult).toEqual(firstResult) // Should still return same result
       expect(computationSpy).toHaveBeenCalledTimes(1)
+      expect(productSelectorSpy).toHaveBeenCalledTimes(2) // global state change will trigger base selector
+      expect(itemsSelectorSpy).toHaveBeenCalledTimes(1) // Should not recompute derived selector
 
       // Change related state
       store.dispatch({
@@ -986,7 +1087,8 @@ describe('Advanced Selector Operations', () => {
           items: store.getState().products.items.map(p => (p.id === 1 ? {...p, inStock: false} : p)),
         },
       })
-      selectExpensiveComputation()
+      lastResult = selectExpensiveComputation()
+      expect(lastResult).not.toEqual(firstResult) // Should recompute due to inStock change
       expect(computationSpy).toHaveBeenCalledTimes(2)
     })
 

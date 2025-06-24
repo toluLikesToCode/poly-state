@@ -50,7 +50,7 @@ export class SelectorManager<S extends object> implements ISelectorManager<S> {
   }
 
   private cleanupSelector(selector: MemoizedSelector<any>) {
-    if (selector._cleanup) {
+    if (selector?._cleanup) {
       selector._cleanup()
     }
     selector._isActive = false
@@ -245,7 +245,7 @@ export class SelectorManager<S extends object> implements ISelectorManager<S> {
           CLEANUP_INTERVAL, // how often to check
           CACHE_TTL, // how long entries live
           (key, entry) => {
-            if (entry.selector._cleanup) entry.selector._cleanup()
+            if (entry.selector?._cleanup) entry.selector._cleanup()
           }
         )
       }
@@ -264,7 +264,7 @@ export class SelectorManager<S extends object> implements ISelectorManager<S> {
         const memoizedSelector = this.createMultiSelectorWithCombiner(inputSelectors, combinerFn)
 
         // Store the original cleanup function
-        const originalCleanup = memoizedSelector._cleanup
+        const originalCleanup = memoizedSelector?._cleanup
 
         // Enhanced cleanup that also removes from parameter cache
         memoizedSelector._cleanup = () => {
@@ -470,7 +470,7 @@ export class SelectorManager<S extends object> implements ISelectorManager<S> {
       }
 
       // Clean up the memoized selector
-      if (subscription.selector._cleanup) {
+      if (subscription.selector?._cleanup) {
         subscription.selector._cleanup()
       }
 
@@ -623,7 +623,7 @@ export class SelectorManager<S extends object> implements ISelectorManager<S> {
 
       // Clean up memoized selectors
       memoizedSelectors.forEach(sel => {
-        if (sel._cleanup) {
+        if (sel?._cleanup) {
           sel._cleanup()
         }
       })

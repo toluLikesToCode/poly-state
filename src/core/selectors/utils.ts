@@ -1,4 +1,5 @@
 import {deepEqual} from '../utils/index'
+import {DependencySubscription, MemoizedSelector} from './types'
 
 export function smartEqual<T>(a: T, b: T): boolean {
   // Fast path: reference equality (works great with Immer's structural sharing)
@@ -164,4 +165,38 @@ export function startTTLCacheCleanup<T>(
       intervalHandle = null
     }
   }
+}
+
+/**
+ * Type guard for checking if a value is a memoized selector.
+ *
+ * @param value - The value to check
+ * @returns True if the value is a memoized selector
+ *
+ * @remarks
+ * Useful for runtime type checking and debugging selector-related issues.
+ * Checks for the presence of selector-specific properties.
+ */
+export function isMemoizedSelector<R>(value: any): value is MemoizedSelector<R> {
+  return typeof value === 'function' && (value._isActive !== undefined || value._lastAccessed !== undefined)
+}
+
+/**
+ * Type guard for checking if a value is a dependency subscription.
+ *
+ * @param value - The value to check
+ * @returns True if the value is a dependency subscription
+ *
+ * @remarks
+ * Useful for runtime type checking and debugging subscription-related issues.
+ * Checks for the presence of subscription-specific properties.
+ */
+export function isDependencySubscription<T>(value: any): value is DependencySubscription<T> {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof value.id === 'string' &&
+    typeof value.cleanup === 'function' &&
+    typeof value.isActive === 'boolean'
+  )
 }
