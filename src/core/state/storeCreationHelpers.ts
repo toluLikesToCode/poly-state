@@ -1,5 +1,5 @@
-import createStore from "./createStore";
-import { Store, StoreOptions, StorageType } from "./types";
+import createStore from './createStore'
+import {Store, StoreOptions, StorageType} from './types'
 
 /**
  * Creates a store with automatic persistence
@@ -12,13 +12,13 @@ import { Store, StoreOptions, StorageType } from "./types";
 export function createPersistentStore<S extends object>(
   initialState: S,
   persistKey: string,
-  options: Omit<StoreOptions<S>, "persistKey"> = {}
+  options: Omit<StoreOptions<S>, 'persistKey'> = {}
 ): Store<S> {
   return createStore(initialState, {
     ...options,
     persistKey,
     storageType: options.storageType || StorageType.Local,
-  });
+  })
 }
 
 /**
@@ -32,15 +32,12 @@ export function createPersistentStore<S extends object>(
 export function createSharedStore<S extends object>(
   initialState: S,
   persistKey: string,
-  options: Omit<
-    StoreOptions<S>,
-    "persistKey" | "storageType" | "syncAcrossTabs"
-  > = {}
+  options: Omit<StoreOptions<S>, 'persistKey' | 'storageType' | 'syncAcrossTabs'> = {}
 ): Store<S> {
   return createStore(initialState, {
     ...options,
     persistKey,
     storageType: StorageType.Local,
     syncAcrossTabs: true,
-  });
+  })
 }

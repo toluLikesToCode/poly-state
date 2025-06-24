@@ -1,45 +1,46 @@
-import typescript from "@rollup/plugin-typescript";
-import { nodeResolve } from "@rollup/plugin-node-resolve";
-import dts from "rollup-plugin-dts";
+import typescript from '@rollup/plugin-typescript'
+import {nodeResolve} from '@rollup/plugin-node-resolve'
+import dts from 'rollup-plugin-dts'
 
-const external = ["react", "react/jsx-runtime"];
+const external = ['react', 'react/jsx-runtime']
 
 export default [
   // Core bundle (vanilla TypeScript)
   {
-    input: "src/index.ts",
+    input: 'src/index.ts',
     output: [
       {
-        file: "dist/index.js",
-        format: "cjs",
+        file: 'dist/index.js',
+        format: 'cjs',
         sourcemap: true,
       },
       {
-        file: "dist/index.esm.js",
-        format: "esm",
+        file: 'dist/index.esm.js',
+        format: 'esm',
         sourcemap: true,
       },
     ],
     plugins: [
       nodeResolve(),
       typescript({
-        tsconfig: "./tsconfig.build.json",
-        exclude: ["src/react/**/*"],
+        tsconfig: './tsconfig.build.json',
+        exclude: ['src/react/**/*'],
+        outputToFilesystem: true,
       }),
     ],
   },
   // React bundle
   {
-    input: "src/react.ts",
+    input: 'src/react.ts',
     output: [
       {
-        file: "dist/react.js",
-        format: "cjs",
+        file: 'dist/react.js',
+        format: 'cjs',
         sourcemap: true,
       },
       {
-        file: "dist/react.esm.js",
-        format: "esm",
+        file: 'dist/react.esm.js',
+        format: 'esm',
         sourcemap: true,
       },
     ],
@@ -47,26 +48,27 @@ export default [
     plugins: [
       nodeResolve(),
       typescript({
-        tsconfig: "./tsconfig.build.json",
+        tsconfig: './tsconfig.build.json',
+        outputToFilesystem: true,
       }),
     ],
   },
   // Type definitions for core
   {
-    input: "src/index.ts",
+    input: 'src/index.ts',
     output: {
-      file: "dist/index.d.ts",
-      format: "esm",
+      file: 'dist/index.d.ts',
+      format: 'esm',
     },
     plugins: [dts()],
   },
   // Type definitions for React
   {
-    input: "src/react.ts",
+    input: 'src/react.ts',
     output: {
-      file: "dist/react.d.ts",
-      format: "esm",
+      file: 'dist/react.d.ts',
+      format: 'esm',
     },
     plugins: [dts()],
   },
-];
+]

@@ -1,48 +1,67 @@
+# Release Workflow (Currently Disabled)
+# This workflow is disabled until the package is ready for release
+
 name: Release
 
+# Minimal trigger that won't activate (workflow_dispatch allows manual runs for testing)
 on:
-  push:
-    tags:
-      - "v*"
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "confirm" to acknowledge this is a development package'
+        required: true
+        default: ''
 
 jobs:
-  release:
+  # Placeholder job to prevent workflow errors
+  release-placeholder:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - name: Package Not Ready for Release
+        run: |
+          echo "🚧 This package is currently under development"
+          echo "📦 No release will be created at this time"
+          echo "🔗 Use npm link or npm pack for local testing"
+          echo "📖 See DEVELOPMENT_WORKFLOW.md for testing instructions"
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "18.x"
-          cache: "npm"
-          registry-url: "https://registry.npmjs.org"
+          if [ "${{ github.event.inputs.confirm }}" != "confirm" ]; then
+            echo "❌ Workflow cancelled: confirmation not provided"
+            exit 1
+          fi
 
-      - name: Install dependencies
-        run: npm ci
+          echo "✅ Workflow completed successfully (no-op)"
+          exit 0
 
-      - name: Run tests
-        run: npm run test:run
-
-      - name: Build package
-        run: npm run build
-
-      - name: Publish to NPM
-        run: npm publish --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Create GitHub Release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
-          body: |
-            Changes in this Release
-            - See CHANGELOG.md for details
-          draft: false
-          prerelease: false
+  # TODO: Enable when ready for first release
+  # release:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v4
+  #     - name: Setup Node.js
+  #       uses: actions/setup-node@v4
+  #       with:
+  #         node-version: '18.x'
+  #         cache: 'npm'
+  #         registry-url: 'https://registry.npmjs.org'
+  #     - name: Install dependencies
+  #       run: npm ci
+  #     - name: Run tests
+  #       run: npm run test:run
+  #     - name: Build package
+  #       run: npm run build
+  #     - name: Publish to NPM
+  #       run: npm publish --access public
+  #       env:
+  #         NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+  #     - name: Create GitHub Release
+  #       uses: actions/create-release@v1
+  #       env:
+  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  #       with:
+  #         tag_name: ${{ github.ref }}
+  #         release_name: Release ${{ github.ref }}
+  #         body: See CHANGELOG.md for release notes
+  #         draft: false
+  #         prerelease: false

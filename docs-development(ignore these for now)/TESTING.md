@@ -1,6 +1,7 @@
 # Testing Guide for Universal Store
 
-This project uses [Vitest](https://vitest.dev) as the test runner. Vitest provides a fast, modern testing experience with TypeScript support and React Testing Library integration.
+This project uses [Vitest](https://vitest.dev) as the test runner. Vitest provides a fast, modern
+testing experience with TypeScript support and React Testing Library integration.
 
 ## Running Tests
 
@@ -49,21 +50,21 @@ The testing environment is configured in `vitest.config.ts` with:
 For testing the core store functionality:
 
 ```typescript
-import { describe, it, expect, beforeEach } from "vitest";
-import { createStore, type Store } from "../../src/core/store.js";
+import {describe, it, expect, beforeEach} from 'vitest'
+import {createStore, type Store} from '../../src/core/store.js'
 
-describe("Store Feature", () => {
-  let store: Store<{ count: number }>;
+describe('Store Feature', () => {
+  let store: Store<{count: number}>
 
   beforeEach(() => {
-    store = createStore({ count: 0 });
-  });
+    store = createStore({count: 0})
+  })
 
-  it("should test store behavior", () => {
-    store.dispatch({ count: 1 });
-    expect(store.getState().count).toBe(1);
-  });
-});
+  it('should test store behavior', () => {
+    store.dispatch({count: 1})
+    expect(store.getState().count).toBe(1)
+  })
+})
 ```
 
 ### React Integration Tests
@@ -71,28 +72,29 @@ describe("Store Feature", () => {
 For testing React components and hooks:
 
 ```typescript
-import { describe, it, expect, beforeEach } from "vitest";
-import { createStore } from "../../src/core/store.js";
-import { createStoreContext } from "../../src/react/index.js";
+import {describe, it, expect, beforeEach} from 'vitest'
+import {createStore} from '../../src/core/store.js'
+import {createStoreContext} from '../../src/react/index.js'
 
-describe("React Integration", () => {
-  let store: ReturnType<typeof createStore<{ count: number }>>;
+describe('React Integration', () => {
+  let store: ReturnType<typeof createStore<{count: number}>>
 
   beforeEach(() => {
-    store = createStore({ count: 0 });
-  });
+    store = createStore({count: 0})
+  })
 
-  it("should create store context successfully", () => {
-    const context = createStoreContext(store);
-    expect(context.StoreProvider).toBeDefined();
-    expect(context.useStore).toBeDefined();
-  });
-});
+  it('should create store context successfully', () => {
+    const context = createStoreContext(store)
+    expect(context.StoreProvider).toBeDefined()
+    expect(context.useStore).toBeDefined()
+  })
+})
 ```
 
 ## Coverage Reports
 
-Coverage reports are generated in the `coverage/` directory when running `npm run test:coverage`. The project maintains 80% coverage thresholds for:
+Coverage reports are generated in the `coverage/` directory when running `npm run test:coverage`.
+The project maintains 80% coverage thresholds for:
 
 - Branches
 - Functions

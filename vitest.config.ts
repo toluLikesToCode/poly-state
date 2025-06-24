@@ -1,37 +1,29 @@
 /// <reference types="vitest" />
-import { defineConfig } from "vitest/config";
+import {defineConfig} from 'vitest/config'
 
 export default defineConfig({
   test: {
     // Test environment setup
-    environment: "jsdom",
+    environment: 'jsdom',
 
     // Global test configuration
     globals: true,
 
     // Setup files
-    setupFiles: ["./test/setup.ts"],
+    setupFiles: ['./test/setup.ts'],
 
     // Include and exclude patterns
     include: [
-      "test/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}",
-      "src/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}",
+      'test/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}',
+      'src/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}',
     ],
-    exclude: ["node_modules", "dist", "examples"],
+    exclude: ['node_modules', 'dist', 'examples'],
 
     // Coverage configuration
     coverage: {
-      provider: "v8",
-      reporter: ["text", "json", "html"],
-      exclude: [
-        "coverage/**",
-        "dist/**",
-        "test/**",
-        "examples/**",
-        "**/*.d.ts",
-        "**/*.config.*",
-        "**/node_modules/**",
-      ],
+      provider: 'v8',
+      reporter: ['text', 'json', 'html'],
+      exclude: ['coverage/**', 'dist/**', 'test/**', 'examples/**', '**/*.d.ts', '**/*.config.*', '**/node_modules/**'],
       thresholds: {
         global: {
           branches: 80,
@@ -45,4 +37,4 @@ export default defineConfig({
     // Test timeout
     testTimeout: 10000,
   },
-});
+})

@@ -1,14 +1,14 @@
-import { StorageError } from "../../shared/errors";
+import {StorageError} from '../../shared/errors'
 
 /**
  * The key used to store the client session ID in localStorage.
  */
-export const CLIENT_SESSION_KEY = "clientSessionId";
+export const CLIENT_SESSION_KEY = 'clientSessionId'
 
 /**
  * Internal state for the current client session ID.
  */
-let _currentClientSessionId: string | null = null;
+let _currentClientSessionId: string | null = null
 
 /**
  * Gets the current client session ID.
@@ -16,7 +16,7 @@ let _currentClientSessionId: string | null = null;
  * @returns The current client session ID, or null if not initialized
  */
 export function getClientSessionId(): string | null {
-  return _currentClientSessionId;
+  return _currentClientSessionId
 }
 
 /**
@@ -27,62 +27,56 @@ export function getClientSessionId(): string | null {
  */
 export function updateClientSessionId(newId: string): boolean {
   if (!newId || newId === _currentClientSessionId) {
-    return false;
+    return false
   }
 
   try {
-    _currentClientSessionId = newId;
+    _currentClientSessionId = newId
     if (isLocalStorageAvailable()) {
-      setLocalStorage(CLIENT_SESSION_KEY, newId);
+      setLocalStorage(CLIENT_SESSION_KEY, newId)
     }
-    console.info("Client Session ID updated", {
-      operation: "updateClientSessionId",
+    // TODO: add a logger that can be disabled in production
+    // eslint-disable-next-line no-console
+    console.info('Client Session ID updated', {
+      operation: 'updateClientSessionId',
       sessionId: newId,
-    });
-    return true;
+    })
+    return true
   } catch (error) {
-    console.error("Failed to update client session ID", {
-      operation: "updateClientSessionId",
+    console.error('Failed to update client session ID', {
+      operation: 'updateClientSessionId',
       error: error instanceof Error ? error.message : String(error),
       newId,
-    });
-    return false;
+    })
+    return false
   }
 }
 
 /**
  * Safe error handler for storage operations
  */
-function handleStorageError(
-  operation: string,
-  key: string,
-  error: unknown
-): void {
-  const errorMessage = error instanceof Error ? error.message : String(error);
+function handleStorageError(operation: string, key: string, error: unknown): void {
+  const errorMessage = error instanceof Error ? error.message : String(error)
   console.warn(`Failed to ${operation}`, {
     operation,
     key,
     error: errorMessage,
-  });
+  })
 }
 
 /**
  * Gets a value from localStorage and parses it from JSON.
  */
-export function getLocalStorage<T>(
-  key: string,
-  fallback: T,
-  reviver?: (this: any, key: string, value: any) => any
-): T {
+export function getLocalStorage<T>(key: string, fallback: T, reviver?: (this: any, key: string, value: any) => any): T {
   try {
-    const saved = localStorage.getItem(key);
+    const saved = localStorage.getItem(key)
     if (saved !== null) {
-      return JSON.parse(saved, reviver);
+      return JSON.parse(saved, reviver)
     }
   } catch (error) {
-    handleStorageError("get localStorage", key, error);
+    handleStorageError('get localStorage', key, error)
   }
-  return fallback;
+  return fallback
 }
 
 /**
@@ -90,15 +84,10 @@ export function getLocalStorage<T>(
  */
 export function setLocalStorage(key: string, value: unknown): void {
   try {
-    localStorage.setItem(key, JSON.stringify(value));
+    localStorage.setItem(key, JSON.stringify(value))
   } catch (error) {
-    handleStorageError("set localStorage", key, error);
-    throw new StorageError(
-      `Failed to set localStorage for key '${key}'`,
-      "setLocalStorage",
-      key,
-      error
-    );
+    handleStorageError('set localStorage', key, error)
+    throw new StorageError(`Failed to set localStorage for key '${key}'`, 'setLocalStorage', key, error)
   }
 }
 
@@ -107,9 +96,9 @@ export function setLocalStorage(key: string, value: unknown): void {
  */
 export function removeLocalStorage(key: string): void {
   try {
-    localStorage.removeItem(key);
+    localStorage.removeItem(key)
   } catch (error) {
-    handleStorageError("remove localStorage", key, error);
+    handleStorageError('remove localStorage', key, error)
   }
 }
 
@@ -118,9 +107,9 @@ export function removeLocalStorage(key: string): void {
  */
 export function clearLocalStorage(): void {
   try {
-    localStorage.clear();
+    localStorage.clear()
   } catch (error) {
-    handleStorageError("clear localStorage", "all", error);
+    handleStorageError('clear localStorage', 'all', error)
   }
 }
 
@@ -129,10 +118,10 @@ export function clearLocalStorage(): void {
  */
 export function getAllLocalStorageKeys(): string[] {
   try {
-    return Object.keys(localStorage);
+    return Object.keys(localStorage)
   } catch (error) {
-    handleStorageError("get localStorage keys", "all", error);
-    return [];
+    handleStorageError('get localStorage keys', 'all', error)
+    return []
   }
 }
 
@@ -141,11 +130,11 @@ export function getAllLocalStorageKeys(): string[] {
  */
 export function isLocalStorageAvailable(): boolean {
   try {
-    const testKey = "__storage_test__";
-    localStorage.setItem(testKey, "test");
-    localStorage.removeItem(testKey);
-    return true;
+    const testKey = '__storage_test__'
+    localStorage.setItem(testKey, 'test')
+    localStorage.removeItem(testKey)
+    return true
   } catch {
-    return false;
+    return false
   }
 }

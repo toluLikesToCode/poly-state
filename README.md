@@ -1,209 +1,254 @@
-# Universal Store
+# Open Store
 
-A lightweight, feature-rich state management library for TypeScript and React applications.
+> **Development Notice**: This project is currently under active development and hasn't been
+> published to npm yet. The API is stabilizing but may still change before the first release.
+>
+> Project name is also subject to change before release.
 
-## 🚀 Features
+A lightweight, TypeScript-first state management solution that works seamlessly with both vanilla
+JavaScript/TypeScript projects and React applications.
 
-- **Zero dependencies** (React is optional peer dependency)
-- **Small bundle size** with tree-shaking support
-- **Immutable updates** with automatic state freezing in development
-- **Built-in persistence** (localStorage, sessionStorage, cookies)
-- **Cross-tab synchronization**
-- **Undo/Redo functionality**
-- **Plugin system** for extensibility
-- **TypeScript first** with full type safety
-- **React integration** with hooks and context
+## Why Open Store?
 
-## 📦 Installation
+- **Universal compatibility** - One store, multiple environments
+- **Zero dependencies** - React is optional, everything else is built-in
+- **Developer friendly** - Great TypeScript support and debugging experience
+- **Lightweight** - Small bundle with tree-shaking support
+- **Immutable by default** - Safe state updates with automatic freezing in dev mode
+- **Persistent state** - Built-in localStorage, sessionStorage, and cookie support
+- **Time travel** - Undo/redo functionality out of the box
+- **Extensible** - Plugin system for custom functionality
+
+## Installation
+
+> **Note**: Package not yet published to npm. For now, you can clone and build locally.
 
 ```bash
-npm install @tolulikescode/universal-store
-# For React support
-npm install @tolulikescode/universal-store react
+# When published:
+npm install open-store
+
+# For React projects:
+npm install open-store react
 ```
 
-## 🎯 Quick Start
+## Getting Started
 
-### Vanilla TypeScript
+### For Vanilla TypeScript/JavaScript
 
 ```typescript
-import { createStore } from "@tolulikescode/universal-store";
+import {createStore} from 'open-store'
 
-const store = createStore({ count: 0 });
+const store = createStore({count: 0})
 
-// Subscribe to changes
-store.subscribe(state => console.log("State:", state));
+// Listen for changes
+store.subscribe(state => console.log('State updated:', state))
 
 // Update state
-store.dispatch({ count: 1 });
+store.dispatch({count: 1})
 ```
 
-### React
+### For React Applications
 
-```typescript
-import { createStore } from "@tolulikescode/universal-store";
-import { createStoreContext } from "@tolulikescode/universal-store/react";
+```tsx
+import React from 'react'
+import {createStore} from 'open-store'
+import {createStoreContext} from 'open-store/react'
 
-const store = createStore({ count: 0 });
-const { StoreProvider, useSelector, useDispatch } = createStoreContext(store);
+const store = createStore({
+  count: 0,
+  user: {name: '', email: ''},
+  todos: [],
+})
+
+const {StoreProvider, useSelector, useDispatch, useStoreHistory, useTransaction, useAsyncThunk} =
+  createStoreContext(store)
 
 function Counter() {
-  const count = useSelector(state => state.count);
-  const dispatch = useDispatch();
+  const count = useSelector(state => state.count)
+  const dispatch = useDispatch()
+  const {undo, redo, canUndo, canRedo} = useStoreHistory()
 
-  return <button onClick={() => dispatch({ count: count + 1 })}>Count: {count}</button>;
+  return (
+    <div>
+      <button onClick={() => dispatch({count: count + 1})}>Count: {count}</button>
+      <button onClick={() => undo()} disabled={!canUndo}>
+        Undo
+      </button>
+      <button onClick={() => redo()} disabled={!canRedo}>
+        Redo
+      </button>
+    </div>
+  )
+}
+
+function UserForm() {
+  const user = useSelector(state => state.user)
+  const transaction = useTransaction()
+
+  const handleSave = () => {
+    transaction(draft => {
+      draft.user.name = 'John Doe'
+      draft.user.email = 'john@example.com'
+    })
+  }
+
+  return (
+    <div>
+      <p>User: {user.name || 'No name'}</p>
+      <button onClick={handleSave}>Save User</button>
+    </div>
+  )
 }
 
 function App() {
   return (
     <StoreProvider>
       <Counter />
+      <UserForm />
     </StoreProvider>
-  );
+  )
 }
 ```
 
-## 📚 API Documentation
+## API Reference
 
-### Core API
+### Core Store API
 
-#### `createStore<T>(initialState: T, options?: StoreOptions): Store<T>`
+#### Creating a Store
 
-Creates a new store instance with the given initial state.
+```typescript
+const store = createStore(initialState, options?)
+```
+
+The main function to create a store instance. Pass your initial state and optional configuration.
 
 ```typescript
 const store = createStore(
   {
-    user: { name: "", email: "" },
-    settings: { theme: "light" },
+    user: {name: '', email: ''},
+    settings: {theme: 'light'},
   },
   {
-    persistKey: "my-app-state",
+    persistKey: 'my-app-state',
     storageType: StorageType.Local,
   }
-);
+)
 ```
 
 #### Store Methods
 
-- `getState()` - Get current state
-- `dispatch(action)` - Update state
-- `subscribe(listener)` - Subscribe to changes
-- `select(selector)` - Create memoized selector
-- `asReadOnly()` - Get read-only interface
+- `getState()` - Get the current state
+- `dispatch(action)` - Update state or execute thunks
+- `updatePath(path,updater)` - Update a nested property in the state using a function that takes the
+  old value and returns the new one
+- `batch(fn: () => void)` - Takes a function that can call dispatch multiple times
+- `subscribe(listener)` - Listen for state changes
+- `select(selector)` - Create a memoized selector
+- `asReadOnly()` - Get a read-only version of the store
 
-### React API
+There are many more store methods detailed in `src/core/state/types.ts`. These will be documented
+here at a later date.
 
-#### `createStoreContext<T>(store: Store<T>): StoreContextResult<T>`
+### React Integration
 
-Creates React context and hooks for a store.
+#### Setting Up Context
 
 ```typescript
-const { StoreProvider, useSelector, useDispatch, useStore } = createStoreContext(store);
+const {StoreProvider, useSelector, useDispatch, useStore} = createStoreContext(store)
 ```
 
-#### Hooks
+This creates all the React hooks and components you need to integrate with your store.
 
-- `useSelector<R>(selector: (state: T) => R): R` - Select and subscribe to state
-- `useDispatch(): Store<T>['dispatch']` - Get dispatch function
-- `useStore(): ReadOnlyStore<T>` - Get store instance
+#### Available Hooks
 
-## 🔧 Development Setup
+The hooks let you interact with your store in different ways:
 
-### Prerequisites
+**Basic hooks:**
 
-- Node.js 16+
-- npm or yarn
+- `useSelector(selector)` - Subscribe to specific parts of state
+- `useDispatch()` - Get the dispatch function
+- `useStore()` - Access the store directly
+- `useStoreState()` - Get the entire state (auto-subscribes)
 
-### Installation
+**Advanced hooks:**
+
+- `useSubscribeTo(selector, listener, options?)` - Custom state subscriptions
+- `useSubscribeToPath(path, listener, options?)` - Listen to specific paths
+- `useStoreValue(selector, deps?)` - Memoized selectors with custom deps
+- `useTransaction()` - Batch multiple updates atomically
+- `useBatch()` - Group dispatches together
+- `useUpdatePath()` - Update nested state directly
+- `useStoreHistory()` - Undo/redo functionality
+- `useThunk()` - Execute sync thunks
+- `useAsyncThunk()` - Execute async thunks with loading states
+- `useStoreEffect(effect, deps?)` - Side effects on state changes
+
+## Development & Contributing
+
+### Getting Set Up Locally
+
+**Requirements:** Node.js 16+ and npm/yarn
 
 ```bash
-# Clone the repository
+# Get the code
 git clone <your-repo-url>
-cd universal-store
+cd open-store
 
-# Install dependencies
+# Install dependencies and build
 npm install
-
-# Build the package
 npm run build
 ```
 
-### Scripts
+### Exploring the Examples
 
-- `npm run build` - Build for production
-- `npm run dev` - Build in watch mode
-- `npm run test` - Run tests
-- `npm run lint` - Lint code
-- `npm run clean` - Clean build artifacts
+Check out the `examples/` folder to see Open Store in action:
 
-## 🏗️ Building Your Store
+- `examples/vanilla.ts` - Complete vanilla TypeScript/JavaScript usage
+- `examples/react.tsx` - React integration with all hooks demonstrated
 
-### 1. Copy Your Store Implementation
+The examples use relative imports since the package isn't published yet, but they show you exactly
+how to use Open Store in your projects.
 
-Replace the placeholder content in these files with your actual implementation:
+### Available Scripts
 
-- `src/core/store.ts` - Your main store logic
-- `src/core/types.ts` - Your type definitions
-- `src/core/utils.ts` - Your utility functions
-- `src/plugins/index.ts` - Your plugin implementations
+- `npm run build` - Create production build
+- `npm run dev` - Build in watch mode for development
+- `npm run test` - Run tests with Vitest
+- `npm run lint` - Check code with ESLint
+- `npm run format` - Format code with Prettier
+- `npm run clean` - Remove build artifacts
 
-### 2. Build the Package
+## Project Status
 
-```bash
-npm run build
-```
+This project is actively being developed. The core functionality is working well, but we're still
+polishing things before the first npm release.
 
-### 3. Test in Your Projects
+**What's working:**
 
-#### Vanilla TypeScript\Javascript
+- Core store functionality with TypeScript support
+- React integration with comprehensive hooks
+- State persistence and undo/redo
+- Plugin system architecture
+- Test coverage of the basic functionality
 
-```typescript
-import { createStore } from "@tolulikescode/universal-store";
+**What's next:**
 
-const appStore = createStore({
-  user: { id: null, name: "", email: "" },
-  todos: [],
-});
+- Performance optimizations
+- More comprehensive documentation
+- Additional storage adapters
+- Complete test coverage
 
-appStore.dispatch({ user: { id: 1, name: "John", email: "john@example.com" } });
-```
+## Contributing
 
-#### React Application
-
-```typescript
-import { createStore } from "@tolulikescode/universal-store";
-import { createStoreContext } from "@tolulikescode/universal-store/react";
-
-const store = createStore({ count: 0 });
-const { StoreProvider, useSelector, useDispatch } = createStoreContext(store);
-
-// Use in your React components
-```
-
-## 📝 Publishing
-
-1. Update version in `package.json`
-2. Build the package: `npm run build`
-3. Publish to npm: `npm publish`
-
-## 📄 License
-
-MIT
-
-## 🤝 Contributing
+Interested in contributing? Here's how:
 
 1. Fork the repository
-2. Create your feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
+2. Create a feature branch (`git checkout -b feature/cool-new-thing`)
+3. Make your changes
+4. Add tests if needed
+5. Run `npm test` and `npm run lint`
+6. Submit a pull request
 
----
+## License
 
-**Next Steps:**
-
-1. Copy your existing store implementation to the appropriate files
-2. Test the build process
-3. Verify both vanilla TypeScript and React usage
-4. Publish to npm when ready
+MIT - feel free to use this in your projects.

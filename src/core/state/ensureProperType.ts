@@ -15,36 +15,29 @@
  * );
  * ```
  */
-export function ensureProperType<T>(
-  value: any,
-  expectedType: "Set" | "Map",
-  fallbackTransform?: (v: any) => any
-): T {
-  if (expectedType === "Set") {
+export function ensureProperType<T>(value: any, expectedType: 'Set' | 'Map', fallbackTransform?: (v: any) => any): T {
+  if (expectedType === 'Set') {
     if (value instanceof Set) {
-      return value as unknown as T;
+      return value as unknown as T
     }
     if (Array.isArray(value)) {
-      return new Set(value) as unknown as T;
+      return new Set(value) as unknown as T
     }
     if (fallbackTransform) {
-      return new Set(fallbackTransform(value)) as unknown as T;
+      return new Set(fallbackTransform(value)) as unknown as T
     }
-    return new Set() as unknown as T;
-  } else if (expectedType === "Map") {
+    return new Set() as unknown as T
+  } else if (expectedType === 'Map') {
     if (value instanceof Map) {
-      return value as unknown as T;
+      return value as unknown as T
     }
-    if (
-      Array.isArray(value) &&
-      value.every(item => Array.isArray(item) && item.length === 2)
-    ) {
-      return new Map(value) as unknown as T;
+    if (Array.isArray(value) && value.every(item => Array.isArray(item) && item.length === 2)) {
+      return new Map(value) as unknown as T
     }
     if (fallbackTransform) {
-      return new Map(fallbackTransform(value)) as unknown as T;
+      return new Map(fallbackTransform(value)) as unknown as T
     }
-    return new Map() as unknown as T;
+    return new Map() as unknown as T
   }
-  throw new Error(`Unsupported type: ${expectedType}`);
+  throw new Error(`Unsupported type: ${expectedType}`)
 }
