@@ -240,9 +240,14 @@ export class SelectorManager<S extends object> implements ISelectorManager<S> {
     // Use extracted utility for TTL cache cleanup
     const ensureCleanupRunning = () => {
       if (!cleanupStopper) {
-        cleanupStopper = utils.startTTLCacheCleanup(parameterCache, CACHE_TTL, (key, entry) => {
-          if (entry.selector._cleanup) entry.selector._cleanup()
-        })
+        cleanupStopper = utils.startTTLCacheCleanup(
+          parameterCache,
+          CLEANUP_INTERVAL, // how often to check
+          CACHE_TTL, // how long entries live
+          (key, entry) => {
+            if (entry.selector._cleanup) entry.selector._cleanup()
+          }
+        )
       }
     }
 

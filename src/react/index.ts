@@ -7,8 +7,8 @@
  *
  * @example
  * ```tsx
- * import { createStore } from 'universal-store';
- * import { createStoreContext } from 'universal-store/react';
+ * import { createStore } from 'open-store';
+ * import { createStoreContext } from 'open-store/react';
  *
  * const store = createStore({ count: 0, user: { name: 'John' } });
  * const { StoreProvider, useSelector, useDispatch } = createStoreContext(store);

@@ -127,16 +127,18 @@ export function sortObjectKeys(obj: object): object {
 /**
  * Starts a TTL-based cleanup interval for a cache map.
  * @param cache - The cache map
- * @param ttl - Time to live in ms
+ * @param cleanupInterval - How often to check for expired entries (ms)
+ * @param ttl - Time to live for each entry (ms)
  * @param onCleanup - Callback for each removed entry
  * @returns A function to stop the cleanup
  */
 export function startTTLCacheCleanup<T>(
   cache: Map<string, T>,
+  cleanupInterval: number,
   ttl: number,
   onCleanup: (key: string, value: T) => void
 ): () => void {
-  let cleanupInterval: NodeJS.Timeout | null = null
+  let intervalHandle: NodeJS.Timeout | null = null
   const interval = setInterval(() => {
     const now = Date.now()
     const toRemove: string[] = []
@@ -150,16 +152,16 @@ export function startTTLCacheCleanup<T>(
       if (value) onCleanup(key, value)
       cache.delete(key)
     })
-    if (cache.size === 0 && cleanupInterval) {
-      clearInterval(cleanupInterval)
-      cleanupInterval = null
+    if (cache.size === 0 && intervalHandle) {
+      clearInterval(intervalHandle)
+      intervalHandle = null
     }
-  }, ttl / 2)
-  cleanupInterval = interval
+  }, cleanupInterval)
+  intervalHandle = interval
   return () => {
-    if (cleanupInterval) {
-      clearInterval(cleanupInterval)
-      cleanupInterval = null
+    if (intervalHandle) {
+      clearInterval(intervalHandle)
+      intervalHandle = null
     }
   }
 }

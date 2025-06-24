@@ -1,6 +1,7 @@
 # Security Policy
 
-Hey there! Thanks for checking out Open Store. I'm still learning and building this project, so your help with security is super appreciated.
+Hey there! Thanks for checking out Open Store. I'm still learning and building this project, so your
+help with security is super appreciated.
 
 ## Supported Versions
 
@@ -13,7 +14,8 @@ Right now, I only provide security updates for these versions:
 
 ## Found a Security Issue?
 
-If you spot a security problem, please let me know! I'm learning as I go, so any heads-up is helpful.
+If you spot a security problem, please let me know! I'm learning as I go, so any heads-up is
+helpful.
 
 ### How to Report
 
@@ -61,7 +63,8 @@ I try to keep things safe by checking dependencies:
 
 ## Non-Security Issues?
 
-If you find a regular bug or have a question, please use [GitHub Issues](https://github.com/toluLikesToCode/universal-store/issues).
+If you find a regular bug or have a question, please use
+[GitHub Issues](https://github.com/toluLikesToCode/universal-store/issues).
 
 ## Contact
 

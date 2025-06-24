@@ -16,8 +16,8 @@
  * @example
  * **Basic Setup and Usage**
  * ```tsx
- * import { createStore } from '@tolulikescode/universal-store';
- * import { createStoreContext } from '@tolulikescode/universal-store/react';
+ * import { createStore } from 'open-store';
+ * import { createStoreContext } from 'open-store/react';
  *
  * // Define your state shape
  * interface AppState {

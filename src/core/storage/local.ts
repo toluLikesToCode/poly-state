@@ -35,6 +35,8 @@ export function updateClientSessionId(newId: string): boolean {
     if (isLocalStorageAvailable()) {
       setLocalStorage(CLIENT_SESSION_KEY, newId)
     }
+    // TODO: add a logger that can be disabled in production
+    // eslint-disable-next-line no-console
     console.info('Client Session ID updated', {
       operation: 'updateClientSessionId',
       sessionId: newId,

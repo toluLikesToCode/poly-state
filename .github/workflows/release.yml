@@ -16,7 +16,7 @@ jobs:
   # Placeholder job to prevent workflow errors
   release-placeholder:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Package Not Ready for Release
         run: |
@@ -24,12 +24,12 @@ jobs:
           echo "📦 No release will be created at this time"
           echo "🔗 Use npm link or npm pack for local testing"
           echo "📖 See DEVELOPMENT_WORKFLOW.md for testing instructions"
-          
+
           if [ "${{ github.event.inputs.confirm }}" != "confirm" ]; then
             echo "❌ Workflow cancelled: confirmation not provided"
             exit 1
           fi
-          
+
           echo "✅ Workflow completed successfully (no-op)"
           exit 0
 

@@ -25,6 +25,7 @@ export default [
       typescript({
         tsconfig: './tsconfig.build.json',
         exclude: ['src/react/**/*'],
+        outputToFilesystem: true,
       }),
     ],
   },
@@ -48,6 +49,7 @@ export default [
       nodeResolve(),
       typescript({
         tsconfig: './tsconfig.build.json',
+        outputToFilesystem: true,
       }),
     ],
   },

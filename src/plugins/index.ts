@@ -2,18 +2,19 @@
  * Plugins for Universal Store
  *
  * @remarks
- * Copy your plugin implementations here from your existing store.
+ * This module exports plugin implementations for extending store functionality.
+ * The plugin system allows for custom middleware, validation, logging, and other
+ * store enhancements.
  *
  * @packageDocumentation
  */
 
-// TODO: Copy your plugin implementations here
-// These should include logger, validator, and other plugins
+import {Plugin} from '../core'
 
-// Example plugin structure - replace with your actual plugins
-export interface ExamplePlugin {
+// TODO: Add built in plugins here
+
+// Example plugin structure for now
+export interface BasePlugin<S extends object> {
   name: string
-  version: string
+  plugin: Plugin<S>
 }
-
-// Export your actual plugins here

@@ -1,10 +1,12 @@
 # Open Store
 
-> **Development Notice**: This project is currently under active development and hasn't been published to npm yet. The API is stabilizing but may still change before the first release.
+> **Development Notice**: This project is currently under active development and hasn't been
+> published to npm yet. The API is stabilizing but may still change before the first release.
 >
->Project name is also subject to change before release.
+> Project name is also subject to change before release.
 
-A lightweight, TypeScript-first state management solution that works seamlessly with both vanilla JavaScript/TypeScript projects and React applications.
+A lightweight, TypeScript-first state management solution that works seamlessly with both vanilla
+JavaScript/TypeScript projects and React applications.
 
 ## Why Open Store?
 
@@ -55,7 +57,7 @@ import {createStoreContext} from 'open-store/react'
 const store = createStore({
   count: 0,
   user: {name: '', email: ''},
-  todos: []
+  todos: [],
 })
 
 const {StoreProvider, useSelector, useDispatch, useStoreHistory, useTransaction, useAsyncThunk} =
@@ -124,11 +126,11 @@ The main function to create a store instance. Pass your initial state and option
 const store = createStore(
   {
     user: {name: '', email: ''},
-    settings: {theme: 'light'}
+    settings: {theme: 'light'},
   },
   {
     persistKey: 'my-app-state',
-    storageType: StorageType.Local
+    storageType: StorageType.Local,
   }
 )
 ```
@@ -137,13 +139,15 @@ const store = createStore(
 
 - `getState()` - Get the current state
 - `dispatch(action)` - Update state or execute thunks
-- `updatePath(path,updater)` - Update a nested property in the state using a function that takes the old value and returns the new one
+- `updatePath(path,updater)` - Update a nested property in the state using a function that takes the
+  old value and returns the new one
 - `batch(fn: () => void)` - Takes a function that can call dispatch multiple times
 - `subscribe(listener)` - Listen for state changes
 - `select(selector)` - Create a memoized selector
 - `asReadOnly()` - Get a read-only version of the store
 
-There are many more store methods detailed in `src/core/state/types.ts`. These will be documented here at a later date.
+There are many more store methods detailed in `src/core/state/types.ts`. These will be documented
+here at a later date.
 
 ### React Integration
 
@@ -202,7 +206,8 @@ Check out the `examples/` folder to see Open Store in action:
 - `examples/vanilla.ts` - Complete vanilla TypeScript/JavaScript usage
 - `examples/react.tsx` - React integration with all hooks demonstrated
 
-The examples use relative imports since the package isn't published yet, but they show you exactly how to use Open Store in your projects.
+The examples use relative imports since the package isn't published yet, but they show you exactly
+how to use Open Store in your projects.
 
 ### Available Scripts
 
@@ -215,7 +220,8 @@ The examples use relative imports since the package isn't published yet, but the
 
 ## Project Status
 
-This project is actively being developed. The core functionality is working well, but we're still polishing things before the first npm release.
+This project is actively being developed. The core functionality is working well, but we're still
+polishing things before the first npm release.
 
 **What's working:**
 

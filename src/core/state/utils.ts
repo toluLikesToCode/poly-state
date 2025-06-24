@@ -1,15 +1,6 @@
-import {StoreError, ValidationError} from '../../shared/errors'
+import {ValidationError} from '../../shared/errors'
 import * as storage from '../storage/index'
-import {
-  ActionPayload,
-  Middleware,
-  PersistedState,
-  StorageType,
-  Store,
-  StoreOptions,
-  ValidationErrorHandler,
-  ValidatorFn,
-} from './types'
+import {Middleware, PersistedState, ValidationErrorHandler, ValidatorFn} from './types'
 /**
  * Clean up stale persisted states across all storage types
  */
@@ -256,6 +247,8 @@ function strictStructureMatch(obj: any, template: any): boolean {
  * @see {@link createValidatorMiddleware} for validation middleware
  */
 export function createLoggerMiddleware<S extends object>(
+  // TODO: add a logger that can be disabled in production
+  // eslint-disable-next-line no-console
   logger: (...args: any[]) => void = console.log
 ): Middleware<S> {
   return (action, prevState, dispatchNext, getState) => {

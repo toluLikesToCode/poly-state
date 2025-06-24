@@ -150,15 +150,9 @@ describe('Store Core Functionality', () => {
       expect(currentName()).toBe('not-test') // Should still be "not-test"
 
       const result4 = store.undo(5) // Undo 5 steps
-      let history = store.getHistory()
-      console.table(
-        history.history.map(entry => {
-          return {Count: entry.count}
-        })
-      )
-      console.log(`Current history index: ${history.currentIndex}`)
       expect(result4).toBe(true)
 
+      const history = store.getHistory()
       expect(history.history.length).toBe(6) // Should have 6 entries in history
       expect(history.history[4].count).toBe(9)
       expect(currentCount()).toBe(4) // 9 -> 8 -> 7 -> 6 -> 5 -> 4

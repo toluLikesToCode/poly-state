@@ -5,14 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-> **⚠️ Development Status**: This package is currently in active development and has not been published to npm yet. All versions listed below represent development milestones and local builds only.
+> **⚠️ Development Status**: This package is currently in active development and has not been
+> published to npm yet. All versions listed below represent development milestones and local builds
+> only.
 
 ## [Unreleased] - In Active Development
 
 ### Added
 
 - Enhanced React example with comprehensive hook demonstrations
-- Vanilla TypeScript example with complete feature showcase  
+- Vanilla TypeScript example with complete feature showcase
 - Additional npm scripts for better development workflow:
   - `lint:fix` - ESLint with automatic fixes
   - `format` - Format all files with Prettier

@@ -201,7 +201,7 @@ export function createStore<S extends object>(initialState: S, options: StoreOpt
 
     if (typeof action === 'object' && action !== null && '__REDUX_DEVTOOLS_TIME_TRAVEL__' in action) {
       // This is a DevTools time travel action, apply it directly without middleware
-      const {__REDUX_DEVTOOLS_TIME_TRAVEL__, ...actualPayload} = action as any
+      const {actualPayload} = action as any
       _applyStateChange(actualPayload as ActionPayload<S>, false)
       return
     }
@@ -651,7 +651,10 @@ export function createStore<S extends object>(initialState: S, options: StoreOpt
         _internalDispatch(nextState as ActionPayload<S>, false)
       } else {
         // No changes were made, but transaction was successful
+        // TODO: add a logger that i can disable in production
+        // eslint-disable-next-line no-console
         if (typeof console !== 'undefined' && console.debug) {
+          // eslint-disable-next-line no-console
           console.debug(`[Store: ${name || 'Unnamed'}] Transaction completed with no state changes.`, {
             operation: 'transaction',
           })
@@ -808,7 +811,6 @@ export function createStore<S extends object>(initialState: S, options: StoreOpt
   ;(storeInstance as any)._getDependencySubscriptionCount = () => {
     return selectorManager.getDependencySubscriptionCount()
   }
-
   ;(storeInstance as any)._cleanupDependencySubscriptions = () => {
     return selectorManager.cleanupDependencySubscriptions()
   }

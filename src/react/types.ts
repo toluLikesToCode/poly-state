@@ -7,8 +7,8 @@
  *
  * @example
  * ```tsx
- * import type { StoreContextResult, StoreHooks } from 'universal-store/react';
- * import { createStoreContext } from 'universal-store/react';
+ * import type { StoreContextResult, StoreHooks } from 'open-store/react';
+ * import { createStoreContext } from 'open-store/react';
  *
  * // Type-safe store context creation
  * interface AppState { count: number; user: { name: string } }

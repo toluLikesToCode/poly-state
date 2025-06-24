@@ -437,16 +437,9 @@ export interface SelectorManagerStats {
 export type SelectorCache = WeakMap<Function, WeakMap<any, MemoizedSelector<any>>>
 
 /**
- * Enhanced cache structure with explicit state type information.
- *
- * @template S - The state type
- *
- * @remarks
- * Provides type-safe access to the selector cache with state-specific
- * type information. Used internally by the SelectorManager to ensure
- * type safety across all cache operations.
+ * Internal typed selector cache structure
  */
-export type TypedSelectorCache<S extends object> = WeakMap<Function, WeakMap<any, MemoizedSelector<any>>>
+export type TypedSelectorCache = WeakMap<Function, WeakMap<any, MemoizedSelector<any>>>
 
 /**
  * Cache entry metadata for debugging and monitoring.
@@ -608,18 +601,15 @@ export interface SelectorPerformanceMetrics {
 /**
  * Internal state management for the SelectorManager.
  *
- * @template S - The state type
- *
  * @remarks
  * Contains all internal state variables used by the SelectorManager
  * for tracking selectors, subscriptions, and performance metrics.
- * This interface documents the complete internal state structure.
  */
-export interface SelectorManagerInternalState<S extends object> {
+export interface SelectorManagerInternalState {
   /**
    * Primary selector cache using WeakMap structure.
    */
-  selectorCache: TypedSelectorCache<S>
+  selectorCache: TypedSelectorCache
 
   /**
    * Set of all currently active selectors.
@@ -745,14 +735,12 @@ export type ParameterizedSelector<Props, R> = (params: Props) => (() => R) & {la
 /**
  * Internal cache structure for tracking selector instances.
  *
- * @template S - The state type
- *
  * @remarks
  * Maps selector functions to their memoized instances using WeakMaps for
  * automatic garbage collection. The two-level structure allows caching
  * based on both the selector function and its input dependencies.
  */
-export type SelectorCacheStructure<S extends object> = WeakMap<Function, WeakMap<any, MemoizedSelector<any>>>
+export type SelectorCacheStructure = WeakMap<Function, WeakMap<any, MemoizedSelector<any>>>
 
 /**
  * Set of active selectors being tracked by the manager.
@@ -769,10 +757,9 @@ export type ActiveSelectorsSet = Set<MemoizedSelector<any>>
  *
  * @remarks
  * Maintains references to all active dependency subscriptions for cleanup
- * and lifecycle management. Subscriptions are automatically managed through
- * their lifecycle from creation to cleanup.
+ * and lifecycle management.
  */
-export type DependencySubscriptionsSet<S extends object> = Set<DependencySubscription<any>>
+export type DependencySubscriptionsSet = Set<DependencySubscription<any>>
 
 /**
  * Smart equality comparison function signature.
@@ -1519,7 +1506,7 @@ export interface ISelectorManagerInternal<S extends object> {
    *
    * @internal
    */
-  selectorCache: SelectorCacheStructure<S>
+  selectorCache: SelectorCacheStructure
 
   /**
    * Set of currently active memoized selectors.
@@ -1578,7 +1565,7 @@ export interface ISelectorManagerInternal<S extends object> {
    *
    * @internal
    */
-  dependencySubscriptions: DependencySubscriptionsSet<S>
+  dependencySubscriptions: DependencySubscriptionsSet
 
   // --- Configuration Constants ---
 
@@ -1618,14 +1605,10 @@ export interface ISelectorManagerInternal<S extends object> {
 /**
  * Internal helper functions and utilities used by the SelectorManager.
  *
- * @template S - The state type
- *
  * @remarks
- * These functions are used internally by parameterized selectors and other
- * advanced selector features. They are not part of the public API but are
- * documented for completeness and debugging purposes.
+ * These functions are used internally by the selector manager
  */
-export interface SelectorManagerInternalHelpers<S extends object> {
+export interface SelectorManagerInternalHelpers {
   /**
    * Smart parameter serialization function for cache key generation.
    *

@@ -1,8 +1,11 @@
 # Development Workflow Guide
 
-This guide outlines the recommended workflows for testing the Open Store package in external projects during active development, before npm publication.
+This guide outlines the recommended workflows for testing the Open Store package in external
+projects during active development, before npm publication.
 
-> **🚧 Development Status**: This package is currently under active development and has not been published to npm yet. This guide shows you how to test and use it locally while development continues.
+> **🚧 Development Status**: This package is currently under active development and has not been
+> published to npm yet. This guide shows you how to test and use it locally while development
+> continues.
 
 ## Table of Contents
 
@@ -117,7 +120,7 @@ interface AppState {
 
 const store = createStore({
   count: 0,
-  user: null
+  user: null,
 })
 
 // Listen for changes
@@ -183,14 +186,14 @@ export default Counter
 
 ## Workflow Comparison (Summary Table)
 
-| Aspect                | NPM Link        | NPM Pack           |
-| --------------------- | --------------- | ------------------ |
-| **Best For**          | Development     | Final testing      |
-| **Update Speed**      | Instant         | Manual             |
-| **Setup**             | Medium          | Simple             |
-| **Production-like**   | No              | Yes                |
-| **Debugging**         | Excellent       | Good               |
-| **Team Sharing**      | Complex         | Easy (.tgz file)   |
+| Aspect              | NPM Link    | NPM Pack         |
+| ------------------- | ----------- | ---------------- |
+| **Best For**        | Development | Final testing    |
+| **Update Speed**    | Instant     | Manual           |
+| **Setup**           | Medium      | Simple           |
+| **Production-like** | No          | Yes              |
+| **Debugging**       | Excellent   | Good             |
+| **Team Sharing**    | Complex     | Easy (.tgz file) |
 
 ### What NPM Pack Does
 
@@ -487,24 +490,20 @@ npx tsc --noEmit
 ### General Best Practices
 
 1. **Maintain both entry points**
-
    - Test vanilla TypeScript usage: `import from 'open-store'`
    - Test React usage: `import from 'open-store/react'`
 
 2. **Use proper TypeScript configuration**
-
    - Ensure `tsconfig.build.json` is properly configured
    - Generate declaration files (`"declaration": true`)
 
 3. **Test in different environments**
-
    - CommonJS projects
    - ESM projects
    - TypeScript projects
    - JavaScript projects
 
 4. **Document breaking changes**
-
    - Keep `CHANGELOG.md` updated
    - Use semantic versioning appropriately
 
