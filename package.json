@@ -14,11 +14,7 @@
   "main": "dist/index.js",
   "module": "dist/index.esm.js",
   "types": "dist/index.d.ts",
-  "files": [
-    "dist",
-    "README.md",
-    "LICENSE"
-  ],
+  "files": ["dist", "README.md", "LICENSE"],
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -46,19 +42,15 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "prepare": "npm run build",
-    "clean": "rm -rf dist coverage"
+    "clean": "rm -rf dist coverage",
+    "pub:local": "yalc publish --push"
   },
-  "keywords": [
-    "state-management",
-    "typescript",
-    "react",
-    "store",
-    "immutable",
-    "persistence",
-    "undo-redo"
-  ],
+  "keywords": ["state-management", "typescript", "react", "store", "immutable", "persistence", "undo-redo"],
   "author": "ToluLikesToCode",
   "license": "MIT",
+  "peerDependencies": {
+    "react": ">=16.8.0"
+  },
   "peerDependenciesMeta": {
     "react": {
       "optional": true

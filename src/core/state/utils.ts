@@ -122,143 +122,149 @@ function strictStructureMatch(obj: any, template: any): boolean {
 }
 
 /**
- * Creates a logging middleware that logs state changes and actions for debugging purposes.
- * The middleware logs both before and after the action is applied, providing full visibility
- * into the state transition process.
+ * Creates a robust logging middleware with native Consola support and Redux DevTools-like grouping.
  *
- * @param logger - Custom logging function. Defaults to console.log. Can be any function
- *                that accepts multiple arguments for flexible logging strategies.
- * @returns Middleware function that logs state updates
+ * @param logger - A logging function or Consola instance. Defaults to console.
+ * @param options - Optional config: { enabled, logLevel }
+ * @returns Middleware function for logging state transitions
  *
  * @remarks
- * The logger middleware provides two log entries per action:
- * 1. **Before dispatch**: Shows the action and potential next state
- * 2. **After dispatch**: Shows the actual applied state after all middleware processing
- *
- * This is particularly useful for:
- * - Debugging state changes during development
- * - Auditing state transitions in production (with appropriate loggers)
- * - Understanding middleware execution flow
- * - Tracking performance issues with state updates
+ * - If a Consola instance is provided, uses its methods for pretty output.
+ * - Groups logs for each action using console.groupCollapsed or consola.box.
+ * - Only logs in development by default, unless enabled is set to true.
+ * - Logging errors never block state updates.
  *
  * @example
- * **Basic usage with console logging:**
- * ```typescript
- * const store = createStore(
- *   { count: 0, user: null },
- *   {
- *     middleware: [createLoggerMiddleware()]
- *   }
- * );
- *
- * store.dispatch({ count: 1 });
- * // Output:
- * // State Update: {
- * //   action: { count: 1 },
- * //   prevState: { count: 0, user: null },
- * //   nextPotentialState: { count: 1, user: null }
- * // }
- * // State Update Applied. New state: { count: 1, user: null }
- * ```
- *
- * @example
- * **Custom logger for structured logging:**
- * ```typescript
- * const structuredLogger = (message: string, data: any) => {
- *   console.log(JSON.stringify({
- *     timestamp: new Date().toISOString(),
- *     level: 'INFO',
- *     message,
- *     data
- *   }, null, 2));
- * };
+ * // Basic usage (console)
+ * import { createStore } from './core/state/createStore'
+ * import { createLoggerMiddleware } from './core/state/utils'
  *
  * const store = createStore(
- *   { items: [], loading: false },
- *   {
- *     middleware: [createLoggerMiddleware(structuredLogger)]
- *   }
- * );
- * ```
+ *   { count: 0 },
+ *   { middleware: [createLoggerMiddleware()] }
+ * )
+ *
+ * store.dispatch({ type: 'increment', count: 1 })
+ * // Logs grouped state transition in the browser/Node console
  *
  * @example
- * **Integration with external logging services:**
- * ```typescript
- * import { analytics } from './analytics-service';
+ * // With Consola for pretty output
+ * import consola from 'consola'
+ * import { createStore } from './core/state/createStore'
+ * import { createLoggerMiddleware } from './core/state/utils'
  *
+ * const store = createStore(
+ *   { user: null },
+ *   { middleware: [createLoggerMiddleware(consola)] }
+ * )
+ *
+ * store.dispatch({ type: 'login', user: { name: 'Ada' } })
+ * // Logs with Consola's formatting and grouping
+ *
+ * @example
+ * // Custom log level and always enabled
+ * import consola from 'consola'
+ * import { createLoggerMiddleware } from './core/state/utils'
+ *
+ * const logger = createLoggerMiddleware(consola, { enabled: true, logLevel: 'info' })
+ * // Use in your store config
+ *
+ * @example
+ * // Custom logger function (e.g., for analytics)
  * const analyticsLogger = (message: string, data: any) => {
- *   if (message.includes('State Update:')) {
- *     analytics.track('state_change_initiated', {
- *       action: data.action,
- *       timestamp: Date.now()
- *     });
- *   } else if (message.includes('Applied')) {
- *     analytics.track('state_change_completed', {
- *       newState: data,
- *       timestamp: Date.now()
- *     });
- *   }
- * };
+ *   myAnalytics.track(message, data)
+ * }
  *
- * const store = createStore(initialState, {
- *   middleware: [createLoggerMiddleware(analyticsLogger)]
- * });
- * ```
+ * const store = createStore(
+ *   { items: [] },
+ *   { middleware: [createLoggerMiddleware(analyticsLogger, { enabled: true })] }
+ * )
  *
  * @example
- * **Conditional logging based on environment:**
- * ```typescript
+ * // Conditional logging (production/development)
  * const conditionalLogger = (...args: any[]) => {
  *   if (process.env.NODE_ENV === 'development') {
- *     console.log(...args);
- *   } else if (process.env.NODE_ENV === 'production') {
- *     // Send to production logging service
- *     productionLogger.info(args);
+ *     console.log(...args)
+ *   } else {
+ *     prodLogger.info(...args)
  *   }
- * };
- *
- * const store = createStore(initialState, {
- *   middleware: [createLoggerMiddleware(conditionalLogger)]
- * });
- * ```
- *
- * @example
- * **Filtering sensitive data:**
- * ```typescript
- * const sanitizingLogger = (message: string, data: any) => {
- *   const sanitizedData = JSON.parse(JSON.stringify(data, (key, value) => {
- *     // Filter out sensitive fields
- *     if (['password', 'token', 'secret'].includes(key.toLowerCase())) {
- *       return '[REDACTED]';
- *     }
- *     return value;
- *   }));
- *
- *   console.log(message, sanitizedData);
- * };
+ * }
  *
  * const store = createStore(
- *   { user: { name: '', password: '' }, session: { token: '' } },
- *   { middleware: [createLoggerMiddleware(sanitizingLogger)] }
- * );
- * ```
- *
- * @see {@link Middleware} for more information about middleware architecture
- * @see {@link createValidatorMiddleware} for validation middleware
+ *   { foo: 'bar' },
+ *   { middleware: [createLoggerMiddleware(conditionalLogger)] }
+ * )
  */
 export function createLoggerMiddleware<S extends object>(
-  // TODO: add a logger that can be disabled in production
-  // eslint-disable-next-line no-console
-  logger: (...args: any[]) => void = console.log
+  logger:
+    | ((...args: any[]) => void)
+    | {log: Function; info?: Function; success?: Function; warn?: Function; error?: Function; box?: Function} = console,
+  options?: {enabled?: boolean; logLevel?: 'log' | 'info' | 'success' | 'warn' | 'error'}
 ): Middleware<S> {
+  const isConsola = typeof logger === 'object' && typeof (logger as any).log === 'function'
+  const enabled =
+    options?.enabled ?? (typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'development')
+  const logLevel = options?.logLevel ?? 'log'
+
+  // Helper to infer a human-friendly action name
+  function inferActionName(action: any): string {
+    if (action == null) return '[null]'
+    if (typeof action === 'function') return '[thunk]'
+    if (typeof action !== 'object') return `[${typeof action}]`
+    // Try to find a single key that changed
+    const keys = Object.keys(action)
+    if (keys.length === 0) return '[empty action]'
+    if (keys.length === 1) {
+      return keys[0]
+    }
+    // If multiple keys, join them for a summary
+    return keys.join(', ')
+  }
+
   return (action, prevState, dispatchNext, getState) => {
-    logger('State Update: ', {
-      action,
-      prevState: {...prevState}, // Log copy
-      nextPotentialState: {...prevState, ...action}, // What it would be if applied directly
-    })
-    dispatchNext(action) // Pass the action to the next middleware or applyState
-    logger('State Update Applied. New state:', {...getState()})
+    if (!enabled) return dispatchNext(action)
+
+    const time = new Date().toISOString()
+    const actionName = inferActionName(action)
+    const groupLabel = `Action: ${actionName} @ ${time}`
+
+    try {
+      if (typeof console.groupCollapsed === 'function') {
+        console.groupCollapsed(groupLabel)
+      }
+
+      if (isConsola && typeof (logger as any).box === 'function') {
+        ;(logger as any).box(`\uD83D\uDD28 ${groupLabel}`)
+      }
+
+      if (isConsola) {
+        ;(logger as any)[logLevel]?.('Prev state', prevState)
+        ;(logger as any)[logLevel]?.('Action', action)
+      } else if (typeof logger === 'function') {
+        logger('Prev state:', prevState)
+        logger('Action:', action)
+      }
+
+      dispatchNext(action)
+
+      const nextState = getState()
+      if (isConsola) {
+        ;(logger as any)[logLevel]?.('Next state', nextState)
+      } else if (typeof logger === 'function') {
+        logger('Next state:', nextState)
+      }
+
+      if (typeof console.groupEnd === 'function') {
+        console.groupEnd()
+      }
+    } catch (err) {
+      if (isConsola && typeof (logger as any).error === 'function') {
+        ;(logger as any).error('Logger middleware error', err)
+      } else {
+        console.error('Logger middleware error', err)
+      }
+      dispatchNext(action)
+    }
   }
 }
 
@@ -568,52 +574,75 @@ export function createValidatorMiddleware<S extends object>(
 
       // Handle synchronous validator
       if (typeof validationResult === 'boolean') {
-        if (validationResult) {
-          dispatchNext(action)
-        } else {
-          const validationError = new ValidationError('State validation failed', {
+        if (validationResult === false) {
+          const validationError = new ValidationError('State update validation failed', {
+            state: tempNextState,
             action,
-            stateAttempted: tempNextState,
           })
-          if (validationErrorHandler) validationErrorHandler(validationError, action)
-          else console.error(validationError.message, validationError.context)
+
+          if (validationErrorHandler) {
+            validationErrorHandler(validationError, action)
+          } else {
+            console.error(validationError.message, validationError.context)
+          }
+
+          // Block the action if validation fails
+          return
         }
-        return
+      } else if (validationResult instanceof Promise) {
+        // Handle asynchronous validator
+        validationResult
+          .then(result => {
+            if (result === false) {
+              const validationError = new ValidationError('Async state update validation failed', {
+                state: tempNextState,
+                action,
+              })
+
+              if (validationErrorHandler) {
+                validationErrorHandler(validationError, action)
+              } else {
+                console.error(validationError.message, validationError.context)
+              }
+
+              // Block the action if validation fails
+              return
+            }
+
+            dispatchNext(action) // Proceed with the action if validation passes
+          })
+          .catch(error => {
+            const validationError = new ValidationError('Async validation error', {
+              error,
+              action,
+            })
+
+            if (validationErrorHandler) {
+              validationErrorHandler(validationError, action)
+            } else {
+              console.error(validationError.message, validationError.context)
+            }
+
+            // Block the action on validation error
+          })
+        return // Prevent dispatching the action multiple times
       }
 
-      // Handle asynchronous validator
-      if (validationResult && typeof validationResult.then === 'function') {
-        return validationResult
-          .then((isValid: boolean) => {
-            if (isValid) {
-              dispatchNext(action)
-            } else {
-              const validationError = new ValidationError('State validation failed', {
-                action,
-                stateAttempted: tempNextState,
-              })
-              if (validationErrorHandler) validationErrorHandler(validationError, action)
-              else console.error(validationError.message, validationError.context)
-            }
-          })
-          .catch((e: any) => {
-            const validationError = new ValidationError(e.message || 'State validation threw an error', {
-              error: e,
-              action,
-              stateAttempted: tempNextState,
-            })
-            if (validationErrorHandler) validationErrorHandler(validationError, action)
-            else console.error(validationError.message, validationError.context)
-          })
-      }
-    } catch (e: any) {
-      const validationError = new ValidationError(e.message || 'State validation threw an error', {
-        error: e,
+      dispatchNext(action) // Proceed with the action if validation passes
+    } catch (error) {
+      const validationError = new ValidationError('Validation middleware error', {
+        error,
         action,
-        stateAttempted: tempNextState,
       })
-      if (validationErrorHandler) validationErrorHandler(validationError, action)
-      else console.error(validationError.message, validationError.context)
+
+      if (validationErrorHandler) {
+        validationErrorHandler(validationError, action)
+      } else {
+        console.error(validationError.message, validationError.context)
+      }
+
+      // Allow the action to proceed even if validation middleware encounters an error
+      dispatchNext(action)
     }
   }
 }
