@@ -9,6 +9,7 @@ import {HistoryManager} from './HistoryManager'
 import {PersistenceManager} from './persistenceManager'
 import {storeRegistry} from './storeRegistry'
 import {TypeRegistry} from './typeRegistry'
+import {MiddlewareExecutor} from './middlewear'
 import type {
   ActionPayload,
   CleanupOptions,
@@ -81,6 +82,8 @@ export function createStore<S extends object>(initialState: S, options: StoreOpt
       })
     }
   }
+
+  const middlewareExecutor = new MiddlewareExecutor<S>(middleware, handleError)
 
   // Initialize persistence manager for handling state persistence
   const persistenceManager = new PersistenceManager<S>(
@@ -219,47 +222,7 @@ export function createStore<S extends object>(initialState: S, options: StoreOpt
       return
     }
 
-    // Capture prevState *before* any middleware or state change.
-    const prevStateForMiddleware = {...state}
-
-    // Middleware processing
-    if (middleware.length > 0) {
-      let middlewareIndex = 0
-      const nextMiddleware = async (currentPayload: ActionPayload<S>) => {
-        if (middlewareIndex < middleware.length) {
-          const currentMiddleware = middleware[middlewareIndex++]
-          try {
-            const result = currentMiddleware(
-              currentPayload,
-              prevStateForMiddleware, // Pass the initially captured prevState
-              nextMiddleware,
-              storeInstance.getState,
-              storeInstance.reset
-            )
-            // If the middleware returns a promise, await it
-            if (result && typeof result.then === 'function') {
-              await result
-            }
-          } catch (e: any) {
-            handleError(
-              new MiddlewareError('Middleware execution failed', {
-                operation: 'middlewareExecution',
-                error: e,
-                middlewareName: currentMiddleware.name || 'anonymous',
-              })
-            )
-            // Optionally, do not apply state if middleware fails critically
-          }
-        } else {
-          // If middleware chain completes, apply the (potentially transformed) payload
-          _applyStateChange(currentPayload, false)
-        }
-      }
-      await nextMiddleware(action) // Start middleware chain and wait for completion
-    } else {
-      // No middleware, apply directly
-      _applyStateChange(action, false)
-    }
+    await middlewareExecutor.execute(action, {...state}, storeInstance.getState, _applyStateChange, storeInstance.reset)
   }
 
   // --- Store Methods ---
