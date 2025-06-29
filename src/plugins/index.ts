@@ -13,6 +13,8 @@ import {Plugin} from '../core'
 
 // TODO: Add built in plugins here
 
+export * from './devTools'
+
 // Example plugin structure for now
 export interface BasePlugin<S extends object> {
   name: string

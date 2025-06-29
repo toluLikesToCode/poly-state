@@ -14,7 +14,11 @@
   "main": "dist/index.js",
   "module": "dist/index.esm.js",
   "types": "dist/index.d.ts",
-  "files": ["dist", "README.md", "LICENSE"],
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -45,7 +49,15 @@
     "clean": "rm -rf dist coverage",
     "pub:local": "yalc publish --push"
   },
-  "keywords": ["state-management", "typescript", "react", "store", "immutable", "persistence", "undo-redo"],
+  "keywords": [
+    "state-management",
+    "typescript",
+    "react",
+    "store",
+    "immutable",
+    "persistence",
+    "undo-redo"
+  ],
   "author": "ToluLikesToCode",
   "license": "MIT",
   "peerDependencies": {
@@ -79,6 +91,8 @@
     "vitest": "^3.2.4"
   },
   "dependencies": {
-    "immer": "^10.1.1"
+    "immer": "^10.1.1",
+    "jsan": "^3.1.14",
+    "redux": "^5.0.1"
   }
 }
