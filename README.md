@@ -129,11 +129,44 @@ const store = createStore(
     settings: {theme: 'light'},
   },
   {
-    persistKey: 'my-app-state',
-    storageType: StorageType.Local,
+    persistKey: 'my-app-state', // Key for persisting state in storage
+    storageType: StorageType.Local, // Storage type: Local, Session, Cookie, or None
+    cookieOptions: {path: '/', secure: true}, // Cookie storage options (if using cookies)
+    cookiePrefix: 'os_', // Prefix for cookie keys (for cleanup)
+    syncAcrossTabs: true, // Enable cross-tab state sync
+    middleware: [myMiddleware], // Array of middleware functions
+    historyLimit: 50, // Max undo/redo steps to keep
+    name: 'MyStore', // Optional store name (for debugging/tools)
+    staleAge: 3600_000, // State is considered stale after this many ms
+    cleanupStaleStatesOnLoad: true, // Remove old states on load
+    cleanupOptions: {removePersistedState: true, clearHistory: true}, // Cleanup behavior on destroy/reset
+    plugins: [myPlugin], // Array of store plugins
+    onError: error => {
+      /* handle errors */
+    }, // Centralized error handler
   }
 )
 ```
+
+**Store Options:**
+
+| Option                     | Type                          | Description                                                                                |
+| -------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------ |
+| `persistKey`               | `string`                      | Key for persisting state in storage (local/session/cookie)                                 |
+| `storageType`              | `StorageType`                 | Where to persist state: `Local`, `Session`, `Cookie`, or `None`                            |
+| `cookieOptions`            | `CookieStorageOptions`        | Cookie config: `{ expires, path, domain, secure, sameSite }`                               |
+| `cookiePrefix`             | `string`                      | Prefix for cookie keys (for easier cleanup)                                                |
+| `syncAcrossTabs`           | `boolean`                     | Enable cross-tab state sync (default: false)                                               |
+| `middleware`               | `Middleware<S>[]`             | Array of middleware functions for intercepting actions                                     |
+| `historyLimit`             | `number`                      | Max undo/redo steps to keep in history                                                     |
+| `name`                     | `string`                      | Optional store name (for debugging/dev tools)                                              |
+| `staleAge`                 | `number`                      | State is considered stale after this many ms                                               |
+| `cleanupStaleStatesOnLoad` | `boolean`                     | Remove old/stale states on load                                                            |
+| `cleanupOptions`           | `CleanupOptions`              | Cleanup behavior on destroy/reset: `{ removePersistedState, clearHistory, resetRegistry }` |
+| `plugins`                  | `Plugin<S>[]`                 | Array of store plugins for extensibility                                                   |
+| `onError`                  | `(error: StoreError) => void` | Centralized error handler for store/plugin errors                                          |
+
+See `src/core/state/types.ts` for full type definitions and advanced options.
 
 #### Store Methods
 
