@@ -36,7 +36,6 @@ export function createStore<S extends object>(initialState: S, options: StoreOpt
   let isDestroyed = false
   let batching = false
   let batchedActions: ActionPayload<S>[] = []
-  let isInUpdatePath = false
 
   const {
     persistKey,
@@ -172,22 +171,19 @@ export function createStore<S extends object>(initialState: S, options: StoreOpt
        or generate useless listener notifications. */
     if (Object.keys(newPartialState).length === 0) return
 
-    // Check if this is an updatePath operation that should preserve structural sharing
-    if (isInUpdatePath) {
-      // For updatePath, directly assign the state to preserve Immer's structural sharing
-
-      //state = newPartialState as S
-      state = immer.produce(state, draft => {
-        Object.assign(draft, newPartialState)
-      }) // Immer will handle structural sharing
-    } else {
-      // Normal case: merge the partial state
-      //state = {...state, ...newPartialState} // Apply the changes
-      state = immer.produce(state, draft => {
-        // Use Immer to apply changes, ensureing that the partial state is applied immutably
-        Object.assign(draft, newPartialState)
+    // Immer: Apply the new state change
+    state = immer.produce(state, (draft: Draft<S>) => {
+      // Use Immer to merge the new state changes
+      Object.entries(newPartialState).forEach(([key, value]) => {
+        if (key in draft) {
+          // If the key exists, update it
+          ;(draft as any)[key] = value
+        } else {
+          // If the key doesn't exist, add it
+          ;(draft as any)[key] = value
+        }
       })
-    }
+    })
 
     // --- Notifications and History ---
     if (!fromSync && persistKey && storageType !== StorageType.None) {
@@ -458,22 +454,9 @@ export function createStore<S extends object>(initialState: S, options: StoreOpt
 
     // Only dispatch if state actually changed (Immer provides reference equality)
     if (nextState !== state) {
-      if (batching) {
-        // During batching, use minimal diff to avoid state replacement conflicts
-        const diff = buildMinimalDiff(nextState, path)
-        _internalDispatch(diff, false)
-      } else {
-        // For non-batched operations, use flag to preserve structural sharing
-        // and dispatch the complete state to provide full context to plugins
-        const currentUpdatePathFlag = isInUpdatePath
-        isInUpdatePath = true
-
-        try {
-          _internalDispatch(nextState as ActionPayload<S>, false)
-        } finally {
-          isInUpdatePath = currentUpdatePathFlag
-        }
-      }
+      // Always build and dispatch the minimal diff, even when not batching
+      const diff = buildMinimalDiff(nextState, path)
+      _internalDispatch(diff, false)
     }
   }
 
@@ -618,8 +601,18 @@ export function createStore<S extends object>(initialState: S, options: StoreOpt
 
       // Only proceed if state actually changed (Immer provides reference equality check)
       if (nextState !== state) {
+        // Find the changed paths (for now, we assume root-level keys changed)
+        // For more advanced diffing, we should use/make a utility to find all changed paths
+        // though this could be expensive for large states.
+        // Here, we build a minimal diff for all changed root keys
+        const diff: Partial<S> = {}
+        for (const key in nextState) {
+          if (!Object.is(state[key], nextState[key])) {
+            diff[key] = nextState[key]
+          }
+        }
         // Use _internalDispatch to go through the full middleware/plugin flow
-        _internalDispatch(nextState as ActionPayload<S>, false)
+        _internalDispatch(diff as ActionPayload<S>, false)
       } else {
         // No changes were made, but transaction was successful
         // TODO: add a logger that i can disable in production
