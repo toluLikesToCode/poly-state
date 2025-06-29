@@ -702,10 +702,10 @@ export function createStore<S extends object>(initialState: S, options: StoreOpt
   storeInstance._setStateForDevTools = (newState: S, isTimeTravel = true) => {
     if (isDestroyed) return
 
-    const prevState = {...state}
+    const prevState = state
 
     // --- Audit and sanitize the input state ---
-    let sanitizedState: S = {...newState}
+    let sanitizedState: S = immer.produce(newState, () => {})
 
     // If the current state contains any complex types registered in TypeRegistry,
     // attempt to restore them in the new state as well.
@@ -750,7 +750,7 @@ export function createStore<S extends object>(initialState: S, options: StoreOpt
 
     sanitizedState = auditAndSanitize(state, newState)
 
-    state = {...sanitizedState}
+    state = immer.produce(sanitizedState, () => {})
 
     // Persist the new state if needed
     if (persistKey && storageType !== StorageType.None) {
