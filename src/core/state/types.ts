@@ -137,7 +137,11 @@ export interface Plugin<S extends object> {
    * @remarks This is useful for logging, validation, or modifying actions before they reach the reducer.
    * @throws MiddlewareError if the action is invalid or cannot be processed. This error is handled internally by the store and logged.
    */
-  beforeStateChange?: (action: ActionPayload<S>, prevState: S, store: Store<S>) => ActionPayload<S> | void // Can transform action
+  beforeStateChange?: (
+    action: ActionPayload<S>,
+    prevState: S,
+    store: Store<S>
+  ) => ActionPayload<S> | void // Can transform action
 
   /**
    * Invoked after the store's state has been updated.
@@ -147,7 +151,12 @@ export interface Plugin<S extends object> {
    * @param store - The store instance whose state changed.
    * @throws MiddlewareError if the action is invalid or cannot be processed. This error is handled internally by the store and logged.
    */
-  onStateChange?: (newState: S, prevState: S, action: ActionPayload<S> | null, store: Store<S>) => void
+  onStateChange?: (
+    newState: S,
+    prevState: S,
+    action: ActionPayload<S> | null,
+    store: Store<S>
+  ) => void
 
   /**
    * Called when the store is being destroyed.
@@ -193,7 +202,11 @@ export interface Plugin<S extends object> {
    * @returns Transformed state to use, or void to use original
    * @throws MiddlewareError if the state is invalid or cannot be processed. It is handled internally by the store and logged. The store will proceed with the next plugins if available.
    */
-  onStateLoaded?: (loadedState: Partial<S>, storageType: StorageType, store: Store<S>) => Partial<S> | void
+  onStateLoaded?: (
+    loadedState: Partial<S>,
+    storageType: StorageType,
+    store: Store<S>
+  ) => Partial<S> | void
 
   /**
    * Called when cross-tab sync occurs
@@ -259,7 +272,12 @@ export interface Plugin<S extends object> {
    * @param store - The store instance
    * @throws MiddlewareError if the batch cannot be started. It is handled internally by the store and logged. The store will proceed with the next plugins if available.
    */
-  onTransactionEnd?: (success: boolean, store: Store<S>, changes?: Partial<S>, error?: Error) => void
+  onTransactionEnd?: (
+    success: boolean,
+    store: Store<S>,
+    changes?: Partial<S>,
+    error?: Error
+  ) => void
 }
 
 /**
@@ -728,7 +746,7 @@ export interface Store<S extends object> extends ReadOnlyStore<S> {
    * store.reset(); // State is back to { count: 0, name: 'Initial' }
    * ```
    *
-   * @see {@link Store.destroy} for complete store cleanup
+   * @see {@link destroy} for complete store cleanup
    */
   reset: () => void
 

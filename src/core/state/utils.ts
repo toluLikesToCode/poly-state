@@ -1,6 +1,137 @@
 import {ValidationError} from '../../shared/errors'
 import * as storage from '../storage/index'
 import {Middleware, PersistedState, ValidationErrorHandler, ValidatorFn} from './types'
+import {TypeRegistry} from './typeRegistry'
+
+import {produce, Draft} from 'immer'
+
+/**
+ * Deeply merges newState into state using Immer, handling arrays, objects, Maps, Sets, Dates, and custom classes.
+ * Arrays are replaced, not merged. Maps/Sets are replaced by default, but can be extended for custom merge logic.
+ * Custom classes are replaced unless a type handler is registered.
+ * @param state - The current state
+ * @param newState - The new state to merge
+ * @param typeRegistry - Optional TypeRegistry for custom class/complex type handling, defaults to a new instance
+ * @returns The next state
+ * @example
+ * assignState({a: {b: 1}}, {a: {c: 2}}) // {a: {b: 1, c: 2}}
+ *
+ * @todo Support for circular references in state is not currently implemented due to Immer limitations.
+ *       See test for circular references for more details and future implementation notes.
+ */
+export function assignState<S extends object>(
+  state: S,
+  newState: Partial<S>,
+  typeRegistry: {findTypeFor: (value: any) => any} = new TypeRegistry()
+): S {
+  /**
+   * Checks for circular references in an object.
+   * @param obj - The object to check
+   * @returns true if a circular reference is found, false otherwise
+   */
+  function hasCircularReference(obj: any, seen = new WeakSet()): boolean {
+    if (obj && typeof obj === 'object') {
+      if (seen.has(obj)) return true
+      seen.add(obj)
+      for (const key in obj) {
+        if (Object.prototype.hasOwnProperty.call(obj, key)) {
+          if (hasCircularReference(obj[key], seen)) return true
+        }
+      }
+      seen.delete(obj)
+    }
+    return false
+  }
+
+  if (hasCircularReference(newState)) {
+    throw new ValidationError(
+      'Circular references in state are not supported by Immer or Open Store.'
+    )
+  }
+  return produce(state, (draft: Draft<S>) => {
+    deepMerge(draft, newState, typeRegistry)
+  })
+}
+
+/**
+ * Recursively merges source into target, handling arrays, Maps, Sets, Dates, and custom classes.
+ * Arrays are replaced, Maps/Sets are shallow copied, Dates are cloned, and custom classes are replaced
+ * unless a typeRegistry is provided to handle serialization/deserialization.
+ * @param target - The target object to merge into
+ * @param source - The source object to merge from
+ * @param typeRegistry - Optional TypeRegistry for custom class handling
+ */
+function deepMerge(target: any, source: any, typeRegistry?: {findTypeFor: (value: any) => any}) {
+  for (const key of Object.keys(source)) {
+    const srcVal = source[key]
+    const tgtVal = target[key]
+
+    // Handle null/undefined
+    if (srcVal === null || srcVal === undefined) {
+      target[key] = srcVal
+      continue
+    }
+
+    // Handle arrays (replace, not merge)
+    if (Array.isArray(srcVal)) {
+      target[key] = srcVal.slice()
+      continue
+    }
+
+    // Handle Map
+    if (srcVal instanceof Map) {
+      target[key] = new Map(srcVal)
+      continue
+    }
+
+    // Handle Set
+    if (srcVal instanceof Set) {
+      target[key] = new Set(srcVal)
+      continue
+    }
+
+    // Handle Date
+    if (srcVal instanceof Date) {
+      target[key] = new Date(srcVal.getTime())
+      continue
+    }
+
+    // Handle custom class or registered type
+    if (typeof srcVal === 'object' && srcVal.constructor && srcVal.constructor !== Object) {
+      // If a typeRegistry is provided, try to use it
+      if (typeRegistry) {
+        const typeDef = typeRegistry.findTypeFor(srcVal)
+        if (typeDef) {
+          // Use serialize/deserialize to ensure correct type
+          target[key] = typeDef.deserialize(typeDef.serialize(srcVal))
+          continue
+        }
+      }
+      // Otherwise, just replace the value (shallow copy)
+      target[key] = srcVal
+      continue
+    }
+
+    // Handle plain object
+    if (
+      typeof srcVal === 'object' &&
+      srcVal !== null &&
+      tgtVal &&
+      typeof tgtVal === 'object' &&
+      tgtVal.constructor === Object
+    ) {
+      if (!target[key] || typeof target[key] !== 'object') {
+        target[key] = {}
+      }
+      deepMerge(target[key], srcVal)
+      continue
+    }
+
+    // Primitive or fallback
+    target[key] = srcVal
+  }
+}
+
 /**
  * Clean up stale persisted states across all storage types
  */
@@ -198,12 +329,20 @@ function strictStructureMatch(obj: any, template: any): boolean {
 export function createLoggerMiddleware<S extends object>(
   logger:
     | ((...args: any[]) => void)
-    | {log: Function; info?: Function; success?: Function; warn?: Function; error?: Function; box?: Function} = console,
+    | {
+        log: Function
+        info?: Function
+        success?: Function
+        warn?: Function
+        error?: Function
+        box?: Function
+      } = console,
   options?: {enabled?: boolean; logLevel?: 'log' | 'info' | 'success' | 'warn' | 'error'}
 ): Middleware<S> {
   const isConsola = typeof logger === 'object' && typeof (logger as any).log === 'function'
   const enabled =
-    options?.enabled ?? (typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'development')
+    options?.enabled ??
+    (typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'development')
   const logLevel = options?.logLevel ?? 'log'
 
   // Helper to infer a human-friendly action name
@@ -542,16 +681,19 @@ export function createValidatorMiddleware<S extends object>(
 ): Middleware<S> {
   let hasValidatedInitialState = false
 
-  return (action, prevState, dispatchNext, _getState, reset) => {
+  return (action, prevState, dispatchNext, getState, reset) => {
     // Validate initial state structure on first run if template provided
     if (!hasValidatedInitialState && initialStateTemplate) {
       hasValidatedInitialState = true
 
       if (!strictStructureMatch(prevState, initialStateTemplate)) {
-        const validationError = new ValidationError('Initial state structure does not match the provided template', {
-          currentState: prevState,
-          expectedTemplate: initialStateTemplate,
-        })
+        const validationError = new ValidationError(
+          'Initial state structure does not match the provided template',
+          {
+            currentState: prevState,
+            expectedTemplate: initialStateTemplate,
+          }
+        )
 
         if (validationErrorHandler) {
           validationErrorHandler(validationError, action)

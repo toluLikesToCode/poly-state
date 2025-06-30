@@ -2,7 +2,12 @@ import * as immer from 'immer'
 import {Draft} from 'immer'
 import {PluginManager} from '../../plugins/pluginManager'
 import {MiddlewareError, StoreError, SyncError, TransactionError} from '../../shared/errors'
-import {type DependencyListener, type DependencySubscriptionOptions, type Selector, SelectorManager} from '../selectors'
+import {
+  type DependencyListener,
+  type DependencySubscriptionOptions,
+  type Selector,
+  SelectorManager,
+} from '../selectors'
 import {getClientSessionId} from '../storage/index'
 import {deepEqual, getPath, isDevMode} from '../utils/index'
 import {HistoryManager} from './HistoryManager'
@@ -21,7 +26,7 @@ import type {
   Thunk,
 } from './types'
 import {StorageType} from './types'
-import {cleanupStaleStates} from './utils'
+import {assignState, cleanupStaleStates} from './utils'
 
 // Enable Immer features for better performance and functionality
 immer.enableMapSet()
@@ -30,8 +35,11 @@ immer.enablePatches()
 /**
  * Creates a new store
  */
-export function createStore<S extends object>(initialState: S, options: StoreOptions<S> = {}): Store<S> {
-  let state = {...initialState}
+export function createStore<S extends object>(
+  initialState: S,
+  options: StoreOptions<S> = {}
+): Store<S> {
+  let state = assignState({} as S, initialState) as S // Ensure state is a copy of initialState
   let listeners: Listener<S>[] = []
   let isDestroyed = false
   let batching = false
@@ -53,7 +61,8 @@ export function createStore<S extends object>(initialState: S, options: StoreOpt
       clearHistory: true,
     },
     plugins = [],
-    onError = err => console.error(`[Store: ${name || 'Unnamed'}] Error:`, err.message, err.context || ''),
+    onError = err =>
+      console.error(`[Store: ${name || 'Unnamed'}] Error:`, err.message, err.context || ''),
   } = options
 
   const sessionId = getClientSessionId()
@@ -99,7 +108,12 @@ export function createStore<S extends object>(initialState: S, options: StoreOpt
   const pluginManager = new PluginManager<S>(plugins, handleError, name)
 
   function persistState(dataToPersist: S): void {
-    const success = persistenceManager.persistState(persistKey, dataToPersist, pluginManager, storeInstance)
+    const success = persistenceManager.persistState(
+      persistKey,
+      dataToPersist,
+      pluginManager,
+      storeInstance
+    )
     if (!success && isDevMode()) {
       console.warn(
         `[Store: ${name || 'Unnamed'}] Failed to persist state. Check storage availability or configuration.`
@@ -127,12 +141,8 @@ export function createStore<S extends object>(initialState: S, options: StoreOpt
   const notifyListeners = (prevState: S, actionApplied: ActionPayload<S> | null = null): void => {
     // Use Immer to create deeply immutable state copies for external consumption
     // This prevents listeners from accidentally mutating nested objects
-    const safeCurrentState = immer.produce(state, () => {
-      // Empty producer - just creates an immutable copy
-    })
-    const safePrevState = immer.produce(prevState, () => {
-      // Empty producer - just creates an immutable copy
-    })
+    const safeCurrentState = assignState(state, state) as S
+    const safePrevState = assignState(prevState, prevState) as S
 
     pluginManager.onStateChange(safeCurrentState, safePrevState, actionApplied, storeInstance)
 
@@ -156,7 +166,7 @@ export function createStore<S extends object>(initialState: S, options: StoreOpt
   const _applyStateChange = (payload: ActionPayload<S>, fromSync = false): void => {
     if (isDestroyed) return
 
-    const prevState = {...state}
+    const prevState = assignState(state, state) as S // Capture state before change
     let newPartialState = payload
 
     // Plugin: beforeStateChange
@@ -172,18 +182,7 @@ export function createStore<S extends object>(initialState: S, options: StoreOpt
     if (Object.keys(newPartialState).length === 0) return
 
     // Immer: Apply the new state change
-    state = immer.produce(state, (draft: Draft<S>) => {
-      // Use Immer to merge the new state changes
-      Object.entries(newPartialState).forEach(([key, value]) => {
-        if (key in draft) {
-          // If the key exists, update it
-          ;(draft as any)[key] = value
-        } else {
-          // If the key doesn't exist, add it
-          ;(draft as any)[key] = value
-        }
-      })
-    })
+    state = assignState(state, newPartialState, typeRegistry) as S
 
     // --- Notifications and History ---
     if (!fromSync && persistKey && storageType !== StorageType.None) {
@@ -194,7 +193,10 @@ export function createStore<S extends object>(initialState: S, options: StoreOpt
     notifyListeners(prevState, newPartialState) // Notify with the state *before* this change as prevState
   }
 
-  const _internalDispatch = async (action: ActionPayload<S>, isChainedCall = false): Promise<void> => {
+  const _internalDispatch = async (
+    action: ActionPayload<S>,
+    isChainedCall = false
+  ): Promise<void> => {
     if (isDestroyed) return
     if (typeof action !== 'object' || action === null) {
       handleError(
@@ -206,7 +208,11 @@ export function createStore<S extends object>(initialState: S, options: StoreOpt
       return
     }
 
-    if (typeof action === 'object' && action !== null && '__REDUX_DEVTOOLS_TIME_TRAVEL__' in action) {
+    if (
+      typeof action === 'object' &&
+      action !== null &&
+      '__REDUX_DEVTOOLS_TIME_TRAVEL__' in action
+    ) {
       // This is a DevTools time travel action, apply it directly without middleware
       const {actualPayload} = action as any
       _applyStateChange(actualPayload as ActionPayload<S>, false)
@@ -218,14 +224,23 @@ export function createStore<S extends object>(initialState: S, options: StoreOpt
       return
     }
 
-    await middlewareExecutor.execute(action, {...state}, storeInstance.getState, _applyStateChange, storeInstance.reset)
+    await middlewareExecutor.execute(
+      action,
+      assignState(state, state) as S, // Use a copy of the current state
+      storeInstance.getState,
+      _applyStateChange,
+      storeInstance.reset
+    )
   }
 
   // --- Store Methods ---
   storeInstance.getState = () => {
     if (batching && batchedActions.length > 0) {
-      // During batching, return the state with all batched actions applied
-      const intermediateState = batchedActions.reduce((acc, curr) => ({...acc, ...curr}), state)
+      // During batching, return the state with all batched actions applied to the current state
+      const intermediateState = batchedActions.reduce(
+        (acc, curr) => assignState(acc as S, curr),
+        state as S
+      )
       return freezeDev(intermediateState as S)
     }
     // Always return a copy before freezing to prevent mutation issues with Immer
@@ -322,7 +337,9 @@ export function createStore<S extends object>(initialState: S, options: StoreOpt
     options?: DependencySubscriptionOptions
   ): (() => void) => {
     if (isDestroyed) {
-      console.warn(`[Store: ${name || 'Unnamed'}] Cannot create multi-subscription on destroyed store`)
+      console.warn(
+        `[Store: ${name || 'Unnamed'}] Cannot create multi-subscription on destroyed store`
+      )
       return () => {} // Return no-op cleanup function
     }
 
@@ -339,7 +356,9 @@ export function createStore<S extends object>(initialState: S, options: StoreOpt
     options?: DependencySubscriptionOptions
   ): (() => void) => {
     if (isDestroyed) {
-      console.warn(`[Store: ${name || 'Unnamed'}] Cannot create path subscription on destroyed store`)
+      console.warn(
+        `[Store: ${name || 'Unnamed'}] Cannot create path subscription on destroyed store`
+      )
       return () => {} // Return no-op cleanup function
     }
 
@@ -374,8 +393,10 @@ export function createStore<S extends object>(initialState: S, options: StoreOpt
 
   storeInstance.reset = () => {
     if (isDestroyed) return
-    const prevState = {...state} // Capture state before reset
-    state = {...initialState}
+    const prevState = assignState(state, state) as S // Capture state before reset
+
+    // use immer to reset the state to the initial state
+    state = assignState({} as S, initialState)
     persistState(state)
 
     // Clear history when resetting the store
@@ -398,7 +419,7 @@ export function createStore<S extends object>(initialState: S, options: StoreOpt
       notifyFn: prevState => notifyListeners(prevState, null),
     })
     if (result === false) return false
-    state = result // Update the store's state
+    state = assignState(state, result) // Update the store's state, ensuring reference equality
     return true
   }
 
@@ -414,13 +435,16 @@ export function createStore<S extends object>(initialState: S, options: StoreOpt
     })
 
     if (result !== false) {
-      state = result // Update the store's state
+      state = assignState(state, result) // Update the store's state, ensuring reference equality
       return true
     }
     return false
   }
 
-  storeInstance.updatePath = <V = any>(path: (string | number)[], updater: (currentValue: V) => V) => {
+  storeInstance.updatePath = <V = any>(
+    path: (string | number)[],
+    updater: (currentValue: V) => V
+  ) => {
     if (isDestroyed) return
 
     // Use Immer to safely update the path with automatic structural sharing
@@ -543,7 +567,7 @@ export function createStore<S extends object>(initialState: S, options: StoreOpt
       }
 
       // Call onBatchEnd for all plugins with success
-      const finalState = state // Current state after all actions applied
+      const finalState = assignState({} as S, state) // Current state after all actions applied
       pluginManager.onBatchEnd(batchedActions, finalState, storeInstance)
     } catch (e: any) {
       // Store the batched actions before clearing for error reporting
@@ -561,7 +585,7 @@ export function createStore<S extends object>(initialState: S, options: StoreOpt
       // Pass empty array for actions since they weren't applied
       for (const plugin of plugins) {
         try {
-          plugin.onBatchEnd?.([], state, storeInstance)
+          plugin.onBatchEnd?.([], assignState({} as S, state), storeInstance)
         } catch (pluginError: any) {
           handleError(
             new MiddlewareError(`Plugin ${plugin.name}.onBatchEnd failed after batch error`, {
@@ -619,14 +643,21 @@ export function createStore<S extends object>(initialState: S, options: StoreOpt
         // eslint-disable-next-line no-console
         if (typeof console !== 'undefined' && console.debug) {
           // eslint-disable-next-line no-console
-          console.debug(`[Store: ${name || 'Unnamed'}] Transaction completed with no state changes.`, {
-            operation: 'transaction',
-          })
+          console.debug(
+            `[Store: ${name || 'Unnamed'}] Transaction completed with no state changes.`,
+            {
+              operation: 'transaction',
+            }
+          )
         }
       }
 
       // Call onTransactionEnd for all plugins with success
-      pluginManager.onTransactionEnd(true, storeInstance, nextState !== state ? (nextState as Partial<S>) : undefined)
+      pluginManager.onTransactionEnd(
+        true,
+        storeInstance,
+        nextState !== state ? (nextState as Partial<S>) : undefined
+      )
 
       return true
     } catch (e: any) {
@@ -702,7 +733,7 @@ export function createStore<S extends object>(initialState: S, options: StoreOpt
   storeInstance._setStateForDevTools = (newState: S, isTimeTravel = true) => {
     if (isDestroyed) return
 
-    const prevState = state
+    const prevState = assignState(state, state) // Capture state before change
 
     // --- Audit and sanitize the input state ---
     let sanitizedState: S = immer.produce(newState, () => {})
@@ -717,7 +748,12 @@ export function createStore<S extends object>(initialState: S, options: StoreOpt
         // If input is not already the correct type, try to deserialize it
         try {
           // If input looks like a serialized form, try to use the typeDef's deserialize
-          if (input && typeof input === 'object' && '__type' in input && input.__type === typeDef.typeName) {
+          if (
+            input &&
+            typeof input === 'object' &&
+            '__type' in input &&
+            input.__type === typeDef.typeName
+          ) {
             return typeDef.deserialize(input.data)
           }
           // Otherwise, try to serialize and then deserialize to coerce
@@ -750,7 +786,7 @@ export function createStore<S extends object>(initialState: S, options: StoreOpt
 
     sanitizedState = auditAndSanitize(state, newState)
 
-    state = immer.produce(sanitizedState, () => {})
+    state = assignState(state, sanitizedState, typeRegistry) as S
 
     // Persist the new state if needed
     if (persistKey && storageType !== StorageType.None) {
@@ -784,7 +820,12 @@ export function createStore<S extends object>(initialState: S, options: StoreOpt
     cleanupStaleStates(staleAge, cookiePrefix)
   }
 
-  const savedState = persistenceManager.loadState(persistKey, staleAge, pluginManager, storeInstance)
+  const savedState = persistenceManager.loadState(
+    persistKey,
+    staleAge,
+    pluginManager,
+    storeInstance
+  )
   if (savedState) {
     //state = { ...state, ...savedState };
     _internalDispatch(savedState as ActionPayload<S>, false) // allow plugins/middleware to process the loaded state
@@ -804,7 +845,11 @@ export function createStore<S extends object>(initialState: S, options: StoreOpt
           // Ensure this update isn't from the current session to avoid loops
 
           // And only apply if state truly differs to prevent redundant notifications
-          if (persisted.meta && persisted.meta.sessionId !== sessionId && !deepEqual(state, persisted.data)) {
+          if (
+            persisted.meta &&
+            persisted.meta.sessionId !== sessionId &&
+            !deepEqual(state, persisted.data)
+          ) {
             let stateToApply = persisted.data
 
             // Call plugin onCrossTabSync hooks
