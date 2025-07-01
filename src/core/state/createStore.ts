@@ -251,13 +251,13 @@ export function createStore<S extends object>(
     if (isDestroyed) return
     if (typeof action === 'function') {
       try {
-        const result = (action as Thunk<S, any>)(
-          storeInstance.dispatch,
-          storeInstance.getState,
-          storeInstance.updatePath,
-          storeInstance.transaction,
-          storeInstance.batch
-        )
+        const result = (action as Thunk<S, any>)({
+          dispatch: storeInstance.dispatch,
+          getState: storeInstance.getState,
+          updatePath: storeInstance.updatePath,
+          transaction: storeInstance.transaction,
+          batch: storeInstance.batch,
+        })
 
         // If the thunk returns a promise, handle potential rejections
         if (result && typeof result === 'object' && typeof result.then === 'function') {
@@ -273,6 +273,7 @@ export function createStore<S extends object>(
             throw e
           })
         }
+        3
 
         return result
       } catch (e: any) {

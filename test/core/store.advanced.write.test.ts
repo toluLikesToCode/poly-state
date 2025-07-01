@@ -76,7 +76,7 @@ describe('Advanced Store Operations', () => {
         const listener = vi.fn()
         store.subscribe(listener)
 
-        const syncThunk: Thunk<ThunkTestState> = (dispatch, getState) => {
+        const syncThunk: Thunk<ThunkTestState> = ({dispatch, getState}) => {
           const currentState = getState()
           expect(typeof dispatch).toBe('function')
           expect(typeof getState).toBe('function')
@@ -99,7 +99,7 @@ describe('Advanced Store Operations', () => {
 
       it('should return the thunk result for sync thunks', () => {
         const returnValue = 'sync-result'
-        const syncThunk: Thunk<ThunkTestState, string> = (dispatch, getState) => {
+        const syncThunk: Thunk<ThunkTestState, string> = ({dispatch, getState}) => {
           dispatch({value: getState().value + 1})
           return returnValue
         }
@@ -110,7 +110,7 @@ describe('Advanced Store Operations', () => {
       })
 
       it('should handle complex synchronous logic in thunks', () => {
-        const complexThunk: Thunk<ThunkTestState> = (dispatch, getState) => {
+        const complexThunk: Thunk<ThunkTestState> = ({dispatch, getState}) => {
           const state = getState()
 
           // Complex calculation
@@ -148,14 +148,14 @@ describe('Advanced Store Operations', () => {
       })
 
       it('should handle thunks that dispatch other thunks', () => {
-        const innerThunk: Thunk<ThunkTestState> = (dispatch, getState) => {
+        const innerThunk: Thunk<ThunkTestState> = ({dispatch, getState}) => {
           dispatch({
             value: getState().value + 10,
             status: 'completed',
           })
         }
 
-        const outerThunk: Thunk<ThunkTestState> = (dispatch, getState) => {
+        const outerThunk: Thunk<ThunkTestState> = ({dispatch}) => {
           dispatch({status: 'pending'})
           dispatch(innerThunk) // Dispatch another thunk
           dispatch({
@@ -182,7 +182,7 @@ describe('Advanced Store Operations', () => {
         const listener = vi.fn()
         store.subscribe(listener)
 
-        const asyncThunk: Thunk<ThunkTestState, Promise<void>> = async (dispatch, getState) => {
+        const asyncThunk: Thunk<ThunkTestState, Promise<void>> = async ({dispatch, getState}) => {
           dispatch({status: 'pending'})
 
           // Simulate async work
@@ -208,7 +208,7 @@ describe('Advanced Store Operations', () => {
 
       it('should return promises from async thunks', async () => {
         const returnValue = 'async-result'
-        const asyncThunk: Thunk<ThunkTestState, Promise<string>> = async dispatch => {
+        const asyncThunk: Thunk<ThunkTestState, Promise<string>> = async ({dispatch}) => {
           await new Promise(resolve => setTimeout(resolve, 10))
           dispatch({status: 'completed'})
           return returnValue
@@ -225,7 +225,10 @@ describe('Advanced Store Operations', () => {
           timestamp: Date.now(),
         })
 
-        const complexAsyncThunk: Thunk<ThunkTestState, Promise<string>> = async (dispatch, getState) => {
+        const complexAsyncThunk: Thunk<ThunkTestState, Promise<string>> = async ({
+          dispatch,
+          getState,
+        }) => {
           dispatch({status: 'pending', data: 'loading...'})
 
           try {
@@ -267,7 +270,7 @@ describe('Advanced Store Operations', () => {
       })
 
       it('should handle async thunk errors properly', async () => {
-        const erroringAsyncThunk: Thunk<ThunkTestState, Promise<void>> = async dispatch => {
+        const erroringAsyncThunk: Thunk<ThunkTestState, Promise<void>> = async ({dispatch}) => {
           dispatch({status: 'pending'})
           await new Promise(resolve => setTimeout(resolve, 10))
           throw new Error('Async operation failed')
@@ -282,7 +285,7 @@ describe('Advanced Store Operations', () => {
       it('should handle concurrent async thunks', async () => {
         const createAsyncThunk =
           (id: number, delay: number): Thunk<ThunkTestState, Promise<number>> =>
-          async (dispatch, getState) => {
+          async ({dispatch, getState}) => {
             await new Promise(resolve => setTimeout(resolve, delay))
             dispatch({
               value: getState().value + id,
@@ -313,7 +316,7 @@ describe('Advanced Store Operations', () => {
 
       it('should return primitive values from synchronous thunks', () => {
         // String return value
-        const stringThunk: Thunk<ThunkTestState, string> = dispatch => {
+        const stringThunk: Thunk<ThunkTestState, string> = ({dispatch}) => {
           dispatch({value: 1})
           return 'operation-completed'
         }
@@ -323,7 +326,7 @@ describe('Advanced Store Operations', () => {
         expect(typeof stringResult).toBe('string')
 
         // Number return value
-        const numberThunk: Thunk<ThunkTestState, number> = (dispatch, getState) => {
+        const numberThunk: Thunk<ThunkTestState, number> = ({dispatch, getState}) => {
           const newValue = getState().value + 42
           dispatch({value: newValue})
           return newValue
@@ -334,7 +337,7 @@ describe('Advanced Store Operations', () => {
         expect(typeof numberResult).toBe('number')
 
         // Boolean return value
-        const booleanThunk: Thunk<ThunkTestState, boolean> = (dispatch, getState) => {
+        const booleanThunk: Thunk<ThunkTestState, boolean> = ({dispatch, getState}) => {
           const currentValue = getState().value
           const isHighValue = currentValue > 40
           dispatch({status: isHighValue ? 'completed' : 'pending'})
@@ -357,7 +360,7 @@ describe('Advanced Store Operations', () => {
           }
         }
 
-        const objectThunk: Thunk<ThunkTestState, OperationResult> = (dispatch, getState) => {
+        const objectThunk: Thunk<ThunkTestState, OperationResult> = ({dispatch, getState}) => {
           const startTime = Date.now()
           const currentState = getState()
 
@@ -393,7 +396,7 @@ describe('Advanced Store Operations', () => {
       })
 
       it('should return array values from synchronous thunks', () => {
-        const arrayThunk: Thunk<ThunkTestState, string[]> = (dispatch, getState) => {
+        const arrayThunk: Thunk<ThunkTestState, string[]> = ({dispatch, getState}) => {
           const state = getState()
           const operations: string[] = []
 
@@ -423,12 +426,14 @@ describe('Advanced Store Operations', () => {
 
         expect(Array.isArray(result)).toBe(true)
         expect(result).toEqual(['positive-value', 'status-completed', 'final-operation'])
-        expect(store.getState().data).toBe('operations: positive-value, status-completed, final-operation')
+        expect(store.getState().data).toBe(
+          'operations: positive-value, status-completed, final-operation'
+        )
       })
 
       it('should return primitive values from asynchronous thunks', async () => {
         // String from async thunk
-        const asyncStringThunk: Thunk<ThunkTestState, Promise<string>> = async dispatch => {
+        const asyncStringThunk: Thunk<ThunkTestState, Promise<string>> = async ({dispatch}) => {
           dispatch({status: 'pending'})
           await new Promise(resolve => setTimeout(resolve, 10))
           dispatch({status: 'completed', data: 'async-string-operation'})
@@ -439,7 +444,10 @@ describe('Advanced Store Operations', () => {
         expect(stringResult).toBe('async-string-result')
 
         // Number from async thunk
-        const asyncNumberThunk: Thunk<ThunkTestState, Promise<number>> = async (dispatch, getState) => {
+        const asyncNumberThunk: Thunk<ThunkTestState, Promise<number>> = async ({
+          dispatch,
+          getState,
+        }) => {
           await new Promise(resolve => setTimeout(resolve, 10))
           const calculatedValue = getState().value * 2
           dispatch({value: calculatedValue})
@@ -471,7 +479,10 @@ describe('Advanced Store Operations', () => {
           }
         }
 
-        const complexAsyncThunk: Thunk<ThunkTestState, Promise<AsyncApiResult>> = async (dispatch, getState) => {
+        const complexAsyncThunk: Thunk<ThunkTestState, Promise<AsyncApiResult>> = async ({
+          dispatch,
+          getState,
+        }) => {
           dispatch({status: 'pending', data: 'fetching-user-data'})
 
           // Simulate API call
@@ -530,15 +541,18 @@ describe('Advanced Store Operations', () => {
       })
 
       it('should handle chained thunks with return values', () => {
-        const firstThunk: Thunk<ThunkTestState, {step: number; data: string}> = (dispatch, getState) => {
+        const firstThunk: Thunk<ThunkTestState, {step: number; data: string}> = ({
+          dispatch,
+          getState,
+        }) => {
           dispatch({value: getState().value + 10, status: 'pending'})
           return {step: 1, data: 'first-completed'}
         }
 
-        const secondThunk: Thunk<ThunkTestState, {step: number; data: string; previousData: string}> = (
-          dispatch,
-          getState
-        ) => {
+        const secondThunk: Thunk<
+          ThunkTestState,
+          {step: number; data: string; previousData: string}
+        > = ({dispatch, getState}) => {
           const firstResult = store.dispatch(firstThunk)
           dispatch({
             value: getState().value + 20,
@@ -568,14 +582,15 @@ describe('Advanced Store Operations', () => {
       it('should handle thunks returning functions (higher-order thunks)', () => {
         type ThunkFactory = (multiplier: number) => Thunk<ThunkTestState, number>
 
-        const thunkFactoryThunk: Thunk<ThunkTestState, ThunkFactory> = dispatch => {
+        const thunkFactoryThunk: Thunk<ThunkTestState, ThunkFactory> = ({dispatch}) => {
           dispatch({data: 'thunk-factory-created'})
 
-          return (multiplier: number) => (innerDispatch, innerGetState) => {
-            const newValue = innerGetState().value * multiplier
-            innerDispatch({value: newValue, status: 'completed'})
-            return newValue
-          }
+          return (adder: number) =>
+            ({dispatch: innerDispatch, getState: innerGetState}) => {
+              const newValue = innerGetState().value + adder
+              innerDispatch({value: newValue, status: 'completed'})
+              return newValue
+            }
         }
 
         const thunkFactory = store.dispatch(thunkFactoryThunk)
@@ -583,17 +598,20 @@ describe('Advanced Store Operations', () => {
         expect(store.getState().data).toBe('thunk-factory-created')
 
         // Use the returned thunk factory
-        const multiplyByTwoThunk = thunkFactory(2)
-        const result = store.dispatch(multiplyByTwoThunk)
+        const addByTwoThunk = thunkFactory(2)
+        const result = store.dispatch(addByTwoThunk)
 
-        expect(result).toBe(0) // 0 * 2 = 0
-        expect(store.getState().value).toBe(0)
+        expect(result).toBe(2) // 0 + 2 = 0
+        expect(store.getState().value).toBe(2)
       })
 
       it('should handle thunks with conditional return types', () => {
         type ConditionalResult = string | number | {error: string}
 
-        const conditionalThunk: Thunk<ThunkTestState, ConditionalResult> = (dispatch, getState) => {
+        const conditionalThunk: Thunk<ThunkTestState, ConditionalResult> = ({
+          dispatch,
+          getState,
+        }) => {
           const currentValue = getState().value
 
           if (currentValue < 0) {
@@ -804,7 +822,7 @@ describe('Advanced Store Operations', () => {
         const listener = vi.fn()
         store.subscribe(listener)
 
-        const incrementThunk: Thunk<BatchTestState> = (dispatch, getState) => {
+        const incrementThunk: Thunk<BatchTestState> = ({dispatch, getState}) => {
           dispatch({count: getState().count + 10})
         }
 
@@ -879,7 +897,11 @@ describe('Advanced Store Operations', () => {
         const listener = vi.fn()
         store.subscribe(listener)
 
-        const asyncMiddleware: Middleware<BatchTestState> = async (action, prevState, dispatchNext) => {
+        const asyncMiddleware: Middleware<BatchTestState> = async (
+          action,
+          prevState,
+          dispatchNext
+        ) => {
           if (action.text === 'async-process') {
             await new Promise(resolve => setTimeout(resolve, 10))
             dispatchNext({
@@ -1277,7 +1299,10 @@ describe('Advanced Store Operations', () => {
       complexStore.subscribe(listener)
 
       // Complex async workflow using all features
-      const complexWorkflow: Thunk<ComplexState, Promise<string>> = async (dispatch, getState) => {
+      const complexWorkflow: Thunk<ComplexState, Promise<string>> = async ({
+        dispatch,
+        getState,
+      }) => {
         // Start with UI updates
         dispatch({
           ui: {
