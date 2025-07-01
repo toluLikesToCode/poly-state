@@ -113,16 +113,18 @@ function deepMerge(target: any, source: any, typeRegistry?: {findTypeFor: (value
     }
 
     // Handle plain object
-    if (
-      typeof srcVal === 'object' &&
-      srcVal !== null &&
-      tgtVal &&
-      typeof tgtVal === 'object' &&
-      tgtVal.constructor === Object
-    ) {
-      if (!target[key] || typeof target[key] !== 'object') {
+    if (typeof srcVal === 'object' && srcVal !== null && srcVal.constructor === Object) {
+      // If the new object is empty, replace the old object
+      if (Object.keys(srcVal).length === 0) {
         target[key] = {}
+        continue
       }
+      // If the target is not an object, replace it
+      if (!tgtVal || typeof tgtVal !== 'object' || tgtVal.constructor !== Object) {
+        target[key] = {...srcVal}
+        continue
+      }
+      // Otherwise, merge recursively
       deepMerge(target[key], srcVal)
       continue
     }
