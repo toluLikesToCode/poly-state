@@ -84,7 +84,7 @@ store.updatePath(['todos', 0, 'completed'], () => true)
 // Thunk type definition, must match the store's state type
 // This thunk can access the store's state, dispatch actions, and perform async operations
 // Thunks can be defined anywhere, but its reccomended to define them in a separate file for better organization
-const asyncThunk: Thunk<AppState> = async (dispatch, getState, updatePath, transaction, batch) => {
+const asyncThunk: Thunk<AppState> = async ({dispatch, getState, updatePath, transaction, batch}) => {
   console.log('Running async thunk...')
 
   // Simulate API call
@@ -106,7 +106,7 @@ store.dispatch(asyncThunk)
 // and updating the state all at once, this is more efficient that calling getState and dispatch multiple times
 // including the Thunk type in the function signature allows TypeScript to infer the state type
 // and provides better type safety, though it is not strictly necessary
-const loadTodosThunk: Thunk<AppState, Promise<ToDo>> = async dispatch => {
+const loadTodosThunk: Thunk<AppState, Promise<ToDo>> = async ({dispatch}) => {
   console.log('Loading todos...')
   // Simulate fetching todos from an API
   await new Promise(resolve => setTimeout(resolve, 1000))
@@ -136,7 +136,7 @@ console.log('Todo loaded, current todo:', currentTodo)
 // - `updatePath`: to update a specific path in the state
 // - `transaction`: to perform multiple updates in a single transaction
 // - `batch`: to batch multiple updates together
-const exampleThunk: Thunk<AppState> = (dispatch, getState, updatePath, transaction, batch) => {
+const exampleThunk: Thunk<AppState> = ({dispatch, getState, updatePath, transaction, batch}) => {
   console.log('Running example thunk...')
   const state = getState()
   console.log('Current state:', state)
