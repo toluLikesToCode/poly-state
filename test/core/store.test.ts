@@ -60,7 +60,7 @@ describe('Store Core Functionality', () => {
   })
 
   it('should work with thunk-based state updates', () => {
-    store.dispatch((dispatch, getState) => {
+    store.dispatch(({dispatch, getState}) => {
       const currentState = getState()
       dispatch({
         count: currentState.count + 10,

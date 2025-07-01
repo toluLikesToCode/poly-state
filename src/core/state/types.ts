@@ -61,18 +61,28 @@ export type Dispatch<S extends object> = {
   (action: ActionPayload<S>): void
 }
 
-/**
- * Thunk for async/sync logic
- * @typeParam S – the shape of the state
- * @typeParam R – return type of the thunk (defaults to void)
- */
-export type Thunk<S extends object, R = void> = (
-  dispatch: Dispatch<S>,
-  getState: () => S,
-  updatePath: <V = any>(path: (string | number)[], updater: (currentValue: V) => V) => void,
-  transaction: (recipe: (draft: Draft<S>) => void) => boolean,
+export type ThunkContext<S extends object> = {
+  dispatch: Dispatch<S>
+  getState: () => S
+  updatePath: <V = any>(path: (string | number)[], updater: (currentValue: V) => V) => void
+  transaction: (recipe: (draft: Draft<S>) => void) => boolean
   batch: (fn: () => void) => void
-) => R | Promise<R>
+}
+
+export type Thunk<S extends object, R = void> = (ctx: ThunkContext<S>) => R | Promise<R>
+
+// /**
+//  * Thunk for async/sync logic
+//  * @typeParam S – the shape of the state
+//  * @typeParam R – return type of the thunk (defaults to void)
+//  */
+// export type Thunk<S extends object, R = void> = (
+//   dispatch: Dispatch<S>,
+//   getState: () => S,
+//   updatePath: <V = any>(path: (string | number)[], updater: (currentValue: V) => V) => void,
+//   transaction: (recipe: (draft: Draft<S>) => void) => boolean,
+//   batch: (fn: () => void) => void
+// ) => R | Promise<R>
 
 /**
  * Direct state‐update payload
