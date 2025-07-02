@@ -222,22 +222,39 @@ export function cleanupStaleStates(
 
 /**
  * Recursively checks that the structure and types of `obj` and `template` match exactly.
- * All keys must exist in both, and types must match.
+ * For Map/Set, only checks that both are the same type (not contents).
+ * For Array, checks both are arrays and, if both are non-empty, that the element types match.
+ * For plain objects, checks keys and recursively checks structure.
+ * For primitives, checks type equality.
  * @param obj - The object to validate (e.g., loaded state)
  * @param template - The template object (e.g., initial state)
  * @returns True if `obj` matches the structure and types of `template` exactly
  */
 function strictStructureMatch(obj: any, template: any): boolean {
+  if (obj === template) return true
   if (typeof obj !== typeof template) return false
   if (obj === null || template === null) return obj === template
+
+  // Map type check
+  if (obj instanceof Map || template instanceof Map) {
+    return obj instanceof Map && template instanceof Map
+  }
+
+  // Set type check
+  if (obj instanceof Set || template instanceof Set) {
+    return obj instanceof Set && template instanceof Set
+  }
+
+  // Array type and element type check
   if (Array.isArray(obj) || Array.isArray(template)) {
     if (!Array.isArray(obj) || !Array.isArray(template)) return false
-    // make sure both arrays have the same element type in the first position
     if (obj.length > 0 && template.length > 0) {
-      if (typeof obj[0] !== typeof template[0]) return false
+      if (!strictStructureMatch(obj[0], template[0])) return false
     }
     return true
   }
+
+  // Plain object structure check
   if (typeof obj === 'object' && typeof template === 'object') {
     const objKeys = Object.keys(obj)
     const templateKeys = Object.keys(template)
@@ -251,7 +268,9 @@ function strictStructureMatch(obj: any, template: any): boolean {
     }
     return true
   }
-  return true
+
+  // Primitive type check
+  return typeof obj === typeof template
 }
 
 /**
