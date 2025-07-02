@@ -70,7 +70,9 @@ export function isSimpleValue(value: any): boolean {
 }
 
 export function isPlainObject(value: any): boolean {
-  return value != null && typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype
+  return (
+    value != null && typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype
+  )
 }
 
 export function haveInputsChanged<T extends readonly unknown[]>(
@@ -109,6 +111,14 @@ export function serializeParams(params: any): string {
   } catch {
     return `non_serializable_${Date.now()}_${Math.random().toString(36).substring(2)}`
   }
+}
+
+export function generateCacheKey(params: any, path?: (string | number)[]): string {
+  const baseKey = serializeParams(params)
+  if (path && path.length > 0) {
+    return `${baseKey}:${path.join('.')}`
+  }
+  return baseKey
 }
 
 /**
@@ -178,7 +188,10 @@ export function startTTLCacheCleanup<T>(
  * Checks for the presence of selector-specific properties.
  */
 export function isMemoizedSelector<R>(value: any): value is MemoizedSelector<R> {
-  return typeof value === 'function' && (value._isActive !== undefined || value._lastAccessed !== undefined)
+  return (
+    typeof value === 'function' &&
+    (value._isActive !== undefined || value._lastAccessed !== undefined)
+  )
 }
 
 /**

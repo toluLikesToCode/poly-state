@@ -1,6 +1,7 @@
 import React from 'react'
 import {describe, it, expect, beforeEach} from 'vitest'
-import {render, screen, fireEvent, act} from '@testing-library/react'
+import {render, screen, fireEvent} from '@testing-library/react'
+import {act} from 'react'
 import {createStore, Selector, Thunk} from '../../src/core'
 import {createStoreContext} from '../../src/react/index'
 
@@ -354,13 +355,17 @@ describe('React Integration – Complete Basic Usage', () => {
     expect(userEmail.textContent).toBe('No Email')
 
     // Update user
-    fireEvent.click(updateBtn)
+    act(() => {
+      fireEvent.click(updateBtn)
+    })
     expect(userId.textContent).toBe('1')
     expect(userName.textContent).toBe('John Doe')
     expect(userEmail.textContent).toBe('john@example.com')
 
     // Clear user
-    fireEvent.click(clearBtn)
+    act(() => {
+      fireEvent.click(clearBtn)
+    })
     expect(userId.textContent).toBe('No ID')
     expect(userName.textContent).toBe('No Name')
     expect(userEmail.textContent).toBe('No Email')
@@ -376,7 +381,9 @@ describe('React Integration – Complete Basic Usage', () => {
     expect(todoCount.textContent).toBe('0')
 
     // Add first todo
-    fireEvent.click(addBtn)
+    act(() => {
+      fireEvent.click(addBtn)
+    })
     expect(todoCount.textContent).toBe('1')
 
     // Get all todo elements (we can't predict the exact IDs since they use Date.now())
@@ -385,7 +392,9 @@ describe('React Integration – Complete Basic Usage', () => {
     expect(todoElements[0].textContent).toBe('Todo 1')
 
     // Add second todo
-    fireEvent.click(addBtn)
+    act(() => {
+      fireEvent.click(addBtn)
+    })
     expect(todoCount.textContent).toBe('2')
 
     // Should now have 2 todos
@@ -832,10 +841,11 @@ describe('React Integration – Advanced Features', () => {
     expect(screen.getByTestId('count').textContent).toBe('0')
     expect(screen.getByTestId('loading').textContent).toBe('false')
 
-    fireEvent.click(screen.getByTestId('async-thunk-btn'))
-
-    // Wait for async operation to complete
-    await new Promise(resolve => setTimeout(resolve, 20))
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('async-thunk-btn'))
+      // Wait for async operation to complete
+      await new Promise(resolve => setTimeout(resolve, 20))
+    })
 
     expect(screen.getByTestId('count').textContent).toBe('42')
     expect(screen.getByTestId('loading').textContent).toBe('false')

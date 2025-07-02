@@ -235,7 +235,7 @@ export class SelectorManager<S extends object> implements ISelectorManager<S> {
     const CACHE_TTL = 5 * 60 * 1000 // 5 minutes
 
     // Use extracted utility for parameter serialization
-    const {serializeParams} = utils
+    const {generateCacheKey} = utils
 
     // Use extracted utility for TTL cache cleanup
     const ensureCleanupRunning = () => {
@@ -252,7 +252,7 @@ export class SelectorManager<S extends object> implements ISelectorManager<S> {
     }
 
     return (params: Props) => {
-      const paramsKey = serializeParams(params)
+      const paramsKey = generateCacheKey(params)
       const now = Date.now()
 
       // Check if we already have a selector for these parameters
@@ -663,7 +663,16 @@ export class SelectorManager<S extends object> implements ISelectorManager<S> {
       return result as T // Type assertion since we expect the path to exist
     }
 
-    return this.createDependencySubscription(pathSelector, listener, options)
+    const modifiedOptions: DependencySubscriptionOptions = {
+      ...options,
+      equalityFn:
+        options.equalityFn ||
+        (<U>(prev: U, next: U) => {
+          return utils.smartEqual(prev, next)
+        }),
+    }
+
+    return this.createDependencySubscription(pathSelector, listener, modifiedOptions)
   }
 
   cleanupSelectors(): number {
@@ -710,7 +719,9 @@ export class SelectorManager<S extends object> implements ISelectorManager<S> {
   }
 
   cleanupDependencySubscriptions(): number {
-    const inactiveSubscriptions = Array.from(this.dependencySubscriptions).filter(sub => !sub.isActive)
+    const inactiveSubscriptions = Array.from(this.dependencySubscriptions).filter(
+      sub => !sub.isActive
+    )
 
     // Remove inactive subscriptions from the Set
     inactiveSubscriptions.forEach(sub => {
