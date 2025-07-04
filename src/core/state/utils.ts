@@ -4,6 +4,7 @@ import {Middleware, PersistedState, ValidationErrorHandler, ValidatorFn} from '.
 import {TypeRegistry} from './typeRegistry'
 
 import {produce, Draft} from 'immer'
+import {deepClone} from '../utils'
 
 /**
  * Deeply merges newState into state using Immer, handling arrays, objects, Maps, Sets, Dates, and custom classes.
@@ -514,8 +515,8 @@ export function createLoggerMiddleware<S extends object>(
   function removeBlacklistedPaths(obj: any): any {
     if (!blacklist.length || !obj || typeof obj !== 'object') return obj
 
-    // Shallow clone the object/array
-    const clone = Array.isArray(obj) ? [...obj] : {...obj}
+    // Deep clone the object/array to avoid mutating frozen objects
+    const clone = deepClone(obj)
 
     for (const path of blacklist) {
       if (!Array.isArray(path) || path.length === 0) continue
