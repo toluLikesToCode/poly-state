@@ -22,7 +22,8 @@
       "files": ["**/*.test.{ts,tsx}", "**/*.spec.{ts,tsx}", "test/**/*"],
       "rules": {
         "no-console": "off",
-        "@typescript-eslint/no-unused-vars": "off"
+        "@typescript-eslint/no-unused-vars": "off",
+        "no-var": "off"
       }
     }
   ],

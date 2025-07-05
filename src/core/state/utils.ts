@@ -4,6 +4,7 @@ import {Middleware, PersistedState, ValidationErrorHandler, ValidatorFn} from '.
 import {TypeRegistry} from './typeRegistry'
 
 import {produce, Draft} from 'immer'
+import {deepClone} from '../utils'
 
 /**
  * Deeply merges newState into state using Immer, handling arrays, objects, Maps, Sets, Dates, and custom classes.
@@ -222,22 +223,39 @@ export function cleanupStaleStates(
 
 /**
  * Recursively checks that the structure and types of `obj` and `template` match exactly.
- * All keys must exist in both, and types must match.
+ * For Map/Set, only checks that both are the same type (not contents).
+ * For Array, checks both are arrays and, if both are non-empty, that the element types match.
+ * For plain objects, checks keys and recursively checks structure.
+ * For primitives, checks type equality.
  * @param obj - The object to validate (e.g., loaded state)
  * @param template - The template object (e.g., initial state)
  * @returns True if `obj` matches the structure and types of `template` exactly
  */
 function strictStructureMatch(obj: any, template: any): boolean {
+  if (obj === template) return true
   if (typeof obj !== typeof template) return false
   if (obj === null || template === null) return obj === template
+
+  // Map type check
+  if (obj instanceof Map || template instanceof Map) {
+    return obj instanceof Map && template instanceof Map
+  }
+
+  // Set type check
+  if (obj instanceof Set || template instanceof Set) {
+    return obj instanceof Set && template instanceof Set
+  }
+
+  // Array type and element type check
   if (Array.isArray(obj) || Array.isArray(template)) {
     if (!Array.isArray(obj) || !Array.isArray(template)) return false
-    // make sure both arrays have the same element type in the first position
     if (obj.length > 0 && template.length > 0) {
-      if (typeof obj[0] !== typeof template[0]) return false
+      if (!strictStructureMatch(obj[0], template[0])) return false
     }
     return true
   }
+
+  // Plain object structure check
   if (typeof obj === 'object' && typeof template === 'object') {
     const objKeys = Object.keys(obj)
     const templateKeys = Object.keys(template)
@@ -251,24 +269,106 @@ function strictStructureMatch(obj: any, template: any): boolean {
     }
     return true
   }
-  return true
+
+  // Primitive type check
+  return typeof obj === typeof template
 }
 
 /**
- * Creates a robust logging middleware with native Consola support and Redux DevTools-like grouping.
+ * Supported logger types for the logging middleware.
+ */
+export type SupportedLogger =
+  | ((...args: any[]) => void) // Generic function logger
+  | typeof console // Browser/Node console
+  | {
+      // Consola-like logger
+      log?: Function
+      info?: Function
+      success?: Function
+      warn?: Function
+      error?: Function
+      debug?: Function
+      trace?: Function
+      box?: Function
+    }
+  | {
+      // Custom client logger interface
+      log: (...args: any[]) => void
+      info: (...args: any[]) => void
+      warn: (...args: any[]) => void
+      error: (...args: any[]) => void
+      debug: (...args: any[]) => void
+      trace?: (...args: any[]) => void
+      silly?: (...args: any[]) => void
+      group?: (label?: string) => void
+      groupCollapsed?: (label?: string) => void
+      groupEnd?: () => void
+      table?: (data: any, columns?: string[]) => void
+      getCorrelationId?: () => string
+      setCorrelationId?: (id: string) => void
+      child?: (childContextSuffix: string, childDefaultMeta?: Record<string, any>) => any
+    }
+
+/**
+ * Log levels supported by the logger middleware.
+ */
+export type LoggerLevel =
+  | 'log'
+  | 'info'
+  | 'success'
+  | 'warn'
+  | 'error'
+  | 'debug'
+  | 'trace'
+  | 'silly'
+
+/**
+ * Configuration options for the logger middleware.
+ */
+export interface LoggerMiddlewareOptions<S extends object> {
+  /** Whether logging is enabled. Defaults to true in development, false otherwise. */
+  enabled?: boolean
+  /** The log level to use. Defaults to 'log'. */
+  logLevel?: LoggerLevel
+  /** Paths to exclude from logging. Array of property paths as arrays. */
+  blacklist?: Array<Array<keyof S | number | string>>
+  /** Whether to use console.group for grouping. Defaults to true. */
+  useGrouping?: boolean
+  /** Custom correlation ID for tracking related actions. */
+  correlationId?: string
+  /** Whether to include timestamps in logs. Defaults to true. */
+  includeTimestamp?: boolean
+  /** Custom action name formatter. */
+  actionNameFormatter?: (action: any) => string
+}
+
+/**
+ * Creates a robust logging middleware with support for multiple logger types including
+ * custom client loggers, Consola, console, and generic logging utilities.
  *
- * @param logger - A logging function or Consola instance. Defaults to console.
- * @param options - Optional config: { enabled, logLevel }
+ * @param logger - A logging function, console, Consola instance, or custom client logger. Defaults to console.
+ * @param options - Optional configuration for logging behavior.
  * @returns Middleware function for logging state transitions
  *
  * @remarks
- * - If a Consola instance is provided, uses its methods for pretty output.
- * - Groups logs for each action using console.groupCollapsed or consola.box.
- * - Only logs in development by default, unless enabled is set to true.
- * - Logging errors never block state updates.
+ * The middleware automatically detects the logger type and adapts its behavior:
+ * - **Custom Client Logger**: Uses all available methods including grouping and correlation IDs
+ * - **Consola**: Uses Consola's methods and box formatting for pretty output
+ * - **Console**: Uses standard console methods with grouping
+ * - **Generic Function**: Calls the function with formatted messages
+ *
+ * Features:
+ * - Automatic logger type detection and adaptation
+ * - Support for log grouping (console.group/groupCollapsed)
+ * - Blacklisting of sensitive data paths
+ * - Correlation ID support for tracking related actions
+ * - Custom action name formatting
+ * - Error handling that never blocks state updates
+ * - Development/production environment detection
  *
  * @example
- * // Basic usage (console)
+ * **Basic usage with console:**
+ * ```typescript
  * import { createStore } from './core/state/createStore'
  * import { createLoggerMiddleware } from './core/state/utils'
  *
@@ -277,13 +377,14 @@ function strictStructureMatch(obj: any, template: any): boolean {
  *   { middleware: [createLoggerMiddleware()] }
  * )
  *
- * store.dispatch({ type: 'increment', count: 1 })
- * // Logs grouped state transition in the browser/Node console
+ * store.dispatch({ count: 1 })
+ * // Logs grouped state transition in console
+ * ```
  *
  * @example
- * // With Consola for pretty output
+ * **With Consola for pretty output:**
+ * ```typescript
  * import consola from 'consola'
- * import { createStore } from './core/state/createStore'
  * import { createLoggerMiddleware } from './core/state/utils'
  *
  * const store = createStore(
@@ -291,30 +392,63 @@ function strictStructureMatch(obj: any, template: any): boolean {
  *   { middleware: [createLoggerMiddleware(consola)] }
  * )
  *
- * store.dispatch({ type: 'login', user: { name: 'Ada' } })
- * // Logs with Consola's formatting and grouping
+ * store.dispatch({ user: { name: 'Ada' } })
+ * // Logs with Consola's formatting and box grouping
+ * ```
  *
  * @example
- * // Custom log level and always enabled
- * import consola from 'consola'
- * import { createLoggerMiddleware } from './core/state/utils'
+ * **With custom client logger:**
+ * ```typescript
+ * import { createClientLogger, createLoggerMiddleware } from './utils'
  *
- * const logger = createLoggerMiddleware(consola, { enabled: true, logLevel: 'info' })
- * // Use in your store config
+ * const clientLogger = createClientLogger('Store', { module: 'state-management' })
+ * const store = createStore(
+ *   { items: [] },
+ *   {
+ *     middleware: [createLoggerMiddleware(clientLogger, {
+ *       logLevel: 'debug',
+ *       correlationId: 'user-session-123'
+ *     })]
+ *   }
+ * )
+ * ```
  *
  * @example
- * // Custom logger function (e.g., for analytics)
- * const analyticsLogger = (message: string, data: any) => {
- *   myAnalytics.track(message, data)
+ * **Advanced configuration with blacklisting:**
+ * ```typescript
+ * const loggerMiddleware = createLoggerMiddleware(console, {
+ *   enabled: true,
+ *   logLevel: 'info',
+ *   blacklist: [
+ *     ['user', 'password'],     // Remove user.password
+ *     ['apiKeys'],              // Remove entire apiKeys object
+ *     ['tokens', 0, 'secret']   // Remove tokens[0].secret
+ *   ],
+ *   useGrouping: true,
+ *   includeTimestamp: true,
+ *   actionNameFormatter: (action) => {
+ *     if (typeof action === 'function') return '[async-thunk]'
+ *     return Object.keys(action).join('+') || '[empty]'
+ *   }
+ * })
+ * ```
+ *
+ * @example
+ * **Custom analytics logger:**
+ * ```typescript
+ * const analyticsLogger = (message: string, ...data: any[]) => {
+ *   myAnalytics.track('state_change', { message, data })
  * }
  *
  * const store = createStore(
- *   { items: [] },
+ *   { analytics: {} },
  *   { middleware: [createLoggerMiddleware(analyticsLogger, { enabled: true })] }
  * )
+ * ```
  *
  * @example
- * // Conditional logging (production/development)
+ * **Environment-aware logging:**
+ * ```typescript
  * const conditionalLogger = (...args: any[]) => {
  *   if (process.env.NODE_ENV === 'development') {
  *     console.log(...args)
@@ -323,89 +457,259 @@ function strictStructureMatch(obj: any, template: any): boolean {
  *   }
  * }
  *
- * const store = createStore(
- *   { foo: 'bar' },
- *   { middleware: [createLoggerMiddleware(conditionalLogger)] }
- * )
+ * const middleware = createLoggerMiddleware(conditionalLogger, {
+ *   enabled: process.env.NODE_ENV !== 'test'
+ * })
+ * ```
  */
 export function createLoggerMiddleware<S extends object>(
-  logger:
-    | ((...args: any[]) => void)
-    | {
-        log: Function
-        info?: Function
-        success?: Function
-        warn?: Function
-        error?: Function
-        box?: Function
-      } = console,
-  options?: {enabled?: boolean; logLevel?: 'log' | 'info' | 'success' | 'warn' | 'error'}
+  logger: SupportedLogger = console,
+  options: LoggerMiddlewareOptions<S> = {}
 ): Middleware<S> {
-  const isConsola = typeof logger === 'object' && typeof (logger as any).log === 'function'
-  const enabled =
-    options?.enabled ??
-    (typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'development')
-  const logLevel = options?.logLevel ?? 'log'
+  const {
+    enabled = typeof process !== 'undefined' &&
+      process.env &&
+      process.env.NODE_ENV === 'development',
+    logLevel = 'log',
+    blacklist = [],
+    useGrouping = true,
+    correlationId,
+    includeTimestamp = true,
+    actionNameFormatter,
+  } = options
+
+  // Detect logger type and capabilities
+  const loggerType = detectLoggerType(logger)
+  const hasGrouping = loggerType.hasGrouping
+  const hasCorrelationId = loggerType.hasCorrelationId
+  const hasBoxFormatting = loggerType.hasBoxFormatting
+
+  // Set correlation ID if provided and supported
+  if (correlationId && hasCorrelationId && typeof (logger as any).setCorrelationId === 'function') {
+    ;(logger as any).setCorrelationId(correlationId)
+  }
 
   // Helper to infer a human-friendly action name
   function inferActionName(action: any): string {
+    if (actionNameFormatter) {
+      try {
+        return actionNameFormatter(action)
+      } catch (err) {
+        console.warn('Custom actionNameFormatter threw an error:', err)
+        // Fall through to default logic
+      }
+    }
+
     if (action == null) return '[null]'
     if (typeof action === 'function') return '[thunk]'
     if (typeof action !== 'object') return `[${typeof action}]`
-    // Try to find a single key that changed
+
     const keys = Object.keys(action)
     if (keys.length === 0) return '[empty action]'
-    if (keys.length === 1) {
-      return keys[0]
-    }
-    // If multiple keys, join them for a summary
+    if (keys.length === 1) return keys[0]
+
     return keys.join(', ')
+  }
+
+  // Helper to remove blacklisted paths from an object (non-mutating)
+  function removeBlacklistedPaths(obj: any): any {
+    if (!blacklist.length || !obj || typeof obj !== 'object') return obj
+
+    // Deep clone the object/array to avoid mutating frozen objects
+    const clone = deepClone(obj)
+
+    for (const path of blacklist) {
+      if (!Array.isArray(path) || path.length === 0) continue
+
+      let node = clone
+      for (let i = 0; i < path.length - 1; i++) {
+        const key = path[i]
+        if (node && typeof node === 'object' && key in node) {
+          node = node[key]
+        } else {
+          node = null
+          break
+        }
+      }
+
+      if (node && typeof node === 'object') {
+        const lastKey = path[path.length - 1]
+        if (Array.isArray(node)) {
+          if (typeof lastKey === 'number' && lastKey >= 0 && lastKey < node.length) {
+            node.splice(lastKey, 1)
+          }
+        } else if (lastKey in node) {
+          delete (node as Record<string | number, any>)[lastKey as string | number]
+        }
+      }
+    }
+
+    return clone
+  }
+
+  // Helper to create timestamp string
+  function getTimestamp(): string {
+    return includeTimestamp ? new Date().toISOString() : ''
+  }
+
+  // Helper to log with the appropriate method
+  function logWithMethod(method: string, message: string, ...args: any[]): void {
+    if (loggerType.type === 'function') {
+      ;(logger as Function)(message, ...args)
+    } else if (loggerType.type === 'console') {
+      const consoleMethod = (console as any)[method]
+      if (typeof consoleMethod === 'function') {
+        consoleMethod(message, ...args)
+      } else {
+        console.log(message, ...args)
+      }
+    } else if (loggerType.type === 'object') {
+      const loggerObj = logger as any
+      if (typeof loggerObj[method] === 'function') {
+        loggerObj[method](message, ...args)
+      } else if (typeof loggerObj.log === 'function') {
+        loggerObj.log(message, ...args)
+      }
+    }
   }
 
   return (action, prevState, dispatchNext, getState) => {
     if (!enabled) return dispatchNext(action)
 
-    const time = new Date().toISOString()
-    const actionName = inferActionName(action)
-    const groupLabel = `Action: ${actionName} @ ${time}`
+    // Remove blacklisted paths from the action for logging only
+    const loggedAction = removeBlacklistedPaths(action)
+
+    // Skip logging if the action is now empty after blacklisting
+    if (
+      !loggedAction ||
+      (typeof loggedAction === 'object' && Object.keys(loggedAction).length === 0)
+    ) {
+      return dispatchNext(action)
+    }
+
+    const timestamp = getTimestamp()
+    const actionName = inferActionName(loggedAction)
+    const groupLabel = `Action: ${actionName}${timestamp ? ` @ ${timestamp}` : ''}`
 
     try {
-      if (typeof console.groupCollapsed === 'function') {
-        console.groupCollapsed(groupLabel)
+      // Start logging group
+      if (useGrouping && hasGrouping) {
+        if (loggerType.type === 'console') {
+          if (typeof console.groupCollapsed === 'function') {
+            console.groupCollapsed(groupLabel)
+          } else if (typeof console.group === 'function') {
+            console.group(groupLabel)
+          }
+        } else if (loggerType.type === 'object') {
+          const loggerObj = logger as any
+          if (typeof loggerObj.groupCollapsed === 'function') {
+            loggerObj.groupCollapsed(groupLabel)
+          } else if (typeof loggerObj.group === 'function') {
+            loggerObj.group(groupLabel)
+          }
+        }
       }
 
-      if (isConsola && typeof (logger as any).box === 'function') {
-        ;(logger as any).box(`\uD83D\uDD28 ${groupLabel}`)
+      // Special formatting for Consola box if available
+      if (hasBoxFormatting && typeof (logger as any).box === 'function') {
+        ;(logger as any).box(`🔨 ${groupLabel}`)
       }
 
-      if (isConsola) {
-        ;(logger as any)[logLevel]?.('Prev state', prevState)
-        ;(logger as any)[logLevel]?.('Action', action)
-      } else if (typeof logger === 'function') {
-        logger('Prev state:', prevState)
-        logger('Action:', action)
-      }
+      // Log previous state
+      logWithMethod(logLevel, 'Prev state', prevState)
 
+      // Log action
+      logWithMethod(logLevel, 'Action', loggedAction)
+
+      // Execute the action
       dispatchNext(action)
 
+      // Log next state
       const nextState = getState()
-      if (isConsola) {
-        ;(logger as any)[logLevel]?.('Next state', nextState)
-      } else if (typeof logger === 'function') {
-        logger('Next state:', nextState)
-      }
+      logWithMethod(logLevel, 'Next state', nextState)
 
-      if (typeof console.groupEnd === 'function') {
-        console.groupEnd()
+      // End logging group
+      if (useGrouping && hasGrouping) {
+        if (loggerType.type === 'console') {
+          if (typeof console.groupEnd === 'function') {
+            console.groupEnd()
+          }
+        } else if (loggerType.type === 'object') {
+          const loggerObj = logger as any
+          if (typeof loggerObj.groupEnd === 'function') {
+            loggerObj.groupEnd()
+          }
+        }
       }
     } catch (err) {
-      if (isConsola && typeof (logger as any).error === 'function') {
-        ;(logger as any).error('Logger middleware error', err)
+      // Handle logging errors without blocking state updates
+      const errorMessage = 'Logger middleware error'
+
+      if (loggerType.type === 'console') {
+        console.error(errorMessage, err)
+      } else if (loggerType.type === 'object') {
+        const loggerObj = logger as any
+        if (typeof loggerObj.error === 'function') {
+          loggerObj.error(errorMessage, err)
+        } else {
+          console.error(errorMessage, err)
+        }
       } else {
-        console.error('Logger middleware error', err)
+        console.error(errorMessage, err)
       }
+
+      // Ensure the action still gets dispatched
       dispatchNext(action)
     }
+  }
+}
+
+/**
+ * Detects the type and capabilities of a logger.
+ */
+function detectLoggerType(logger: SupportedLogger): {
+  type: 'function' | 'console' | 'object'
+  hasGrouping: boolean
+  hasCorrelationId: boolean
+  hasBoxFormatting: boolean
+} {
+  if (typeof logger === 'function') {
+    return {
+      type: 'function',
+      hasGrouping: false,
+      hasCorrelationId: false,
+      hasBoxFormatting: false,
+    }
+  }
+
+  if (logger === console || (logger as any) === console) {
+    return {
+      type: 'console',
+      hasGrouping: typeof console.group === 'function',
+      hasCorrelationId: false,
+      hasBoxFormatting: false,
+    }
+  }
+
+  if (typeof logger === 'object' && logger !== null) {
+    const loggerObj = logger as any
+    return {
+      type: 'object',
+      hasGrouping:
+        typeof loggerObj.group === 'function' || typeof loggerObj.groupCollapsed === 'function',
+      hasCorrelationId:
+        typeof loggerObj.getCorrelationId === 'function' &&
+        typeof loggerObj.setCorrelationId === 'function',
+      hasBoxFormatting: typeof loggerObj.box === 'function',
+    }
+  }
+
+  // Fallback
+  return {
+    type: 'console',
+    hasGrouping: false,
+    hasCorrelationId: false,
+    hasBoxFormatting: false,
   }
 }
 
