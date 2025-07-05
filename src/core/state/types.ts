@@ -529,7 +529,7 @@ export interface ReadOnlyStore<S extends object> {
    * @see {@link Store.subscribeToMultiple} for multiple value subscriptions
    */
   subscribeToPath: <T = any>(
-    path: string,
+    path: string | (string | number)[],
     listener: DependencyListener<T>,
     options?: DependencySubscriptionOptions
   ) => () => void

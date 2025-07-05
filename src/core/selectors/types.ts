@@ -681,9 +681,12 @@ export type SelectorResults<S extends object, P extends readonly Selector<S, any
  * The projector takes parameters and returns a combiner function that
  * operates on the input selector results.
  */
-export type ParameterizedProjector<Props, S extends object, P extends readonly Selector<S, any>[], R> = (
-  params: Props
-) => (...results: SelectorResults<S, P>) => R
+export type ParameterizedProjector<
+  Props,
+  S extends object,
+  P extends readonly Selector<S, any>[],
+  R,
+> = (params: Props) => (...results: SelectorResults<S, P>) => R
 
 /**
  * Return type for parameterized selectors with enhanced caching.
@@ -797,7 +800,9 @@ export type PlainObjectChecker = (value: any) => boolean
  * Internal method that creates optimized single selectors leveraging
  * Immer's structural sharing for state reference equality checks.
  */
-export type CreateSingleSelectorMethod<S extends object> = <R>(selectorFn: Selector<S, R>) => MemoizedSelector<R>
+export type CreateSingleSelectorMethod<S extends object> = <R>(
+  selectorFn: Selector<S, R>
+) => MemoizedSelector<R>
 
 /**
  * Private method signature for creating multi-selectors.
@@ -833,7 +838,10 @@ export type CreateMultiSelectorMethod<S extends object> = <R, P extends Selector
  * selector instances for specific parameter combinations. Includes
  * state reference caching and enhanced input change detection.
  */
-export type CreateMultiSelectorWithCombinerMethod<S extends object> = <R, P extends Selector<S, any>[]>(
+export type CreateMultiSelectorWithCombinerMethod<S extends object> = <
+  R,
+  P extends Selector<S, any>[],
+>(
   inputSelectors: readonly [...P],
   combiner: (...results: any[]) => R
 ) => MemoizedSelector<R>
@@ -1004,7 +1012,7 @@ export interface ISelectorManager<S extends object> {
    * single dependency subscription system for consistency and performance.
    */
   createPathSubscription<T = any>(
-    path: string,
+    path: string | (string | number)[],
     listener: DependencyListener<T>,
     options?: DependencySubscriptionOptions
   ): () => void

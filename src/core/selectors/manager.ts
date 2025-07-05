@@ -652,13 +652,13 @@ export class SelectorManager<S extends object> implements ISelectorManager<S> {
   }
 
   createPathSubscription<T = any>(
-    path: string,
+    path: string | (string | number)[],
     listener: DependencyListener<T>,
     options: DependencySubscriptionOptions = {}
   ): () => void {
     // Convert path to selector
     const pathSelector: Selector<S, T> = state => {
-      const pathArray = path.split('.')
+      const pathArray = Array.isArray(path) ? path : path.split('.')
       const result = getPath<S, T>(state, pathArray)
       return result as T // Type assertion since we expect the path to exist
     }
