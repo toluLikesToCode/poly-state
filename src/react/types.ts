@@ -18,7 +18,11 @@
 
 import type {ReactNode, ComponentType, DependencyList} from 'react'
 import type {Store, ReadOnlyStore, Thunk} from '../core/state/index'
-import type {Selector, DependencyListener, DependencySubscriptionOptions} from '../core/selectors/index'
+import type {
+  Selector,
+  DependencyListener,
+  DependencySubscriptionOptions,
+} from '../core/selectors/index'
 import type {Draft} from 'immer'
 
 /**
@@ -61,7 +65,38 @@ export type UseStoreHook<S extends object> = () => Store<S>
  * const todoCount = useSelector(state => state.todos.length);
  * ```
  */
-export type UseSelectorHook<S extends object> = <R>(selector: Selector<S, R>) => R
+/**
+ * Hook that selects and subscribes to specific parts of the state
+ * Supports both single selector and multiple selectors with projector patterns
+ * @template S - The shape of the state object
+ */
+export type UseSelectorHook<S extends object> = {
+  // Single selector overload
+  <R>(selector: Selector<S, R>): R
+
+  // Multiple selectors with projector overload
+  <R, P extends Selector<S, any>[]>(
+    ...args: [
+      ...P,
+      (
+        ...results: {
+          [K in keyof P]: P[K] extends Selector<S, infer RT> ? RT : never
+        }
+      ) => R,
+    ]
+  ): R
+}
+
+export type UseCombinedSelectorHook<S extends object> = <R, P extends Selector<S, any>[]>(
+  ...args: [
+    ...P,
+    (
+      ...results: {
+        [K in keyof P]: P[K] extends Selector<S, infer RT> ? RT : never
+      }
+    ) => R,
+  ]
+) => R
 
 /**
  * Hook that provides the dispatch function for updating state
@@ -146,7 +181,7 @@ export type UseSubscribeToHook<S extends object> = <R>(
  * );
  *
  * useSubscribeToPath(
- *   'todos.0.completed',
+ *   ['todos', 0, 'completed'],
  *   (isCompleted) => {
  *     if (isCompleted) showCelebration();
  *   }
@@ -154,7 +189,7 @@ export type UseSubscribeToHook<S extends object> = <R>(
  * ```
  */
 export type UseSubscribeToPathHook = <T = any>(
-  path: string,
+  path: string | (string | number)[],
   listener: DependencyListener<T>,
   options?: DependencySubscriptionOptions
 ) => void
@@ -203,7 +238,9 @@ export type UseStoreValueHook = <T = any>(path: string) => T
  * };
  * ```
  */
-export type UseTransactionHook<S extends object> = () => (recipe: (draft: Draft<S>) => void) => boolean
+export type UseTransactionHook<S extends object> = () => (
+  recipe: (draft: Draft<S>) => void
+) => boolean
 
 /**
  * Hook that provides a batch function for grouping multiple updates
@@ -257,7 +294,10 @@ export type UseBatchHook = () => (fn: () => void) => void
  * };
  * ```
  */
-export type UseUpdatePathHook = () => <V = any>(path: (string | number)[], updater: (currentValue: V) => V) => void
+export type UseUpdatePathHook = () => <V = any>(
+  path: (string | number)[],
+  updater: (currentValue: V) => V
+) => void
 
 /**
  * Store history state information
@@ -335,7 +375,9 @@ export type UseStoreHistoryHook<S extends object> = () => StoreHistoryState<S>
  * };
  * ```
  */
-export type UseThunkHook<S extends object> = () => <R>(thunk: Thunk<S, R>) => R extends Promise<any> ? Promise<R> : R
+export type UseThunkHook<S extends object> = () => <R>(
+  thunk: Thunk<S, R>
+) => R extends Promise<any> ? Promise<R> : R
 
 /**
  * Async thunk execution state
@@ -442,6 +484,9 @@ export interface StoreHooks<S extends object> {
   useStore: UseStoreHook<S>
   /** Hook to select and subscribe to specific parts of the state */
   useSelector: UseSelectorHook<S>
+
+  /** Hook to access the combined selector for multiple state values */
+  useCombinedSelector: UseCombinedSelectorHook<S>
   /** Hook to get the dispatch function for updating state */
   useDispatch: UseDispatchHook<S>
   /** Hook to access the complete store state */
@@ -594,3 +639,14 @@ export type ExtractStoreState<T> = T extends StoreContextResult<infer S> ? S : n
  * @public
  */
 export type ExtractStateFromStore<T> = T extends Store<infer S> ? S : never
+
+/**
+ * Hook function that provides all store hooks without requiring context setup
+ * @template S - The shape of the state object
+ * @param store - The store instance to use
+ * @returns All store hooks bound to the provided store instance
+ * @public
+ */
+export type UseStoreHooksFunction = <S extends object>(
+  store: Store<S>
+) => Omit<StoreContextResult<S>, 'StoreContext' | 'StoreProvider'>

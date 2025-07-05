@@ -4,37 +4,7 @@
  * This module provides React hooks and context providers that enable seamless integration
  * of the Open Store with React applications. It includes hooks for state selection,
  * dispatching actions, transactions, path-based operations, and more.
- *
- * @example
- * ```tsx
- * import { createStore } from 'open-store';
- * import { createStoreContext } from 'open-store/react';
- *
- * const store = createStore({ count: 0, user: { name: 'John' } });
- * const { StoreProvider, useSelector, useDispatch } = createStoreContext(store);
- *
- * function Counter() {
- *   const count = useSelector(state => state.count);
- *   const dispatch = useDispatch();
- *
- *   return (
- *     <div>
- *       <span>{count}</span>
- *       <button onClick={() => dispatch({ count: count + 1 })}>+</button>
- *     </div>
- *   );
- * }
- *
- * function App() {
- *   return (
- *     <StoreProvider>
- *       <Counter />
- *     </StoreProvider>
- *   );
- * }
- * ```
  */
-
 import React, {
   createContext,
   useContext,
@@ -43,11 +13,16 @@ import React, {
   useMemo,
   useCallback,
   useRef,
+  useSyncExternalStore,
   type ReactNode,
   type ComponentType,
 } from 'react'
 import type {Store, ReadOnlyStore, Thunk} from '../core/state/index'
-import type {Selector, DependencyListener, DependencySubscriptionOptions} from '../core/selectors/index'
+import type {
+  Selector,
+  DependencyListener,
+  DependencySubscriptionOptions,
+} from '../core/selectors/index'
 import type {Draft} from 'immer'
 import {getPath} from '../core/utils/path'
 
@@ -56,6 +31,12 @@ export * from './types'
 
 // Import types from the dedicated types file
 import type {StoreContextValue, StoreContextResult, UseSubscribeToHook} from './types'
+
+// Cache for store hooks to avoid recreating them
+const globalStoreHooks = new WeakMap<
+  Store<any>,
+  Omit<StoreContextResult<any>, 'StoreContext' | 'StoreProvider'>
+>()
 
 /**
  * Creates React context and hooks for a store instance
@@ -103,6 +84,7 @@ import type {StoreContextValue, StoreContextResult, UseSubscribeToHook} from './
  */
 export function createStoreContext<S extends object>(store: Store<S>): StoreContextResult<S> {
   const StoreContext = createContext<StoreContextValue<S> | null>(null)
+  StoreContext.displayName = 'StoreContext'
 
   const StoreProvider: React.FC<{children: ReactNode}> = ({children}) => {
     const contextValue = useMemo(
@@ -114,6 +96,7 @@ export function createStoreContext<S extends object>(store: Store<S>): StoreCont
 
     return React.createElement(StoreContext.Provider, {value: contextValue}, children)
   }
+  StoreProvider.displayName = 'StoreProvider'
 
   const useStore = (): Store<S> => {
     const context = useContext(StoreContext)
@@ -123,24 +106,73 @@ export function createStoreContext<S extends object>(store: Store<S>): StoreCont
     return context.store
   }
 
-  const useSelector = <R>(selector: Selector<S, R>): R => {
+  // Multiple selectors with projector hook
+  const useCombinedSelector = <R, P extends Selector<S, any>[]>(
+    ...args: [
+      ...P,
+      (
+        ...results: {
+          [K in keyof P]: P[K] extends Selector<S, infer RT> ? RT : never
+        }
+      ) => R,
+    ]
+  ): R => {
     const store = useStore()
-    const [selectedValue, setSelectedValue] = useState<R>(() => selector(store.getState()))
 
-    useEffect(() => {
-      // Update the value immediately in case the selector or store changed
-      const newValue = selector(store.getState())
-      setSelectedValue(newValue)
+    const memoizedSelector = useMemo(() => {
+      return store.select(...args)
+    }, [store, ...args])
 
-      const unsubscribe = store.subscribe(() => {
-        const latestValue = selector(store.getState())
-        setSelectedValue(latestValue)
-      })
+    // Create stable subscribe function
+    const subscribe = useCallback(
+      (callback: () => void) => {
+        return store.subscribe(callback)
+      },
+      [store]
+    )
 
-      return unsubscribe
-    }, [store, selector])
+    // Create stable getSnapshot function
+    const getSnapshot = useCallback(() => {
+      return memoizedSelector()
+    }, [memoizedSelector])
 
-    return selectedValue
+    return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
+  }
+
+  // Overloaded useSelector that supports both patterns
+  const useSelector = <R, P extends Selector<S, any>[]>(
+    ...args:
+      | [Selector<S, R>]
+      | [
+          ...P,
+          (
+            ...results: {
+              [K in keyof P]: P[K] extends Selector<S, infer RT> ? RT : never
+            }
+          ) => R,
+        ]
+  ): R => {
+    const store = useStore()
+
+    const memoizedSelector = useMemo(() => {
+      // Delegate to store.select which handles both patterns and memoization
+      return store.select(...(args as any)) as (() => R) & {lastValue?: R}
+    }, [store, ...args])
+
+    // Create stable subscribe function
+    const subscribe = useCallback(
+      (callback: () => void) => {
+        return store.subscribe(callback)
+      },
+      [store]
+    )
+
+    // Create stable getSnapshot function
+    const getSnapshot = useCallback(() => {
+      return memoizedSelector()
+    }, [memoizedSelector])
+
+    return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
   }
 
   const useDispatch = (): Store<S>['dispatch'] => {
@@ -159,17 +191,21 @@ export function createStoreContext<S extends object>(store: Store<S>): StoreCont
 
   const useStoreState = (): S => {
     const store = useStore()
-    const [state, setState] = useState<S>(() => store.getState())
 
-    useEffect(() => {
-      const unsubscribe = store.subscribe(() => {
-        setState(store.getState())
-      })
+    // Create stable subscribe function
+    const subscribe = useCallback(
+      (callback: () => void) => {
+        return store.subscribe(callback)
+      },
+      [store]
+    )
 
-      return unsubscribe
+    // Create stable getSnapshot function
+    const getSnapshot = useCallback(() => {
+      return store.getState()
     }, [store])
 
-    return state
+    return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
   }
 
   const useSubscribeTo: UseSubscribeToHook<S> = <R>(
@@ -182,12 +218,16 @@ export function createStoreContext<S extends object>(store: Store<S>): StoreCont
     listenerRef.current = listener
 
     useEffect(() => {
-      return store.subscribeTo(selector, (newVal, oldVal) => listenerRef.current(newVal, oldVal), options)
+      return store.subscribeTo(
+        selector,
+        (newVal, oldVal) => listenerRef.current(newVal, oldVal),
+        options
+      )
     }, [store, selector, options?.immediate])
   }
 
   const useSubscribeToPath = <T = any>(
-    path: string,
+    path: string | (string | number)[],
     listener: DependencyListener<T>,
     options?: DependencySubscriptionOptions
   ) => {
@@ -196,25 +236,33 @@ export function createStoreContext<S extends object>(store: Store<S>): StoreCont
     listenerRef.current = listener
 
     useEffect(() => {
-      return store.subscribeToPath(path, (newVal: T, oldVal: T) => listenerRef.current(newVal, oldVal), options)
+      return store.subscribeToPath(
+        path,
+        (newVal: T, oldVal: T) => listenerRef.current(newVal, oldVal),
+        options
+      )
     }, [store, path, options?.immediate])
   }
 
-  const useStoreValue = <T = any>(path: string): T => {
+  const useStoreValue = <T = any>(path: string | (string | number)[]): T => {
     const store = useStore()
-    const pathArray = path.split('.')
-    const [value, setValue] = useState<T>(() => {
+    const pathArray = useMemo(() => (Array.isArray(path) ? path : path.split('.')), [path])
+
+    // Create stable subscribe function that subscribes to the specific path
+    const subscribe = useCallback(
+      (callback: () => void) => {
+        return store.subscribeToPath(path, callback)
+      },
+      [store, path]
+    )
+
+    // Create stable getSnapshot function
+    const getSnapshot = useCallback(() => {
       const state = store.getState()
       return getPath(state, pathArray) as T
-    })
+    }, [store, pathArray])
 
-    useEffect(() => {
-      return store.subscribeToPath(path, (newVal: T) => {
-        setValue(newVal)
-      })
-    }, [store, path])
-
-    return value
+    return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
   }
 
   const useTransaction = () => {
@@ -252,14 +300,21 @@ export function createStoreContext<S extends object>(store: Store<S>): StoreCont
 
   const useStoreHistory = () => {
     const store = useStore()
-    const [historyState, setHistoryState] = useState(() => store.getHistory())
 
-    useEffect(() => {
-      const unsubscribe = store.subscribe(() => {
-        setHistoryState(store.getHistory())
-      })
-      return unsubscribe
+    // Create stable subscribe function
+    const subscribe = useCallback(
+      (callback: () => void) => {
+        return store.subscribe(callback)
+      },
+      [store]
+    )
+
+    // Create stable getSnapshot function
+    const getSnapshot = useCallback(() => {
+      return store.getHistory()
     }, [store])
+
+    const historyState = useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
 
     const undo = useCallback((steps?: number) => store.undo(steps), [store])
     const redo = useCallback((steps?: number) => store.redo(steps), [store])
@@ -331,6 +386,7 @@ export function createStoreContext<S extends object>(store: Store<S>): StoreCont
     StoreProvider,
     useStore,
     useSelector,
+    useCombinedSelector,
     useDispatch,
     useStoreState,
     useSubscribeTo,
@@ -409,4 +465,357 @@ export function withStore<S extends object, P extends object>(
   WrappedComponent.displayName = `withStore(${Component.displayName || Component.name})`
 
   return WrappedComponent
+}
+
+/**
+ * Alternative hook-based approach that doesn't require context setup
+ *
+ * This function provides all store hooks without needing a provider, making it perfect
+ * for simple components, testing, or when you prefer direct store passing over context.
+ *
+ * @template S - The shape of the state object
+ * @param store - The store instance to use
+ * @returns All store hooks bound to the provided store instance
+ *
+ * @example
+ * **Simple Usage - No Provider Needed**
+ * ```tsx
+ * import { useStoreHooks } from 'open-store/react';
+ * import { appStore } from './store';
+ *
+ * function Counter() {
+ *   const { useSelector, useDispatch } = useStoreHooks(appStore);
+ *   const count = useSelector(state => state.count);
+ *   const dispatch = useDispatch();
+ *
+ *   return (
+ *     <button onClick={() => dispatch({ count: count + 1 })}>
+ *       {count}
+ *     </button>
+ *   );
+ * }
+ *
+ * // No provider wrapper needed!
+ * function App() {
+ *   return <Counter />;
+ * }
+ * ```
+ *
+ * @example
+ * **Perfect for Testing**
+ * ```tsx
+ * import { render, screen } from '@testing-library/react';
+ * import { createStore } from 'open-store';
+ * import { useStoreHooks } from 'open-store/react';
+ *
+ * function TestComponent() {
+ *   const testStore = createStore({ count: 5 });
+ *   const { useSelector } = useStoreHooks(testStore);
+ *   const count = useSelector(state => state.count);
+ *   return <div>{count}</div>;
+ * }
+ *
+ * test('component works with direct store', () => {
+ *   render(<TestComponent />);
+ *   expect(screen.getByText('5')).toBeInTheDocument();
+ * });
+ * ```
+ *
+ * @example
+ * **Advanced Features Still Available**
+ * ```tsx
+ * function AdvancedComponent() {
+ *   const {
+ *     useSelector,
+ *     useTransaction,
+ *     useStoreValue,
+ *     useAsyncThunk,
+ *     useStoreHistory
+ *   } = useStoreHooks(appStore);
+ *
+ *   const userName = useStoreValue<string>('user.name');
+ *   const transaction = useTransaction();
+ *   const { execute, loading } = useAsyncThunk();
+ *   const { undo, redo, canUndo } = useStoreHistory();
+ *
+ *   // All features work exactly the same!
+ * }
+ * ```
+ *
+ * @see {@link createStoreContext} for context-based integration (recommended for large apps)
+ * @see {@link StoreContextResult} for all available hooks
+ */
+export function useStoreHooks<S extends object>(
+  store: Store<S>
+): Omit<StoreContextResult<S>, 'StoreContext' | 'StoreProvider'> {
+  if (!globalStoreHooks.has(store)) {
+    // Create standalone hooks that work directly with the store
+    const hooks = {
+      useStore: () => store,
+
+      useSelector: <R, P extends Selector<S, any>[]>(
+        ...args:
+          | [Selector<S, R>]
+          | [
+              ...P,
+              (
+                ...results: {
+                  [K in keyof P]: P[K] extends Selector<S, infer RT> ? RT : never
+                }
+              ) => R,
+            ]
+      ): R => {
+        const memoizedSelector = useMemo(() => {
+          return store.select(...(args as any)) as (() => R) & {lastValue?: R}
+        }, [store, ...args])
+
+        // Create stable subscribe function
+        const subscribe = useCallback(
+          (callback: () => void) => {
+            return store.subscribe(callback)
+          },
+          [store]
+        )
+
+        // Create stable getSnapshot function
+        const getSnapshot = useCallback(() => {
+          return memoizedSelector()
+        }, [memoizedSelector])
+
+        return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
+      },
+
+      useCombinedSelector: <R, P extends Selector<S, any>[]>(
+        ...args: [
+          ...P,
+          (
+            ...results: {
+              [K in keyof P]: P[K] extends Selector<S, infer RT> ? RT : never
+            }
+          ) => R,
+        ]
+      ): R => {
+        const memoizedSelector = useMemo(() => {
+          return store.select(...args)
+        }, [store, ...args])
+
+        // Create stable subscribe function
+        const subscribe = useCallback(
+          (callback: () => void) => {
+            return store.subscribe(callback)
+          },
+          [store]
+        )
+
+        // Create stable getSnapshot function
+        const getSnapshot = useCallback(() => {
+          return memoizedSelector()
+        }, [memoizedSelector])
+
+        return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
+      },
+
+      useDispatch: () => store.dispatch,
+
+      useStoreState: () => {
+        // Create stable subscribe function
+        const subscribe = useCallback(
+          (callback: () => void) => {
+            return store.subscribe(callback)
+          },
+          [store]
+        )
+
+        // Create stable getSnapshot function
+        const getSnapshot = useCallback(() => {
+          return store.getState()
+        }, [store])
+
+        return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
+      },
+
+      useSubscribeTo: <R>(
+        selector: Selector<S, R>,
+        listener: DependencyListener<R>,
+        options?: DependencySubscriptionOptions
+      ) => {
+        const listenerRef = useRef(listener)
+        listenerRef.current = listener
+
+        useEffect(() => {
+          return store.subscribeTo(
+            selector,
+            (newVal, oldVal) => listenerRef.current(newVal, oldVal),
+            options
+          )
+        }, [store, selector, options?.immediate])
+      },
+
+      useSubscribeToPath: <T = any>(
+        path: string | (string | number)[],
+        listener: DependencyListener<T>,
+        options?: DependencySubscriptionOptions
+      ) => {
+        const listenerRef = useRef(listener)
+        listenerRef.current = listener
+
+        useEffect(() => {
+          return store.subscribeToPath(
+            path,
+            (newVal: T, oldVal: T) => listenerRef.current(newVal, oldVal),
+            options
+          )
+        }, [store, path, options?.immediate])
+      },
+
+      useStoreValue: <T = any>(path: string): T => {
+        const pathArray = useMemo(() => path.split('.'), [path])
+
+        // Create stable subscribe function that subscribes to the specific path
+        const subscribe = useCallback(
+          (callback: () => void) => {
+            return store.subscribeToPath(path, callback)
+          },
+          [store, path]
+        )
+
+        // Create stable getSnapshot function
+        const getSnapshot = useCallback(() => {
+          const state = store.getState()
+          return getPath(state, pathArray) as T
+        }, [store, pathArray])
+
+        return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
+      },
+
+      useTransaction: () => {
+        return useCallback(
+          (recipe: (draft: Draft<S>) => void) => {
+            return store.transaction(recipe)
+          },
+          [store]
+        )
+      },
+
+      useBatch: () => {
+        return useCallback(
+          (fn: () => void) => {
+            store.batch(fn)
+          },
+          [store]
+        )
+      },
+
+      useUpdatePath: () => {
+        return useCallback(
+          <V = any>(path: (string | number)[], updater: (currentValue: V) => V) => {
+            store.updatePath(path, updater)
+          },
+          [store]
+        )
+      },
+
+      useStoreHistory: () => {
+        // Create stable subscribe function
+        const subscribe = useCallback(
+          (callback: () => void) => {
+            return store.subscribe(callback)
+          },
+          [store]
+        )
+
+        // Create stable getSnapshot function
+        const getSnapshot = useCallback(() => {
+          return store.getHistory()
+        }, [store])
+
+        const historyState = useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
+
+        const undo = useCallback((steps?: number) => store.undo(steps), [store])
+        const redo = useCallback((steps?: number) => store.redo(steps), [store])
+
+        return {
+          ...historyState,
+          undo,
+          redo,
+          canUndo: historyState.currentIndex > 0,
+          canRedo: historyState.currentIndex < historyState.history.length - 1,
+        }
+      },
+
+      useThunk: () => {
+        return useCallback(
+          <R>(thunk: Thunk<S, R>) => {
+            return store.dispatch(thunk)
+          },
+          [store]
+        )
+      },
+
+      useAsyncThunk: () => {
+        const [loading, setLoading] = useState(false)
+        const [error, setError] = useState<Error | null>(null)
+
+        const execute = useCallback(
+          async <R>(thunk: Thunk<S, Promise<R>>) => {
+            setLoading(true)
+            setError(null)
+
+            try {
+              const result = await store.dispatch(thunk)
+              return result
+            } catch (err) {
+              const error = err instanceof Error ? err : new Error(String(err))
+              setError(error)
+              throw error
+            } finally {
+              setLoading(false)
+            }
+          },
+          [store]
+        )
+
+        return {execute, loading, error}
+      },
+
+      useStoreEffect: <R>(
+        selector: Selector<S, R>,
+        effect: (value: R, prevValue: R | undefined) => void | (() => void),
+        deps?: React.DependencyList
+      ) => {
+        const memoizedSelector = useMemo(() => {
+          return store.select(selector) as (() => R) & {lastValue?: R}
+        }, [store, selector])
+
+        // Create stable subscribe function
+        const subscribe = useCallback(
+          (callback: () => void) => {
+            return store.subscribe(callback)
+          },
+          [store]
+        )
+
+        // Create stable getSnapshot function
+        const getSnapshot = useCallback(() => {
+          return memoizedSelector()
+        }, [memoizedSelector])
+
+        const selectedValue = useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
+        const prevValueRef = useRef<R>()
+
+        useEffect(() => {
+          const cleanup = effect(selectedValue, prevValueRef.current)
+          prevValueRef.current = selectedValue
+          return cleanup
+        }, [selectedValue, ...(deps || [])])
+      },
+    }
+
+    globalStoreHooks.set(store, hooks as any)
+  }
+
+  return globalStoreHooks.get(store)! as Omit<
+    StoreContextResult<S>,
+    'StoreContext' | 'StoreProvider'
+  >
 }

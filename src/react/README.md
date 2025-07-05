@@ -1,18 +1,66 @@
 # Open Store React Integration Guide
 
 Open Store provides a powerful and intuitive React integration that makes state management feel
-natural and performant. This guide will walk you through everything you need to know, from basic
-concepts to advanced patterns.
+natural and performant. This guide covers both traditional context-based integration and the new
+context-free approach, giving you flexibility to choose the best pattern for your use case.
+
+## Table of Contents
+
+- [Quick Start](#quick-start)
+- [Context-Free Integration](#context-free-integration)
+- [Traditional Context Integration](#traditional-context-integration)
+- [Core Hooks and Usage](#core-hooks-and-usage)
+- [Advanced State Updates](#advanced-state-updates)
+- [Subscriptions and Side Effects](#subscriptions-and-side-effects)
+- [Async Operations](#async-operations-and-loading-states)
+- [History and Time Travel](#history-and-time-travel)
+- [Advanced Patterns](#advanced-patterns-and-best-practices)
+- [TypeScript Integration](#typescript-integration)
+- [Testing Patterns](#testing-patterns)
 
 ## Quick Start
 
-Let's begin with a simple example to understand the core concepts:
+Open Store offers two approaches for React integration. Choose the one that fits your needs:
+
+### Context-Free Approach (Recommended for Simple Cases)
+
+Perfect for simple components, testing, and gradual migration:
+
+```tsx
+import {createStore} from 'open-store'
+import {useStoreHooks} from 'open-store/react'
+
+// Create your store
+const appStore = createStore({
+  count: 0,
+  user: {name: '', email: ''},
+  todos: [],
+})
+
+// Use in components - no provider needed!
+function Counter() {
+  const {useSelector, useDispatch} = useStoreHooks(appStore)
+  const count = useSelector(state => state.count)
+  const dispatch = useDispatch()
+
+  return <button onClick={() => dispatch({count: count + 1})}>Count: {count}</button>
+}
+
+// No provider wrapper required
+function App() {
+  return <Counter />
+}
+```
+
+### Traditional Context Approach (Recommended for Large Apps)
+
+Ideal for applications with many components and centralized state management:
 
 ```tsx
 import {createStore} from 'open-store'
 import {createStoreContext} from 'open-store/react'
 
-// First, define your state shape
+// Define your state shape
 interface AppState {
   count: number
   user: {name: string; email: string}
@@ -50,11 +98,154 @@ function App() {
 }
 ```
 
-This example demonstrates the fundamental pattern: create a store, generate React hooks from it, and
-use those hooks in your components. The `useSelector` hook subscribes to specific parts of state,
-and `useDispatch` provides a way to update the state.
+## Context-Free Integration - Deep Dive
 
-## Understanding the Architecture
+The `useStoreHooks` function provides a clean, optional way to use Open Store with React components
+without requiring any context setup. This approach is useful for:
+
+- **Simple components** that need direct store access
+- **Testing scenarios** where you want isolated store instances
+- **Gradual migration** from other state management libraries
+- **Library components** that shouldn't depend on providers
+
+### Basic Context-Free Usage
+
+```tsx
+import {createStore} from 'open-store'
+import {useStoreHooks} from 'open-store/react'
+
+// Create your store
+const appStore = createStore({
+  count: 0,
+  user: {name: '', email: ''},
+  todos: [],
+})
+
+// Use in components - no provider needed!
+function Counter() {
+  const {useSelector, useDispatch} = useStoreHooks(appStore)
+  const count = useSelector(state => state.count)
+  const dispatch = useDispatch()
+
+  return <button onClick={() => dispatch({count: count + 1})}>Count: {count}</button>
+}
+
+// No provider wrapper required
+function App() {
+  return <Counter />
+}
+```
+
+### Advanced Context-Free Features
+
+All store features work exactly the same as with context-based integration:
+
+```tsx
+function AdvancedComponent() {
+  const {
+    useSelector,
+    useStoreValue, // Path-based access
+    useTransaction, // Atomic updates
+    useAsyncThunk, // Async operations
+    useBatch, // Batched updates
+    useUpdatePath, // Direct path updates
+  } = useStoreHooks(appStore)
+
+  const userName = useStoreValue<string>('user.name')
+  const transaction = useTransaction()
+  const {execute, loading, error} = useAsyncThunk()
+
+  const updateUser = () => {
+    transaction(draft => {
+      draft.user.name = 'John Doe'
+      draft.user.email = 'john@example.com'
+    })
+  }
+
+  const loadData = async () => {
+    await execute(async ctx => {
+      const response = await fetch('/api/data')
+      const data = await response.json()
+      ctx.dispatch({user: data.user})
+    })
+  }
+
+  if (loading) return <div>Loading...</div>
+  if (error) return <div>Error: {error.message}</div>
+
+  return (
+    <div>
+      <h2>{userName || 'No user'}</h2>
+      <button onClick={updateUser}>Update User</button>
+      <button onClick={loadData}>Load Data</button>
+    </div>
+  )
+}
+```
+
+### Perfect for Testing
+
+Context-free hooks make testing much simpler:
+
+```tsx
+import {render, screen, fireEvent} from '@testing-library/react'
+import {createStore} from 'open-store'
+import {useStoreHooks} from 'open-store/react'
+
+function TestComponent() {
+  const testStore = createStore({count: 5})
+  const {useSelector, useDispatch} = useStoreHooks(testStore)
+  const count = useSelector(state => state.count)
+  const dispatch = useDispatch()
+
+  return (
+    <div>
+      <span data-testid="count">{count}</span>
+      <button onClick={() => dispatch({count: count + 1})}>Increment</button>
+    </div>
+  )
+}
+
+test('component works with isolated store', () => {
+  render(<TestComponent />)
+  expect(screen.getByTestId('count')).toHaveTextContent('5')
+
+  fireEvent.click(screen.getByText('Increment'))
+  expect(screen.getByTestId('count')).toHaveTextContent('6')
+})
+```
+
+### Multiple Stores with Context-Free
+
+You can easily work with multiple stores:
+
+```tsx
+const userStore = createStore({name: '', email: ''})
+const settingsStore = createStore({theme: 'light', language: 'en'})
+
+function MultiStoreComponent() {
+  const {useSelector: useUserSelector} = useStoreHooks(userStore)
+  const {useSelector: useSettingsSelector} = useStoreHooks(settingsStore)
+
+  const userName = useUserSelector(state => state.name)
+  const theme = useSettingsSelector(state => state.theme)
+
+  return <div className={`theme-${theme}`}>Hello, {userName}!</div>
+}
+```
+
+### Context-Free Performance
+
+- **Efficient caching**: Hooks are created once per store and reused across components
+- **Optimal re-renders**: Only components using changed state values re-render
+- **Memory friendly**: WeakMap ensures hooks are garbage collected with stores
+
+## Traditional Context Integration
+
+For larger applications, the traditional context-based approach provides centralized state
+management:
+
+### Understanding the Architecture
 
 Open Store's React integration is built around a few key concepts that work together to provide
 efficient state management:
@@ -73,9 +264,24 @@ their relevant data changes.
 **Immutable Updates**: All state updates preserve immutability while leveraging structural sharing
 for performance. The library uses Immer under the hood for complex updates.
 
-## Installation and Setup
+### Installation and Setup
 
 ```bash
+# Note: This package is still in development thus its not yet available on npm.
+
+# To install first download the source code. Then install yalc:
+npm install -g yalc
+
+# Then publish the package locally
+cd path/to/open-store
+yalc publish
+
+# Now you can add it to your project
+cd path/to/your/project
+yalc add open-store
+
+
+# When available on npm, you can install it directly:
 npm install open-store
 # or
 yarn add open-store
@@ -86,7 +292,7 @@ pnpm add open-store
 Open Store requires React 16.8 or later for hook support. TypeScript is strongly recommended for the
 best development experience, though not required.
 
-## Core Hooks and Their Usage
+## Core Hooks and Usage
 
 ### useSelector - Subscribing to State
 
@@ -351,8 +557,6 @@ Sometimes you need to perform side effects when specific state changes occur:
 
 ```tsx
 function NotificationManager() {
-  const notifications = useSelector(state => state.notifications)
-
   // Subscribe to notification changes and show browser notifications
   useSubscribeTo(
     state => state.notifications.unread.length,
@@ -387,6 +591,18 @@ function UserActivityTracker() {
   // Track when user completes their profile
   useSubscribeToPath(
     'user.profile.completeness',
+    (completeness: number, previousCompleteness: number) => {
+      if (completeness === 100 && previousCompleteness < 100) {
+        // Profile just became complete
+        analytics.track('profile_completed')
+        showCelebrationAnimation()
+      }
+    }
+  )
+
+  // Path arrays are also supported
+  useSubscribeToPath(
+    ['user', 'profile', 'completeness'], // Same result as above
     (completeness: number, previousCompleteness: number) => {
       if (completeness === 100 && previousCompleteness < 100) {
         // Profile just became complete
@@ -484,7 +700,6 @@ function DataLoader() {
         // Update state with results
         dispatch({
           apiData: userData,
-          loading: false,
           lastFetch: Date.now(),
         })
       })
@@ -609,7 +824,7 @@ const appStore = createStore({
   cache: new Map(),
 })
 
-// Create separate contexts
+// Option 1: Create separate contexts (traditional approach)
 const UserContext = createStoreContext(userStore)
 const AppContext = createStoreContext(appStore)
 
@@ -623,11 +838,11 @@ function App() {
   )
 }
 
+// Option 2: Use context-free hooks (simpler approach)
 function UserProfile() {
-  // Use user store
-  const {useSelector: useUserSelector, useDispatch: useUserDispatch} = UserContext
-  const profile = useUserSelector(state => state.profile)
-  const dispatch = useUserDispatch()
+  const {useSelector, useDispatch} = useStoreHooks(userStore)
+  const profile = useSelector(state => state.profile)
+  const dispatch = useDispatch()
 
   return (
     <div>
@@ -657,8 +872,6 @@ function useUser() {
         const response = await authService.login(credentials)
         transaction(draft => {
           draft.user.profile = response.user
-          draft.user.token = response.token
-          draft.user.isLoggedIn = true
           draft.user.lastLogin = Date.now()
         })
         return response
@@ -703,73 +916,8 @@ function useUser() {
   }
 }
 
-// Custom hook for todo operations
-function useTodos() {
-  const todos = useSelector(state => state.todos)
-  const transaction = useTransaction()
-
-  const addTodo = useCallback(
-    (text: string) => {
-      transaction(draft => {
-        draft.todos.push({
-          id: Date.now(),
-          text,
-          completed: false,
-          createdAt: new Date(),
-        })
-        draft.stats.totalTodos += 1
-      })
-    },
-    [transaction]
-  )
-
-  const toggleTodo = useCallback(
-    (id: number) => {
-      transaction(draft => {
-        const todo = draft.todos.find(t => t.id === id)
-        if (todo) {
-          todo.completed = !todo.completed
-          if (todo.completed) {
-            draft.stats.completedTodos += 1
-          } else {
-            draft.stats.completedTodos -= 1
-          }
-        }
-      })
-    },
-    [transaction]
-  )
-
-  const deleteTodo = useCallback(
-    (id: number) => {
-      transaction(draft => {
-        const index = draft.todos.findIndex(t => t.id === id)
-        if (index !== -1) {
-          const todo = draft.todos[index]
-          draft.todos.splice(index, 1)
-          draft.stats.totalTodos -= 1
-          if (todo.completed) {
-            draft.stats.completedTodos -= 1
-          }
-        }
-      })
-    },
-    [transaction]
-  )
-
-  return {
-    todos,
-    addTodo,
-    toggleTodo,
-    deleteTodo,
-    activeTodos: todos.filter(t => !t.completed),
-    completedTodos: todos.filter(t => t.completed),
-  }
-}
-
 // Using custom hooks in components
 function TodoApp() {
-  const {todos, addTodo, toggleTodo, deleteTodo, activeTodos} = useTodos()
   const {user, isLoggedIn} = useUser()
 
   if (!isLoggedIn) {
@@ -779,9 +927,7 @@ function TodoApp() {
   return (
     <div>
       <h1>Welcome, {user.profile.name}!</h1>
-      <p>You have {activeTodos.length} active todos</p>
-      <TodoList todos={todos} onToggle={toggleTodo} onDelete={deleteTodo} />
-      <AddTodoForm onAdd={addTodo} />
+      <TodoList />
     </div>
   )
 }
@@ -903,8 +1049,10 @@ const store = createStore<AppState>({
   ui: {sidebarOpen: false, currentView: 'list', loading: false, error: null},
 })
 
-// All hooks are fully typed
+// All hooks are fully typed for both approaches
 const {useSelector, useDispatch, useStoreValue, useTransaction} = createStoreContext(store)
+// OR
+const {useSelector, useDispatch, useStoreValue, useTransaction} = useStoreHooks(store)
 
 // TypeScript provides full intellisense and type checking
 function TypedComponent() {
@@ -912,21 +1060,6 @@ function TypedComponent() {
   const userName = useSelector(state => state.user.profile.name) // string
   const todoCount = useSelector(state => state.todos.length) // number
   const theme = useSelector(state => state.user.preferences.theme) // 'light' | 'dark'
-
-  // Dispatch is typed - only valid state shapes are allowed
-  const dispatch = useDispatch()
-
-  const updateTheme = (newTheme: 'light' | 'dark') => {
-    dispatch({
-      user: {
-        ...store.getState().user,
-        preferences: {
-          ...store.getState().user.preferences,
-          theme: newTheme, // TypeScript ensures this is correct type
-        },
-      },
-    })
-  }
 
   // Path-based access with type annotations
   const currentView = useStoreValue<'list' | 'grid' | 'calendar'>('ui.currentView')
@@ -942,7 +1075,7 @@ function TypedComponent() {
         id: Date.now(),
         text,
         completed: false,
-        priority, // TypeScript ensures this matches the union type
+        priority,
         tags: [],
       })
 
@@ -956,41 +1089,16 @@ function TypedComponent() {
     <div className={`app theme-${theme}`}>
       <h1>Hello, {userName}!</h1>
       <p>You have {todoCount} todos</p>
-      <button onClick={() => updateTheme(theme === 'light' ? 'dark' : 'light')}>
-        Toggle Theme
-      </button>
     </div>
   )
-}
-
-// Custom hooks with TypeScript
-function useTypedUser() {
-  const user = useSelector(state => state.user)
-  const dispatch = useDispatch()
-
-  const updateProfile = useCallback(
-    (updates: Partial<AppState['user']['profile']>) => {
-      dispatch({
-        user: {
-          ...user,
-          profile: {...user.profile, ...updates},
-        },
-      })
-    },
-    [user, dispatch]
-  )
-
-  return {
-    user,
-    isLoggedIn: user.authentication.isLoggedIn,
-    updateProfile,
-  }
 }
 ```
 
 ## Testing Patterns
 
-Open Store integrates well with React testing patterns:
+Open Store integrates well with React testing patterns for both approaches:
+
+### Testing Context-Based Components
 
 ```tsx
 import {render, screen, fireEvent, waitFor} from '@testing-library/react'
@@ -1030,23 +1138,41 @@ describe('Counter Component', () => {
     fireEvent.click(screen.getByText('Increment'))
     expect(screen.getByText('Count: 1')).toBeInTheDocument()
   })
+})
+```
 
-  test('updates multiple times', () => {
-    renderWithStore(<Counter />, {count: 0})
+### Testing Context-Free Components
 
-    const button = screen.getByText('Increment')
-    fireEvent.click(button)
-    fireEvent.click(button)
-    fireEvent.click(button)
+```tsx
+import {render, screen, fireEvent} from '@testing-library/react'
+import {createStore} from 'open-store'
+import {useStoreHooks} from 'open-store/react'
 
-    expect(screen.getByText('Count: 3')).toBeInTheDocument()
-  })
+function TestComponent() {
+  const testStore = createStore({count: 5})
+  const {useSelector, useDispatch} = useStoreHooks(testStore)
+  const count = useSelector(state => state.count)
+  const dispatch = useDispatch()
+
+  return (
+    <div>
+      <span data-testid="count">{count}</span>
+      <button onClick={() => dispatch({count: count + 1})}>Increment</button>
+    </div>
+  )
+}
+
+test('context-free component works with isolated store', () => {
+  render(<TestComponent />)
+  expect(screen.getByTestId('count')).toHaveTextContent('5')
+
+  fireEvent.click(screen.getByText('Increment'))
+  expect(screen.getByTestId('count')).toHaveTextContent('6')
 })
 
 // Test async operations
 describe('Async Data Loading', () => {
   test('handles loading states', async () => {
-    // Mock fetch
     global.fetch = jest.fn(() =>
       Promise.resolve({
         ok: true,
@@ -1054,72 +1180,40 @@ describe('Async Data Loading', () => {
       })
     ) as jest.Mock
 
-    renderWithStore(<UserLoader />)
+    render(<UserLoader />)
 
     fireEvent.click(screen.getByText('Load User'))
 
-    // Check loading state
     expect(screen.getByText('Loading...')).toBeInTheDocument()
 
-    // Wait for data to load
     await waitFor(() => {
       expect(screen.getByText('John')).toBeInTheDocument()
     })
 
     expect(screen.queryByText('Loading...')).not.toBeInTheDocument()
   })
-
-  test('handles error states', async () => {
-    // Mock fetch to fail
-    global.fetch = jest.fn(() => Promise.reject(new Error('Network error'))) as jest.Mock
-
-    renderWithStore(<UserLoader />)
-
-    fireEvent.click(screen.getByText('Load User'))
-
-    await waitFor(() => {
-      expect(screen.getByText(/Error: Network error/)).toBeInTheDocument()
-    })
-  })
-})
-
-// Test store directly
-describe('Store Operations', () => {
-  test('store updates correctly', () => {
-    const store = createTestStore()
-
-    // Test initial state
-    expect(store.getState().count).toBe(0)
-
-    // Test dispatch
-    store.dispatch({count: 5})
-    expect(store.getState().count).toBe(5)
-
-    // Test transactions
-    store.transaction(draft => {
-      draft.count += 10
-      draft.user.name = 'Test User'
-    })
-
-    expect(store.getState().count).toBe(15)
-    expect(store.getState().user.name).toBe('Test User')
-  })
-
-  test('subscriptions work correctly', () => {
-    const store = createTestStore()
-    const listener = jest.fn()
-
-    const unsubscribe = store.subscribe(listener)
-
-    store.dispatch({count: 1})
-    expect(listener).toHaveBeenCalledTimes(1)
-
-    store.dispatch({count: 2})
-    expect(listener).toHaveBeenCalledTimes(2)
-
-    unsubscribe()
-    store.dispatch({count: 3})
-    expect(listener).toHaveBeenCalledTimes(2) // Not called after unsubscribe
-  })
 })
 ```
+
+## When to Use Each Approach
+
+### Use Context-Free (`useStoreHooks`) When
+
+- Building simple components or demos
+- Writing tests with isolated store instances
+- Migrating from other state libraries gradually
+- Creating library components that shouldn't depend on providers
+- Working with multiple independent stores
+- Prototyping or building small applications
+
+### Use Context-Based (`createStoreContext`) When
+
+- Building larger applications with many components
+- You want centralized provider setup
+- Components are deeply nested and need store access
+- You prefer the explicit provider pattern
+- You need centralized error boundaries or middleware setup
+- Working with a single primary application store
+
+Both approaches provide the exact same functionality and performance characteristics - choose what
+works best for your use case! You can even mix both approaches in the same application as needed.

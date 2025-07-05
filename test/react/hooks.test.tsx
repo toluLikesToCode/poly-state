@@ -1,9 +1,23 @@
 import React from 'react'
-import {describe, it, expect, beforeEach} from 'vitest'
+import {describe, it, expect, beforeEach, vi} from 'vitest'
 import {render, screen, fireEvent} from '@testing-library/react'
 import {act} from 'react'
 import {createStore, Selector, Thunk} from '../../src/core'
-import {createStoreContext} from '../../src/react/index'
+import {
+  createStoreContext,
+  UseAsyncThunkHook,
+  UseBatchHook,
+  UseDispatchHook,
+  UseSelectorHook,
+  UseStoreHistoryHook,
+  UseStoreHook,
+  UseStoreStateHook,
+  UseStoreValueHook,
+  UseSubscribeToPathHook,
+  UseThunkHook,
+  UseTransactionHook,
+  UseUpdatePathHook,
+} from '../../src/react/index'
 
 describe('React Integration', () => {
   let store: ReturnType<typeof createStore<{count: number}>>
@@ -25,7 +39,7 @@ describe('React Integration', () => {
   it('should create StoreProvider component', () => {
     const {StoreProvider} = createStoreContext(store)
     expect(typeof StoreProvider).toBe('function')
-    expect(StoreProvider.displayName).toBeUndefined() // React function components don't have displayName by default
+    expect(StoreProvider.displayName).toBe('StoreProvider')
   })
 
   it('should create useStore hook', () => {
@@ -106,9 +120,11 @@ describe('React Integration – Complete Basic Usage', () => {
 
   let store: ReturnType<typeof createStore<AppState>>
   let StoreProvider: React.FC<{children: React.ReactNode}>
-  let useStore: () => ReturnType<(typeof store)['asReadOnly']>
-  let useDispatch: () => (typeof store)['dispatch']
-  let useSelector: <R>(selector: (state: AppState) => R) => R
+  let useStore: UseStoreHook<AppState>
+  let useDispatch: UseDispatchHook<AppState>
+  let useSelector: UseSelectorHook<AppState>
+
+  let selectorSpy = vi.fn()
 
   beforeEach(() => {
     store = createStore<AppState>({
@@ -155,7 +171,16 @@ describe('React Integration – Complete Basic Usage', () => {
 
   // Component that demonstrates user management
   function UserProfile() {
-    const user = useSelector(state => state.user)
+    const user = useSelector(
+      (state: AppState) => state.user,
+      user => {
+        selectorSpy()
+        return {
+          ...user,
+          hasEmail: user.email.length > 0,
+        }
+      }
+    )
     const dispatch = useDispatch()
 
     const updateUser = () => {
@@ -513,6 +538,59 @@ describe('React Integration – Complete Basic Usage', () => {
     render(<TestComponent />)
     expect(screen.getByTestId('error')).toBeDefined()
   })
+
+  it('should handle multiple selectors with projector function', () => {
+    function TestComponent() {
+      // Test multiple selectors with projector
+      const userSummary = useSelector(
+        state => state.user.name,
+        state => state.user.email,
+        state => state.counter,
+        (name, email, counter) => {
+          return {
+            displayName: name || 'Anonymous',
+            hasContact: email.length > 0,
+            activityScore: counter,
+            summary: `${name || 'Anonymous'} (${counter} actions)`,
+          }
+        }
+      )
+
+      return (
+        <div>
+          <div data-testid="display-name">{userSummary.displayName}</div>
+          <div data-testid="has-contact">{userSummary.hasContact.toString()}</div>
+          <div data-testid="activity-score">{userSummary.activityScore}</div>
+          <div data-testid="summary">{userSummary.summary}</div>
+        </div>
+      )
+    }
+
+    render(
+      <StoreProvider>
+        <TestComponent />
+      </StoreProvider>
+    )
+
+    // Initial state
+    expect(screen.getByTestId('display-name').textContent).toBe('Anonymous')
+    expect(screen.getByTestId('has-contact').textContent).toBe('false')
+    expect(screen.getByTestId('activity-score').textContent).toBe('0')
+    expect(screen.getByTestId('summary').textContent).toBe('Anonymous (0 actions)')
+
+    // Update user and counter
+    act(() => {
+      store.dispatch({
+        user: {id: 1, name: 'John Doe', email: 'john@example.com'},
+        counter: 5,
+      })
+    })
+
+    expect(screen.getByTestId('display-name').textContent).toBe('John Doe')
+    expect(screen.getByTestId('has-contact').textContent).toBe('true')
+    expect(screen.getByTestId('activity-score').textContent).toBe('5')
+    expect(screen.getByTestId('summary').textContent).toBe('John Doe (5 actions)')
+  })
 })
 
 describe('React Integration – Advanced Features', () => {
@@ -531,22 +609,15 @@ describe('React Integration – Advanced Features', () => {
 
   let store: ReturnType<typeof createStore<TestState>>
   let StoreProvider: React.FC<{children: React.ReactNode}>
-  let useStoreState: () => TestState
-  let useTransaction: () => (recipe: (draft: any) => void) => boolean
-  let useBatch: () => (fn: () => void) => void
-  let useUpdatePath: () => <V = any>(
-    path: (string | number)[],
-    updater: (currentValue: V) => V
-  ) => void
-  let useStoreValue: <T = any>(path: string) => T
-  let useSubscribeToPath: <T = any>(path: string, listener: any, options?: any) => void
-  let useThunk: () => <R>(thunk: Thunk<TestState, R>) => R extends Promise<any> ? Promise<R> : R
-  let useAsyncThunk: () => {
-    execute: <R>(thunk: Thunk<TestState, Promise<R>>) => Promise<R>
-    loading: boolean
-    error: Error | null
-  }
-  let useSelector: <R>(selector: Selector<TestState, R>) => R
+  let useStoreState: UseStoreStateHook<TestState>
+  let useTransaction: UseTransactionHook<TestState>
+  let useBatch: UseBatchHook
+  let useUpdatePath: UseUpdatePathHook
+  let useStoreValue: UseStoreValueHook
+  let useSubscribeToPath: UseSubscribeToPathHook
+  let useThunk: UseThunkHook<TestState>
+  let useAsyncThunk: UseAsyncThunkHook<TestState>
+  let useSelector: UseSelectorHook<TestState>
 
   beforeEach(() => {
     store = createStore<TestState>({

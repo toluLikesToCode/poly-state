@@ -352,7 +352,7 @@ export function createStore<S extends object>(
   }
 
   storeInstance.subscribeToPath = <T = any>(
-    path: string,
+    path: string | (string | number)[],
     listener: DependencyListener<T>,
     options?: DependencySubscriptionOptions
   ): (() => void) => {
