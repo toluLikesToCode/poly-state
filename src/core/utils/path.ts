@@ -42,7 +42,23 @@ export function getPath<T, V = any>(obj: T, path: (string | number)[]): V | unde
 
 export function setPath<T extends object, V = any>(obj: T, path: (string | number)[], value: V): T {
   if (path.length === 0) {
-    return value as any // Should not happen if used correctly, or T is V
+    return value as any
+  }
+
+  // Handle Map objects at root level
+  if (obj instanceof Map) {
+    const newMap = new Map(obj)
+    if (path.length === 1) {
+      newMap.set(path[0], value)
+      return newMap as T
+    }
+    // For nested paths in Maps, get the nested object and continue
+    const key = path[0]
+    const nestedObj = newMap.get(key)
+    if (nestedObj && typeof nestedObj === 'object') {
+      newMap.set(key, setPath(nestedObj, path.slice(1), value))
+    }
+    return newMap as T
   }
 
   const newObj = Array.isArray(obj) ? [...obj] : {...obj}
@@ -51,12 +67,32 @@ export function setPath<T extends object, V = any>(obj: T, path: (string | numbe
   for (let i = 0; i < path.length - 1; i++) {
     const key = path[i]
     const nextKeyIsNumber = typeof path[i + 1] === 'number'
-    if (current[key] === null || typeof current[key] !== 'object') {
-      current[key] = nextKeyIsNumber ? [] : {}
+
+    // Handle Map objects in the path
+    if (current instanceof Map) {
+      if (!current.has(key)) {
+        const newNestedMap = new Map(current)
+        newNestedMap.set(key, nextKeyIsNumber ? [] : {})
+        current = newNestedMap.get(key)
+      } else {
+        const existing = current.get(key)
+        if (existing === null || typeof existing !== 'object') {
+          const newNestedMap = new Map(current)
+          newNestedMap.set(key, nextKeyIsNumber ? [] : {})
+          current = newNestedMap.get(key)
+        } else {
+          current = Array.isArray(existing) ? [...existing] : {...existing}
+        }
+      }
     } else {
-      current[key] = Array.isArray(current[key]) ? [...current[key]] : {...current[key]}
+      // Existing logic for regular objects/arrays
+      if (current[key] === null || typeof current[key] !== 'object') {
+        current[key] = nextKeyIsNumber ? [] : {}
+      } else {
+        current[key] = Array.isArray(current[key]) ? [...current[key]] : {...current[key]}
+      }
+      current = current[key]
     }
-    current = current[key]
   }
 
   current[path[path.length - 1]] = value

@@ -50,7 +50,7 @@ export class SelectorManager<S extends object> implements ISelectorManager<S> {
   }
 
   private cleanupSelector(selector: MemoizedSelector<any>) {
-    if (selector._cleanup) {
+    if (selector?._cleanup) {
       selector._cleanup()
     }
     selector._isActive = false
@@ -235,7 +235,7 @@ export class SelectorManager<S extends object> implements ISelectorManager<S> {
     const CACHE_TTL = 5 * 60 * 1000 // 5 minutes
 
     // Use extracted utility for parameter serialization
-    const {serializeParams} = utils
+    const {generateCacheKey} = utils
 
     // Use extracted utility for TTL cache cleanup
     const ensureCleanupRunning = () => {
@@ -245,14 +245,14 @@ export class SelectorManager<S extends object> implements ISelectorManager<S> {
           CLEANUP_INTERVAL, // how often to check
           CACHE_TTL, // how long entries live
           (key, entry) => {
-            if (entry.selector._cleanup) entry.selector._cleanup()
+            if (entry.selector?._cleanup) entry.selector._cleanup()
           }
         )
       }
     }
 
     return (params: Props) => {
-      const paramsKey = serializeParams(params)
+      const paramsKey = generateCacheKey(params)
       const now = Date.now()
 
       // Check if we already have a selector for these parameters
@@ -264,7 +264,7 @@ export class SelectorManager<S extends object> implements ISelectorManager<S> {
         const memoizedSelector = this.createMultiSelectorWithCombiner(inputSelectors, combinerFn)
 
         // Store the original cleanup function
-        const originalCleanup = memoizedSelector._cleanup
+        const originalCleanup = memoizedSelector?._cleanup
 
         // Enhanced cleanup that also removes from parameter cache
         memoizedSelector._cleanup = () => {
@@ -470,7 +470,7 @@ export class SelectorManager<S extends object> implements ISelectorManager<S> {
       }
 
       // Clean up the memoized selector
-      if (subscription.selector._cleanup) {
+      if (subscription.selector?._cleanup) {
         subscription.selector._cleanup()
       }
 
@@ -623,7 +623,7 @@ export class SelectorManager<S extends object> implements ISelectorManager<S> {
 
       // Clean up memoized selectors
       memoizedSelectors.forEach(sel => {
-        if (sel._cleanup) {
+        if (sel?._cleanup) {
           sel._cleanup()
         }
       })
@@ -663,7 +663,16 @@ export class SelectorManager<S extends object> implements ISelectorManager<S> {
       return result as T // Type assertion since we expect the path to exist
     }
 
-    return this.createDependencySubscription(pathSelector, listener, options)
+    const modifiedOptions: DependencySubscriptionOptions = {
+      ...options,
+      equalityFn:
+        options.equalityFn ||
+        (<U>(prev: U, next: U) => {
+          return utils.smartEqual(prev, next)
+        }),
+    }
+
+    return this.createDependencySubscription(pathSelector, listener, modifiedOptions)
   }
 
   cleanupSelectors(): number {
@@ -710,7 +719,9 @@ export class SelectorManager<S extends object> implements ISelectorManager<S> {
   }
 
   cleanupDependencySubscriptions(): number {
-    const inactiveSubscriptions = Array.from(this.dependencySubscriptions).filter(sub => !sub.isActive)
+    const inactiveSubscriptions = Array.from(this.dependencySubscriptions).filter(
+      sub => !sub.isActive
+    )
 
     // Remove inactive subscriptions from the Set
     inactiveSubscriptions.forEach(sub => {

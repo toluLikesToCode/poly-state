@@ -66,6 +66,5 @@ declare global {
     key: ReturnType<typeof vi.fn>
   }
 }
-
 globalThis.localStorageMock = localStorageMock
 globalThis.sessionStorageMock = sessionStorageMock

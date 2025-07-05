@@ -1,7 +1,8 @@
 import React from 'react'
 import {describe, it, expect, beforeEach} from 'vitest'
-import {render, screen, fireEvent, act} from '@testing-library/react'
-import {createStore} from '../../src/core'
+import {render, screen, fireEvent} from '@testing-library/react'
+import {act} from 'react'
+import {createStore, Selector, Thunk} from '../../src/core'
 import {createStoreContext} from '../../src/react/index'
 
 describe('React Integration', () => {
@@ -354,13 +355,17 @@ describe('React Integration – Complete Basic Usage', () => {
     expect(userEmail.textContent).toBe('No Email')
 
     // Update user
-    fireEvent.click(updateBtn)
+    act(() => {
+      fireEvent.click(updateBtn)
+    })
     expect(userId.textContent).toBe('1')
     expect(userName.textContent).toBe('John Doe')
     expect(userEmail.textContent).toBe('john@example.com')
 
     // Clear user
-    fireEvent.click(clearBtn)
+    act(() => {
+      fireEvent.click(clearBtn)
+    })
     expect(userId.textContent).toBe('No ID')
     expect(userName.textContent).toBe('No Name')
     expect(userEmail.textContent).toBe('No Email')
@@ -376,7 +381,9 @@ describe('React Integration – Complete Basic Usage', () => {
     expect(todoCount.textContent).toBe('0')
 
     // Add first todo
-    fireEvent.click(addBtn)
+    act(() => {
+      fireEvent.click(addBtn)
+    })
     expect(todoCount.textContent).toBe('1')
 
     // Get all todo elements (we can't predict the exact IDs since they use Date.now())
@@ -385,7 +392,9 @@ describe('React Integration – Complete Basic Usage', () => {
     expect(todoElements[0].textContent).toBe('Todo 1')
 
     // Add second todo
-    fireEvent.click(addBtn)
+    act(() => {
+      fireEvent.click(addBtn)
+    })
     expect(todoCount.textContent).toBe('2')
 
     // Should now have 2 todos
@@ -525,15 +534,19 @@ describe('React Integration – Advanced Features', () => {
   let useStoreState: () => TestState
   let useTransaction: () => (recipe: (draft: any) => void) => boolean
   let useBatch: () => (fn: () => void) => void
-  let useUpdatePath: () => <V = any>(path: (string | number)[], updater: (currentValue: V) => V) => void
+  let useUpdatePath: () => <V = any>(
+    path: (string | number)[],
+    updater: (currentValue: V) => V
+  ) => void
   let useStoreValue: <T = any>(path: string) => T
   let useSubscribeToPath: <T = any>(path: string, listener: any, options?: any) => void
-  let useThunk: () => <R>(thunk: (dispatch: any, getState: () => TestState) => R) => R
+  let useThunk: () => <R>(thunk: Thunk<TestState, R>) => R extends Promise<any> ? Promise<R> : R
   let useAsyncThunk: () => {
-    execute: <R>(thunk: (dispatch: any, getState: () => TestState) => Promise<R>) => Promise<R>
+    execute: <R>(thunk: Thunk<TestState, Promise<R>>) => Promise<R>
     loading: boolean
     error: Error | null
   }
+  let useSelector: <R>(selector: Selector<TestState, R>) => R
 
   beforeEach(() => {
     store = createStore<TestState>({
@@ -555,6 +568,7 @@ describe('React Integration – Advanced Features', () => {
     useSubscribeToPath = context.useSubscribeToPath
     useThunk = context.useThunk as any
     useAsyncThunk = context.useAsyncThunk
+    useSelector = context.useSelector
   })
 
   it('should provide access to full store state with useStoreState', () => {
@@ -713,15 +727,30 @@ describe('React Integration – Advanced Features', () => {
   it('should support thunks with useThunk', () => {
     function TestComponent() {
       const state = useStoreState()
+      const count = useSelector(state => state.count)
       const executeThunk = useThunk()
 
       const performThunk = () => {
-        const result = executeThunk((dispatch, getState) => {
+        executeThunk(({dispatch, getState}) => {
           const currentState = getState()
           dispatch({count: currentState.count + 10})
-          return currentState.count + 10
         })
-        return result
+      }
+
+      const increment = () => {
+        executeThunk(({transaction}) => {
+          transaction(draft => {
+            draft.count += 1
+          })
+        })
+      }
+
+      const decrement = () => {
+        executeThunk(({transaction}) => {
+          transaction(draft => {
+            draft.count -= 1
+          })
+        })
       }
 
       return (
@@ -729,6 +758,12 @@ describe('React Integration – Advanced Features', () => {
           <div data-testid="count">{state.count}</div>
           <button data-testid="thunk-btn" onClick={performThunk}>
             Execute Thunk
+          </button>
+          <button data-testid="inc-thunk" onClick={increment}>
+            Incriment Thunk
+          </button>
+          <button data-testid="dec-thunk" onClick={decrement}>
+            Decriment Thunk
           </button>
         </div>
       )
@@ -745,6 +780,26 @@ describe('React Integration – Advanced Features', () => {
     fireEvent.click(screen.getByTestId('thunk-btn'))
 
     expect(screen.getByTestId('count').textContent).toBe('10')
+
+    fireEvent.click(screen.getByTestId('inc-thunk'))
+
+    expect(screen.getByTestId('count').textContent).toBe('11')
+
+    fireEvent.click(screen.getByTestId('inc-thunk'))
+
+    expect(screen.getByTestId('count').textContent).toBe('12')
+
+    fireEvent.click(screen.getByTestId('inc-thunk'))
+
+    expect(screen.getByTestId('count').textContent).toBe('13')
+
+    fireEvent.click(screen.getByTestId('dec-thunk'))
+
+    expect(screen.getByTestId('count').textContent).toBe('12')
+
+    fireEvent.click(screen.getByTestId('dec-thunk'))
+
+    expect(screen.getByTestId('count').textContent).toBe('11')
   })
 
   it('should support async thunks with useAsyncThunk', async () => {
@@ -754,7 +809,7 @@ describe('React Integration – Advanced Features', () => {
 
       const performAsyncThunk = async () => {
         try {
-          await execute(async (dispatch, getState) => {
+          await execute(async ({dispatch}) => {
             // Simulate async operation
             await new Promise(resolve => setTimeout(resolve, 10))
             dispatch({count: 42})
@@ -786,10 +841,11 @@ describe('React Integration – Advanced Features', () => {
     expect(screen.getByTestId('count').textContent).toBe('0')
     expect(screen.getByTestId('loading').textContent).toBe('false')
 
-    fireEvent.click(screen.getByTestId('async-thunk-btn'))
-
-    // Wait for async operation to complete
-    await new Promise(resolve => setTimeout(resolve, 20))
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('async-thunk-btn'))
+      // Wait for async operation to complete
+      await new Promise(resolve => setTimeout(resolve, 20))
+    })
 
     expect(screen.getByTestId('count').textContent).toBe('42')
     expect(screen.getByTestId('loading').textContent).toBe('false')

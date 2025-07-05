@@ -1,6 +1,140 @@
 import {ValidationError} from '../../shared/errors'
 import * as storage from '../storage/index'
 import {Middleware, PersistedState, ValidationErrorHandler, ValidatorFn} from './types'
+import {TypeRegistry} from './typeRegistry'
+
+import {produce, Draft} from 'immer'
+import {deepClone} from '../utils'
+
+/**
+ * Deeply merges newState into state using Immer, handling arrays, objects, Maps, Sets, Dates, and custom classes.
+ * Arrays are replaced, not merged. Maps/Sets are replaced by default, but can be extended for custom merge logic.
+ * Custom classes are replaced unless a type handler is registered.
+ * @param state - The current state
+ * @param newState - The new state to merge
+ * @param typeRegistry - Optional TypeRegistry for custom class/complex type handling, defaults to a new instance
+ * @returns The next state
+ * @example
+ * assignState({a: {b: 1}}, {a: {c: 2}}) // {a: {b: 1, c: 2}}
+ *
+ * @todo Support for circular references in state is not currently implemented due to Immer limitations.
+ *       See test for circular references for more details and future implementation notes.
+ */
+export function assignState<S extends object>(
+  state: S,
+  newState: Partial<S>,
+  typeRegistry: {findTypeFor: (value: any) => any} = new TypeRegistry()
+): S {
+  /**
+   * Checks for circular references in an object.
+   * @param obj - The object to check
+   * @returns true if a circular reference is found, false otherwise
+   */
+  function hasCircularReference(obj: any, seen = new WeakSet()): boolean {
+    if (obj && typeof obj === 'object') {
+      if (seen.has(obj)) return true
+      seen.add(obj)
+      for (const key in obj) {
+        if (Object.prototype.hasOwnProperty.call(obj, key)) {
+          if (hasCircularReference(obj[key], seen)) return true
+        }
+      }
+      seen.delete(obj)
+    }
+    return false
+  }
+
+  if (hasCircularReference(newState)) {
+    throw new ValidationError(
+      'Circular references in state are not supported by Immer or Open Store.'
+    )
+  }
+  return produce(state, (draft: Draft<S>) => {
+    deepMerge(draft, newState, typeRegistry)
+  })
+}
+
+/**
+ * Recursively merges source into target, handling arrays, Maps, Sets, Dates, and custom classes.
+ * Arrays are replaced, Maps/Sets are shallow copied, Dates are cloned, and custom classes are replaced
+ * unless a typeRegistry is provided to handle serialization/deserialization.
+ * @param target - The target object to merge into
+ * @param source - The source object to merge from
+ * @param typeRegistry - Optional TypeRegistry for custom class handling
+ */
+function deepMerge(target: any, source: any, typeRegistry?: {findTypeFor: (value: any) => any}) {
+  for (const key of Object.keys(source)) {
+    const srcVal = source[key]
+    const tgtVal = target[key]
+
+    // Handle null/undefined
+    if (srcVal === null || srcVal === undefined) {
+      target[key] = srcVal
+      continue
+    }
+
+    // Handle arrays (replace, not merge)
+    if (Array.isArray(srcVal)) {
+      target[key] = srcVal.slice()
+      continue
+    }
+
+    // Handle Map
+    if (srcVal instanceof Map) {
+      target[key] = new Map(srcVal)
+      continue
+    }
+
+    // Handle Set
+    if (srcVal instanceof Set) {
+      target[key] = new Set(srcVal)
+      continue
+    }
+
+    // Handle Date
+    if (srcVal instanceof Date) {
+      target[key] = new Date(srcVal.getTime())
+      continue
+    }
+
+    // Handle custom class or registered type
+    if (typeof srcVal === 'object' && srcVal.constructor && srcVal.constructor !== Object) {
+      // If a typeRegistry is provided, try to use it
+      if (typeRegistry) {
+        const typeDef = typeRegistry.findTypeFor(srcVal)
+        if (typeDef) {
+          // Use serialize/deserialize to ensure correct type
+          target[key] = typeDef.deserialize(typeDef.serialize(srcVal))
+          continue
+        }
+      }
+      // Otherwise, just replace the value (shallow copy)
+      target[key] = srcVal
+      continue
+    }
+
+    // Handle plain object
+    if (typeof srcVal === 'object' && srcVal !== null && srcVal.constructor === Object) {
+      // If the new object is empty, replace the old object
+      if (Object.keys(srcVal).length === 0) {
+        target[key] = {}
+        continue
+      }
+      // If the target is not an object, replace it
+      if (!tgtVal || typeof tgtVal !== 'object' || tgtVal.constructor !== Object) {
+        target[key] = {...srcVal}
+        continue
+      }
+      // Otherwise, merge recursively
+      deepMerge(target[key], srcVal)
+      continue
+    }
+
+    // Primitive or fallback
+    target[key] = srcVal
+  }
+}
+
 /**
  * Clean up stale persisted states across all storage types
  */
@@ -89,22 +223,39 @@ export function cleanupStaleStates(
 
 /**
  * Recursively checks that the structure and types of `obj` and `template` match exactly.
- * All keys must exist in both, and types must match.
+ * For Map/Set, only checks that both are the same type (not contents).
+ * For Array, checks both are arrays and, if both are non-empty, that the element types match.
+ * For plain objects, checks keys and recursively checks structure.
+ * For primitives, checks type equality.
  * @param obj - The object to validate (e.g., loaded state)
  * @param template - The template object (e.g., initial state)
  * @returns True if `obj` matches the structure and types of `template` exactly
  */
 function strictStructureMatch(obj: any, template: any): boolean {
+  if (obj === template) return true
   if (typeof obj !== typeof template) return false
   if (obj === null || template === null) return obj === template
+
+  // Map type check
+  if (obj instanceof Map || template instanceof Map) {
+    return obj instanceof Map && template instanceof Map
+  }
+
+  // Set type check
+  if (obj instanceof Set || template instanceof Set) {
+    return obj instanceof Set && template instanceof Set
+  }
+
+  // Array type and element type check
   if (Array.isArray(obj) || Array.isArray(template)) {
     if (!Array.isArray(obj) || !Array.isArray(template)) return false
-    // make sure both arrays have the same element type in the first position
     if (obj.length > 0 && template.length > 0) {
-      if (typeof obj[0] !== typeof template[0]) return false
+      if (!strictStructureMatch(obj[0], template[0])) return false
     }
     return true
   }
+
+  // Plain object structure check
   if (typeof obj === 'object' && typeof template === 'object') {
     const objKeys = Object.keys(obj)
     const templateKeys = Object.keys(template)
@@ -118,147 +269,447 @@ function strictStructureMatch(obj: any, template: any): boolean {
     }
     return true
   }
-  return true
+
+  // Primitive type check
+  return typeof obj === typeof template
 }
 
 /**
- * Creates a logging middleware that logs state changes and actions for debugging purposes.
- * The middleware logs both before and after the action is applied, providing full visibility
- * into the state transition process.
+ * Supported logger types for the logging middleware.
+ */
+export type SupportedLogger =
+  | ((...args: any[]) => void) // Generic function logger
+  | typeof console // Browser/Node console
+  | {
+      // Consola-like logger
+      log?: Function
+      info?: Function
+      success?: Function
+      warn?: Function
+      error?: Function
+      debug?: Function
+      trace?: Function
+      box?: Function
+    }
+  | {
+      // Custom client logger interface
+      log: (...args: any[]) => void
+      info: (...args: any[]) => void
+      warn: (...args: any[]) => void
+      error: (...args: any[]) => void
+      debug: (...args: any[]) => void
+      trace?: (...args: any[]) => void
+      silly?: (...args: any[]) => void
+      group?: (label?: string) => void
+      groupCollapsed?: (label?: string) => void
+      groupEnd?: () => void
+      table?: (data: any, columns?: string[]) => void
+      getCorrelationId?: () => string
+      setCorrelationId?: (id: string) => void
+      child?: (childContextSuffix: string, childDefaultMeta?: Record<string, any>) => any
+    }
+
+/**
+ * Log levels supported by the logger middleware.
+ */
+export type LoggerLevel =
+  | 'log'
+  | 'info'
+  | 'success'
+  | 'warn'
+  | 'error'
+  | 'debug'
+  | 'trace'
+  | 'silly'
+
+/**
+ * Configuration options for the logger middleware.
+ */
+export interface LoggerMiddlewareOptions<S extends object> {
+  /** Whether logging is enabled. Defaults to true in development, false otherwise. */
+  enabled?: boolean
+  /** The log level to use. Defaults to 'log'. */
+  logLevel?: LoggerLevel
+  /** Paths to exclude from logging. Array of property paths as arrays. */
+  blacklist?: Array<Array<keyof S | number | string>>
+  /** Whether to use console.group for grouping. Defaults to true. */
+  useGrouping?: boolean
+  /** Custom correlation ID for tracking related actions. */
+  correlationId?: string
+  /** Whether to include timestamps in logs. Defaults to true. */
+  includeTimestamp?: boolean
+  /** Custom action name formatter. */
+  actionNameFormatter?: (action: any) => string
+}
+
+/**
+ * Creates a robust logging middleware with support for multiple logger types including
+ * custom client loggers, Consola, console, and generic logging utilities.
  *
- * @param logger - Custom logging function. Defaults to console.log. Can be any function
- *                that accepts multiple arguments for flexible logging strategies.
- * @returns Middleware function that logs state updates
+ * @param logger - A logging function, console, Consola instance, or custom client logger. Defaults to console.
+ * @param options - Optional configuration for logging behavior.
+ * @returns Middleware function for logging state transitions
  *
  * @remarks
- * The logger middleware provides two log entries per action:
- * 1. **Before dispatch**: Shows the action and potential next state
- * 2. **After dispatch**: Shows the actual applied state after all middleware processing
+ * The middleware automatically detects the logger type and adapts its behavior:
+ * - **Custom Client Logger**: Uses all available methods including grouping and correlation IDs
+ * - **Consola**: Uses Consola's methods and box formatting for pretty output
+ * - **Console**: Uses standard console methods with grouping
+ * - **Generic Function**: Calls the function with formatted messages
  *
- * This is particularly useful for:
- * - Debugging state changes during development
- * - Auditing state transitions in production (with appropriate loggers)
- * - Understanding middleware execution flow
- * - Tracking performance issues with state updates
- *
- * @example
- * **Basic usage with console logging:**
- * ```typescript
- * const store = createStore(
- *   { count: 0, user: null },
- *   {
- *     middleware: [createLoggerMiddleware()]
- *   }
- * );
- *
- * store.dispatch({ count: 1 });
- * // Output:
- * // State Update: {
- * //   action: { count: 1 },
- * //   prevState: { count: 0, user: null },
- * //   nextPotentialState: { count: 1, user: null }
- * // }
- * // State Update Applied. New state: { count: 1, user: null }
- * ```
+ * Features:
+ * - Automatic logger type detection and adaptation
+ * - Support for log grouping (console.group/groupCollapsed)
+ * - Blacklisting of sensitive data paths
+ * - Correlation ID support for tracking related actions
+ * - Custom action name formatting
+ * - Error handling that never blocks state updates
+ * - Development/production environment detection
  *
  * @example
- * **Custom logger for structured logging:**
+ * **Basic usage with console:**
  * ```typescript
- * const structuredLogger = (message: string, data: any) => {
- *   console.log(JSON.stringify({
- *     timestamp: new Date().toISOString(),
- *     level: 'INFO',
- *     message,
- *     data
- *   }, null, 2));
- * };
+ * import { createStore } from './core/state/createStore'
+ * import { createLoggerMiddleware } from './core/state/utils'
  *
  * const store = createStore(
- *   { items: [], loading: false },
- *   {
- *     middleware: [createLoggerMiddleware(structuredLogger)]
- *   }
- * );
+ *   { count: 0 },
+ *   { middleware: [createLoggerMiddleware()] }
+ * )
+ *
+ * store.dispatch({ count: 1 })
+ * // Logs grouped state transition in console
  * ```
  *
  * @example
- * **Integration with external logging services:**
+ * **With Consola for pretty output:**
  * ```typescript
- * import { analytics } from './analytics-service';
+ * import consola from 'consola'
+ * import { createLoggerMiddleware } from './core/state/utils'
  *
- * const analyticsLogger = (message: string, data: any) => {
- *   if (message.includes('State Update:')) {
- *     analytics.track('state_change_initiated', {
- *       action: data.action,
- *       timestamp: Date.now()
- *     });
- *   } else if (message.includes('Applied')) {
- *     analytics.track('state_change_completed', {
- *       newState: data,
- *       timestamp: Date.now()
- *     });
- *   }
- * };
+ * const store = createStore(
+ *   { user: null },
+ *   { middleware: [createLoggerMiddleware(consola)] }
+ * )
  *
- * const store = createStore(initialState, {
- *   middleware: [createLoggerMiddleware(analyticsLogger)]
- * });
+ * store.dispatch({ user: { name: 'Ada' } })
+ * // Logs with Consola's formatting and box grouping
  * ```
  *
  * @example
- * **Conditional logging based on environment:**
+ * **With custom client logger:**
+ * ```typescript
+ * import { createClientLogger, createLoggerMiddleware } from './utils'
+ *
+ * const clientLogger = createClientLogger('Store', { module: 'state-management' })
+ * const store = createStore(
+ *   { items: [] },
+ *   {
+ *     middleware: [createLoggerMiddleware(clientLogger, {
+ *       logLevel: 'debug',
+ *       correlationId: 'user-session-123'
+ *     })]
+ *   }
+ * )
+ * ```
+ *
+ * @example
+ * **Advanced configuration with blacklisting:**
+ * ```typescript
+ * const loggerMiddleware = createLoggerMiddleware(console, {
+ *   enabled: true,
+ *   logLevel: 'info',
+ *   blacklist: [
+ *     ['user', 'password'],     // Remove user.password
+ *     ['apiKeys'],              // Remove entire apiKeys object
+ *     ['tokens', 0, 'secret']   // Remove tokens[0].secret
+ *   ],
+ *   useGrouping: true,
+ *   includeTimestamp: true,
+ *   actionNameFormatter: (action) => {
+ *     if (typeof action === 'function') return '[async-thunk]'
+ *     return Object.keys(action).join('+') || '[empty]'
+ *   }
+ * })
+ * ```
+ *
+ * @example
+ * **Custom analytics logger:**
+ * ```typescript
+ * const analyticsLogger = (message: string, ...data: any[]) => {
+ *   myAnalytics.track('state_change', { message, data })
+ * }
+ *
+ * const store = createStore(
+ *   { analytics: {} },
+ *   { middleware: [createLoggerMiddleware(analyticsLogger, { enabled: true })] }
+ * )
+ * ```
+ *
+ * @example
+ * **Environment-aware logging:**
  * ```typescript
  * const conditionalLogger = (...args: any[]) => {
  *   if (process.env.NODE_ENV === 'development') {
- *     console.log(...args);
- *   } else if (process.env.NODE_ENV === 'production') {
- *     // Send to production logging service
- *     productionLogger.info(args);
+ *     console.log(...args)
+ *   } else {
+ *     prodLogger.info(...args)
  *   }
- * };
+ * }
  *
- * const store = createStore(initialState, {
- *   middleware: [createLoggerMiddleware(conditionalLogger)]
- * });
+ * const middleware = createLoggerMiddleware(conditionalLogger, {
+ *   enabled: process.env.NODE_ENV !== 'test'
+ * })
  * ```
- *
- * @example
- * **Filtering sensitive data:**
- * ```typescript
- * const sanitizingLogger = (message: string, data: any) => {
- *   const sanitizedData = JSON.parse(JSON.stringify(data, (key, value) => {
- *     // Filter out sensitive fields
- *     if (['password', 'token', 'secret'].includes(key.toLowerCase())) {
- *       return '[REDACTED]';
- *     }
- *     return value;
- *   }));
- *
- *   console.log(message, sanitizedData);
- * };
- *
- * const store = createStore(
- *   { user: { name: '', password: '' }, session: { token: '' } },
- *   { middleware: [createLoggerMiddleware(sanitizingLogger)] }
- * );
- * ```
- *
- * @see {@link Middleware} for more information about middleware architecture
- * @see {@link createValidatorMiddleware} for validation middleware
  */
 export function createLoggerMiddleware<S extends object>(
-  // TODO: add a logger that can be disabled in production
-  // eslint-disable-next-line no-console
-  logger: (...args: any[]) => void = console.log
+  logger: SupportedLogger = console,
+  options: LoggerMiddlewareOptions<S> = {}
 ): Middleware<S> {
+  const {
+    enabled = typeof process !== 'undefined' &&
+      process.env &&
+      process.env.NODE_ENV === 'development',
+    logLevel = 'log',
+    blacklist = [],
+    useGrouping = true,
+    correlationId,
+    includeTimestamp = true,
+    actionNameFormatter,
+  } = options
+
+  // Detect logger type and capabilities
+  const loggerType = detectLoggerType(logger)
+  const hasGrouping = loggerType.hasGrouping
+  const hasCorrelationId = loggerType.hasCorrelationId
+  const hasBoxFormatting = loggerType.hasBoxFormatting
+
+  // Set correlation ID if provided and supported
+  if (correlationId && hasCorrelationId && typeof (logger as any).setCorrelationId === 'function') {
+    ;(logger as any).setCorrelationId(correlationId)
+  }
+
+  // Helper to infer a human-friendly action name
+  function inferActionName(action: any): string {
+    if (actionNameFormatter) {
+      try {
+        return actionNameFormatter(action)
+      } catch (err) {
+        console.warn('Custom actionNameFormatter threw an error:', err)
+        // Fall through to default logic
+      }
+    }
+
+    if (action == null) return '[null]'
+    if (typeof action === 'function') return '[thunk]'
+    if (typeof action !== 'object') return `[${typeof action}]`
+
+    const keys = Object.keys(action)
+    if (keys.length === 0) return '[empty action]'
+    if (keys.length === 1) return keys[0]
+
+    return keys.join(', ')
+  }
+
+  // Helper to remove blacklisted paths from an object (non-mutating)
+  function removeBlacklistedPaths(obj: any): any {
+    if (!blacklist.length || !obj || typeof obj !== 'object') return obj
+
+    // Deep clone the object/array to avoid mutating frozen objects
+    const clone = deepClone(obj)
+
+    for (const path of blacklist) {
+      if (!Array.isArray(path) || path.length === 0) continue
+
+      let node = clone
+      for (let i = 0; i < path.length - 1; i++) {
+        const key = path[i]
+        if (node && typeof node === 'object' && key in node) {
+          node = node[key]
+        } else {
+          node = null
+          break
+        }
+      }
+
+      if (node && typeof node === 'object') {
+        const lastKey = path[path.length - 1]
+        if (Array.isArray(node)) {
+          if (typeof lastKey === 'number' && lastKey >= 0 && lastKey < node.length) {
+            node.splice(lastKey, 1)
+          }
+        } else if (lastKey in node) {
+          delete (node as Record<string | number, any>)[lastKey as string | number]
+        }
+      }
+    }
+
+    return clone
+  }
+
+  // Helper to create timestamp string
+  function getTimestamp(): string {
+    return includeTimestamp ? new Date().toISOString() : ''
+  }
+
+  // Helper to log with the appropriate method
+  function logWithMethod(method: string, message: string, ...args: any[]): void {
+    if (loggerType.type === 'function') {
+      ;(logger as Function)(message, ...args)
+    } else if (loggerType.type === 'console') {
+      const consoleMethod = (console as any)[method]
+      if (typeof consoleMethod === 'function') {
+        consoleMethod(message, ...args)
+      } else {
+        console.log(message, ...args)
+      }
+    } else if (loggerType.type === 'object') {
+      const loggerObj = logger as any
+      if (typeof loggerObj[method] === 'function') {
+        loggerObj[method](message, ...args)
+      } else if (typeof loggerObj.log === 'function') {
+        loggerObj.log(message, ...args)
+      }
+    }
+  }
+
   return (action, prevState, dispatchNext, getState) => {
-    logger('State Update: ', {
-      action,
-      prevState: {...prevState}, // Log copy
-      nextPotentialState: {...prevState, ...action}, // What it would be if applied directly
-    })
-    dispatchNext(action) // Pass the action to the next middleware or applyState
-    logger('State Update Applied. New state:', {...getState()})
+    if (!enabled) return dispatchNext(action)
+
+    // Remove blacklisted paths from the action for logging only
+    const loggedAction = removeBlacklistedPaths(action)
+
+    // Skip logging if the action is now empty after blacklisting
+    if (
+      !loggedAction ||
+      (typeof loggedAction === 'object' && Object.keys(loggedAction).length === 0)
+    ) {
+      return dispatchNext(action)
+    }
+
+    const timestamp = getTimestamp()
+    const actionName = inferActionName(loggedAction)
+    const groupLabel = `Action: ${actionName}${timestamp ? ` @ ${timestamp}` : ''}`
+
+    try {
+      // Start logging group
+      if (useGrouping && hasGrouping) {
+        if (loggerType.type === 'console') {
+          if (typeof console.groupCollapsed === 'function') {
+            console.groupCollapsed(groupLabel)
+          } else if (typeof console.group === 'function') {
+            console.group(groupLabel)
+          }
+        } else if (loggerType.type === 'object') {
+          const loggerObj = logger as any
+          if (typeof loggerObj.groupCollapsed === 'function') {
+            loggerObj.groupCollapsed(groupLabel)
+          } else if (typeof loggerObj.group === 'function') {
+            loggerObj.group(groupLabel)
+          }
+        }
+      }
+
+      // Special formatting for Consola box if available
+      if (hasBoxFormatting && typeof (logger as any).box === 'function') {
+        ;(logger as any).box(`🔨 ${groupLabel}`)
+      }
+
+      // Log previous state
+      logWithMethod(logLevel, 'Prev state', prevState)
+
+      // Log action
+      logWithMethod(logLevel, 'Action', loggedAction)
+
+      // Execute the action
+      dispatchNext(action)
+
+      // Log next state
+      const nextState = getState()
+      logWithMethod(logLevel, 'Next state', nextState)
+
+      // End logging group
+      if (useGrouping && hasGrouping) {
+        if (loggerType.type === 'console') {
+          if (typeof console.groupEnd === 'function') {
+            console.groupEnd()
+          }
+        } else if (loggerType.type === 'object') {
+          const loggerObj = logger as any
+          if (typeof loggerObj.groupEnd === 'function') {
+            loggerObj.groupEnd()
+          }
+        }
+      }
+    } catch (err) {
+      // Handle logging errors without blocking state updates
+      const errorMessage = 'Logger middleware error'
+
+      if (loggerType.type === 'console') {
+        console.error(errorMessage, err)
+      } else if (loggerType.type === 'object') {
+        const loggerObj = logger as any
+        if (typeof loggerObj.error === 'function') {
+          loggerObj.error(errorMessage, err)
+        } else {
+          console.error(errorMessage, err)
+        }
+      } else {
+        console.error(errorMessage, err)
+      }
+
+      // Ensure the action still gets dispatched
+      dispatchNext(action)
+    }
+  }
+}
+
+/**
+ * Detects the type and capabilities of a logger.
+ */
+function detectLoggerType(logger: SupportedLogger): {
+  type: 'function' | 'console' | 'object'
+  hasGrouping: boolean
+  hasCorrelationId: boolean
+  hasBoxFormatting: boolean
+} {
+  if (typeof logger === 'function') {
+    return {
+      type: 'function',
+      hasGrouping: false,
+      hasCorrelationId: false,
+      hasBoxFormatting: false,
+    }
+  }
+
+  if (logger === console || (logger as any) === console) {
+    return {
+      type: 'console',
+      hasGrouping: typeof console.group === 'function',
+      hasCorrelationId: false,
+      hasBoxFormatting: false,
+    }
+  }
+
+  if (typeof logger === 'object' && logger !== null) {
+    const loggerObj = logger as any
+    return {
+      type: 'object',
+      hasGrouping:
+        typeof loggerObj.group === 'function' || typeof loggerObj.groupCollapsed === 'function',
+      hasCorrelationId:
+        typeof loggerObj.getCorrelationId === 'function' &&
+        typeof loggerObj.setCorrelationId === 'function',
+      hasBoxFormatting: typeof loggerObj.box === 'function',
+    }
+  }
+
+  // Fallback
+  return {
+    type: 'console',
+    hasGrouping: false,
+    hasCorrelationId: false,
+    hasBoxFormatting: false,
   }
 }
 
@@ -536,16 +987,19 @@ export function createValidatorMiddleware<S extends object>(
 ): Middleware<S> {
   let hasValidatedInitialState = false
 
-  return (action, prevState, dispatchNext, _getState, reset) => {
+  return (action, prevState, dispatchNext, getState, reset) => {
     // Validate initial state structure on first run if template provided
     if (!hasValidatedInitialState && initialStateTemplate) {
       hasValidatedInitialState = true
 
       if (!strictStructureMatch(prevState, initialStateTemplate)) {
-        const validationError = new ValidationError('Initial state structure does not match the provided template', {
-          currentState: prevState,
-          expectedTemplate: initialStateTemplate,
-        })
+        const validationError = new ValidationError(
+          'Initial state structure does not match the provided template',
+          {
+            currentState: prevState,
+            expectedTemplate: initialStateTemplate,
+          }
+        )
 
         if (validationErrorHandler) {
           validationErrorHandler(validationError, action)
@@ -568,52 +1022,75 @@ export function createValidatorMiddleware<S extends object>(
 
       // Handle synchronous validator
       if (typeof validationResult === 'boolean') {
-        if (validationResult) {
-          dispatchNext(action)
-        } else {
-          const validationError = new ValidationError('State validation failed', {
+        if (validationResult === false) {
+          const validationError = new ValidationError('State update validation failed', {
+            state: tempNextState,
             action,
-            stateAttempted: tempNextState,
           })
-          if (validationErrorHandler) validationErrorHandler(validationError, action)
-          else console.error(validationError.message, validationError.context)
+
+          if (validationErrorHandler) {
+            validationErrorHandler(validationError, action)
+          } else {
+            console.error(validationError.message, validationError.context)
+          }
+
+          // Block the action if validation fails
+          return
         }
-        return
+      } else if (validationResult instanceof Promise) {
+        // Handle asynchronous validator
+        validationResult
+          .then(result => {
+            if (result === false) {
+              const validationError = new ValidationError('Async state update validation failed', {
+                state: tempNextState,
+                action,
+              })
+
+              if (validationErrorHandler) {
+                validationErrorHandler(validationError, action)
+              } else {
+                console.error(validationError.message, validationError.context)
+              }
+
+              // Block the action if validation fails
+              return
+            }
+
+            dispatchNext(action) // Proceed with the action if validation passes
+          })
+          .catch(error => {
+            const validationError = new ValidationError('Async validation error', {
+              error,
+              action,
+            })
+
+            if (validationErrorHandler) {
+              validationErrorHandler(validationError, action)
+            } else {
+              console.error(validationError.message, validationError.context)
+            }
+
+            // Block the action on validation error
+          })
+        return // Prevent dispatching the action multiple times
       }
 
-      // Handle asynchronous validator
-      if (validationResult && typeof validationResult.then === 'function') {
-        return validationResult
-          .then((isValid: boolean) => {
-            if (isValid) {
-              dispatchNext(action)
-            } else {
-              const validationError = new ValidationError('State validation failed', {
-                action,
-                stateAttempted: tempNextState,
-              })
-              if (validationErrorHandler) validationErrorHandler(validationError, action)
-              else console.error(validationError.message, validationError.context)
-            }
-          })
-          .catch((e: any) => {
-            const validationError = new ValidationError(e.message || 'State validation threw an error', {
-              error: e,
-              action,
-              stateAttempted: tempNextState,
-            })
-            if (validationErrorHandler) validationErrorHandler(validationError, action)
-            else console.error(validationError.message, validationError.context)
-          })
-      }
-    } catch (e: any) {
-      const validationError = new ValidationError(e.message || 'State validation threw an error', {
-        error: e,
+      dispatchNext(action) // Proceed with the action if validation passes
+    } catch (error) {
+      const validationError = new ValidationError('Validation middleware error', {
+        error,
         action,
-        stateAttempted: tempNextState,
       })
-      if (validationErrorHandler) validationErrorHandler(validationError, action)
-      else console.error(validationError.message, validationError.context)
+
+      if (validationErrorHandler) {
+        validationErrorHandler(validationError, action)
+      } else {
+        console.error(validationError.message, validationError.context)
+      }
+
+      // Allow the action to proceed even if validation middleware encounters an error
+      dispatchNext(action)
     }
   }
 }

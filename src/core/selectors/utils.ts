@@ -1,4 +1,5 @@
 import {deepEqual} from '../utils/index'
+import {DependencySubscription, MemoizedSelector} from './types'
 
 export function smartEqual<T>(a: T, b: T): boolean {
   // Fast path: reference equality (works great with Immer's structural sharing)
@@ -69,7 +70,9 @@ export function isSimpleValue(value: any): boolean {
 }
 
 export function isPlainObject(value: any): boolean {
-  return value != null && typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype
+  return (
+    value != null && typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype
+  )
 }
 
 export function haveInputsChanged<T extends readonly unknown[]>(
@@ -108,6 +111,14 @@ export function serializeParams(params: any): string {
   } catch {
     return `non_serializable_${Date.now()}_${Math.random().toString(36).substring(2)}`
   }
+}
+
+export function generateCacheKey(params: any, path?: (string | number)[]): string {
+  const baseKey = serializeParams(params)
+  if (path && path.length > 0) {
+    return `${baseKey}:${path.join('.')}`
+  }
+  return baseKey
 }
 
 /**
@@ -164,4 +175,41 @@ export function startTTLCacheCleanup<T>(
       intervalHandle = null
     }
   }
+}
+
+/**
+ * Type guard for checking if a value is a memoized selector.
+ *
+ * @param value - The value to check
+ * @returns True if the value is a memoized selector
+ *
+ * @remarks
+ * Useful for runtime type checking and debugging selector-related issues.
+ * Checks for the presence of selector-specific properties.
+ */
+export function isMemoizedSelector<R>(value: any): value is MemoizedSelector<R> {
+  return (
+    typeof value === 'function' &&
+    (value._isActive !== undefined || value._lastAccessed !== undefined)
+  )
+}
+
+/**
+ * Type guard for checking if a value is a dependency subscription.
+ *
+ * @param value - The value to check
+ * @returns True if the value is a dependency subscription
+ *
+ * @remarks
+ * Useful for runtime type checking and debugging subscription-related issues.
+ * Checks for the presence of subscription-specific properties.
+ */
+export function isDependencySubscription<T>(value: any): value is DependencySubscription<T> {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof value.id === 'string' &&
+    typeof value.cleanup === 'function' &&
+    typeof value.isActive === 'boolean'
+  )
 }

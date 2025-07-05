@@ -19,18 +19,22 @@ export class TypeRegistry {
 
   constructor() {
     // Initialize with built-in types
+    // Default support for Set
     this.register<Set<any>>({
       typeName: 'Set',
       isType: (value): value is Set<any> => value instanceof Set,
-      serialize: set => Array.from(set),
-      deserialize: data => new Set(data),
+      serialize: (set: Set<any>) => Array.from(set).map(item => this.serialize(item)),
+      deserialize: (data: any[]) => new Set(data.map(item => this.deserialize(item))),
     })
 
+    // Default support for Map
     this.register<Map<any, any>>({
       typeName: 'Map',
       isType: (value): value is Map<any, any> => value instanceof Map,
-      serialize: map => Array.from(map.entries()),
-      deserialize: data => new Map(data),
+      serialize: (map: Map<any, any>) =>
+        Array.from(map.entries()).map(([k, v]) => [this.serialize(k), this.serialize(v)]),
+      deserialize: (data: [any, any][]) =>
+        new Map(data.map(([k, v]) => [this.deserialize(k), this.deserialize(v)])),
     })
   }
 

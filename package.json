@@ -14,7 +14,11 @@
   "main": "dist/index.js",
   "module": "dist/index.esm.js",
   "types": "dist/index.d.ts",
-  "files": ["dist", "README.md", "LICENSE"],
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -42,9 +46,18 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "prepare": "npm run build",
-    "clean": "rm -rf dist coverage"
+    "clean": "rm -rf dist coverage",
+    "pub:local": "yalc publish --push"
   },
-  "keywords": ["state-management", "typescript", "react", "store", "immutable", "persistence", "undo-redo"],
+  "keywords": [
+    "state-management",
+    "typescript",
+    "react",
+    "store",
+    "immutable",
+    "persistence",
+    "undo-redo"
+  ],
   "author": "ToluLikesToCode",
   "license": "MIT",
   "peerDependencies": {
@@ -54,9 +67,6 @@
     "react": {
       "optional": true
     }
-  },
-  "optionalDependencies": {
-    "react": ">=16.8.0"
   },
   "devDependencies": {
     "@rollup/plugin-node-resolve": "^15.0.0",
@@ -74,8 +84,6 @@
     "eslint": "^8.0.0",
     "jsdom": "^26.1.0",
     "prettier": "^3.0.0",
-    "react": "^18.0.0",
-    "react-dom": "^18.3.1",
     "rollup": "^3.0.0",
     "rollup-plugin-dts": "^5.0.0",
     "tslib": "^2.8.1",
@@ -83,6 +91,8 @@
     "vitest": "^3.2.4"
   },
   "dependencies": {
-    "immer": "^10.1.1"
+    "immer": "^10.1.1",
+    "jsan": "^3.1.14",
+    "redux": "^5.0.1"
   }
 }
