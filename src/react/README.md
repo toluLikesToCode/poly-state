@@ -98,10 +98,10 @@ function App() {
 }
 ```
 
-## Context-Free Integration
+## Context-Free Integration - Deep Dive
 
 The `useStoreHooks` function provides a clean, optional way to use Open Store with React components
-without requiring any context setup. This approach is perfect for:
+without requiring any context setup. This approach is useful for:
 
 - **Simple components** that need direct store access
 - **Testing scenarios** where you want isolated store instances
@@ -267,6 +267,21 @@ for performance. The library uses Immer under the hood for complex updates.
 ### Installation and Setup
 
 ```bash
+# Note: This package is still in development thus its not yet available on npm.
+
+# To install first download the source code. Then install yalc:
+npm install -g yalc
+
+# Then publish the package locally
+cd path/to/open-store
+yalc publish
+
+# Now you can add it to your project
+cd path/to/your/project
+yalc add open-store
+
+
+# When available on npm, you can install it directly:
 npm install open-store
 # or
 yarn add open-store
@@ -542,8 +557,6 @@ Sometimes you need to perform side effects when specific state changes occur:
 
 ```tsx
 function NotificationManager() {
-  const notifications = useSelector(state => state.notifications)
-
   // Subscribe to notification changes and show browser notifications
   useSubscribeTo(
     state => state.notifications.unread.length,
