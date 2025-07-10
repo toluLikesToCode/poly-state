@@ -786,7 +786,7 @@ export interface Store<S extends object> extends ReadOnlyStore<S> {
    * @see {@link Store.redo} for forward history navigation
    * @see {@link StoreOptions.historyLimit} for enabling history tracking
    */
-  undo: (steps?: number) => boolean
+  undo: (steps?: number, path?: (string | number)[]) => boolean
 
   /**
    * Moves forward in the store's history to a more recent state.
@@ -813,7 +813,7 @@ export interface Store<S extends object> extends ReadOnlyStore<S> {
    * @see {@link Store.undo} for backward history navigation
    * @see {@link StoreOptions.historyLimit} for enabling history tracking
    */
-  redo: (steps?: number) => boolean
+  redo: (steps?: number, path?: (string | number)[]) => boolean
 
   /**
    * Completely destroys the store and performs cleanup operations.

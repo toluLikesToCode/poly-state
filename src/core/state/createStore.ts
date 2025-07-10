@@ -161,7 +161,7 @@ export function createStore<S extends object>(
   }
 
   // --- History Management ---
-  let historyManager = new HistoryManager<S>(historyLimit, pluginManager)
+  let historyManager = new HistoryManager<S>(historyLimit, pluginManager, initialState)
 
   const _applyStateChange = (payload: ActionPayload<S>, fromSync = false): void => {
     if (isDestroyed) return
@@ -189,7 +189,7 @@ export function createStore<S extends object>(
       persistState(state)
     }
 
-    historyManager.addToHistory(state) // Add new state to history for undo/redo
+    historyManager.addToHistory(state) // Add state to history for undo/redo
     notifyListeners(prevState, newPartialState) // Notify with the state *before* this change as prevState
   }
 
@@ -220,6 +220,8 @@ export function createStore<S extends object>(
     }
 
     if (batching && !isChainedCall) {
+      // TODO: Decide if history manager should include the internals of a batch in history or
+      // just the final accumulation
       batchedActions.push(action)
       return
     }
@@ -401,15 +403,12 @@ export function createStore<S extends object>(
     persistState(state)
 
     // Clear history when resetting the store
-    historyManager.clear()
-
-    // Add the initial state to history after reset
-    historyManager.addToHistory(state)
+    historyManager.clear(true)
 
     notifyListeners(prevState, null) // Notify with state before reset as prevState
   }
 
-  storeInstance.undo = (steps = 1) => {
+  storeInstance.undo = (steps: number = 1, path?: (string | number)[]) => {
     const result = historyManager.undo({
       operation: 'undo',
       steps,
@@ -420,11 +419,18 @@ export function createStore<S extends object>(
       notifyFn: prevState => notifyListeners(prevState, null),
     })
     if (result === false) return false
+
+    if (path) {
+      const diff = buildMinimalDiff(result, path)
+      state = assignState(state, diff)
+      return true
+    }
+
     state = assignState(state, result) // Update the store's state, ensuring reference equality
     return true
   }
 
-  storeInstance.redo = (steps = 1) => {
+  storeInstance.redo = (steps = 1, path?: (string | number)[]) => {
     const result = historyManager.redo({
       operation: 'redo',
       steps,
@@ -435,11 +441,16 @@ export function createStore<S extends object>(
       notifyFn: prevState => notifyListeners(prevState, null),
     })
 
-    if (result !== false) {
-      state = assignState(state, result) // Update the store's state, ensuring reference equality
+    if (result === false) return false
+
+    if (path) {
+      const diff = buildMinimalDiff(result, path)
+      state = assignState(state, diff)
       return true
     }
-    return false
+
+    state = assignState(state, result) // Update the store's state, ensuring reference equality
+    return true
   }
 
   storeInstance.updatePath = <V = any>(
@@ -492,7 +503,7 @@ export function createStore<S extends object>(
   } => {
     if (historyLimit) return historyManager.getHistory()
     return {
-      history: [],
+      history: [] as readonly S[],
       currentIndex: -1,
       initialState: null,
     }
@@ -678,34 +689,6 @@ export function createStore<S extends object>(
     }
   }
 
-  storeInstance.destroy = (options?: CleanupOptions) => {
-    if (isDestroyed) return
-    const cleanupOpts = {...defaultCleanupOptions, ...options}
-    isDestroyed = true
-
-    selectorManager.destroyAll()
-
-    pluginManager.onDestroy(storeInstance)
-
-    listeners = []
-    if (cleanupOpts.clearHistory) historyManager.clear()
-    if (cleanupOpts.removePersistedState) persistenceManager.removeState(persistKey)
-
-    // Unregister from global registry
-    if (sessionId && storeRegistry.has(sessionId)) {
-      const storeSet = storeRegistry.get(sessionId)!
-      storeSet.delete(storeInstance as Store<object>)
-      if (storeSet.size === 0) {
-        storeRegistry.delete(sessionId)
-      }
-    }
-
-    if (cleanupOpts.resetRegistry) {
-      // Reset the global store registry if requested
-      storeRegistry.clear()
-    }
-  }
-
   storeInstance.getName = () => name
   storeInstance.getSessionId = () => sessionId
 
@@ -837,53 +820,77 @@ export function createStore<S extends object>(
     historyManager.addToHistory(state)
   }
 
-  // Cross-tab sync
-  if (syncAcrossTabs && storageType === StorageType.Local && persistKey) {
-    const storageEventHandler = (event: StorageEvent) => {
-      if (event.key === persistKey && event.newValue && !isDestroyed) {
-        try {
-          const persisted = JSON.parse(event.newValue) as PersistedState<S>
-          // Ensure this update isn't from the current session to avoid loops
+  function storageEventHandler(event: StorageEvent) {
+    if (event.key === persistKey && event.newValue && !isDestroyed) {
+      try {
+        const persisted = JSON.parse(event.newValue) as PersistedState<S>
+        // Ensure this update isn't from the current session to avoid loops
 
-          // And only apply if state truly differs to prevent redundant notifications
-          if (
-            persisted.meta &&
-            persisted.meta.sessionId !== sessionId &&
-            !deepEqual(state, persisted.data)
-          ) {
-            let stateToApply = persisted.data
+        // And only apply if state truly differs to prevent redundant notifications
+        if (
+          persisted.meta &&
+          persisted.meta.sessionId !== sessionId &&
+          !deepEqual(state, persisted.data)
+        ) {
+          let stateToApply = persisted.data
 
-            // Call plugin onCrossTabSync hooks
-            const transformed = pluginManager.onCrossTabSync(
-              stateToApply,
-              persisted.meta.sessionId || 'unknown',
-              storeInstance
-            )
-            if (transformed) {
-              // If the plugin transformed the state, use it
-              stateToApply = transformed
-            }
-
-            // _applyStateChange will capture the current `state` as its `prevState`
-            _applyStateChange(stateToApply, true)
-          }
-        } catch (e: any) {
-          handleError(
-            new SyncError('Failed to sync state from another tab', {
-              error: e,
-              key: persistKey,
-            })
+          // Call plugin onCrossTabSync hooks
+          const transformed = pluginManager.onCrossTabSync(
+            stateToApply,
+            persisted.meta.sessionId || 'unknown',
+            storeInstance
           )
+          if (transformed) {
+            // If the plugin transformed the state, use it
+            stateToApply = transformed
+          }
+
+          // _applyStateChange will capture the current `state` as its `prevState`
+          _applyStateChange(stateToApply, true)
         }
+      } catch (e: any) {
+        handleError(
+          new SyncError('Failed to sync state from another tab', {
+            error: e,
+            key: persistKey,
+          })
+        )
       }
     }
+  }
+
+  // Cross-tab sync
+  if (syncAcrossTabs && storageType === StorageType.Local && persistKey)
     window.addEventListener('storage', storageEventHandler)
-    // Need to also clean this listener up in destroy()
-    const originalDestroy = storeInstance.destroy
-    storeInstance.destroy = (opts?: CleanupOptions) => {
-      window.removeEventListener('storage', storageEventHandler)
-      originalDestroy(opts)
+
+  storeInstance.destroy = (options?: CleanupOptions) => {
+    if (isDestroyed) return
+    const cleanupOpts = {...defaultCleanupOptions, ...options}
+    isDestroyed = true
+
+    selectorManager.destroyAll()
+
+    pluginManager.onDestroy(storeInstance)
+
+    listeners = []
+    if (cleanupOpts.clearHistory) historyManager.clear()
+    if (cleanupOpts.removePersistedState) persistenceManager.removeState(persistKey)
+
+    // Unregister from global registry
+    if (sessionId && storeRegistry.has(sessionId)) {
+      const storeSet = storeRegistry.get(sessionId)!
+      storeSet.delete(storeInstance as Store<object>)
+      if (storeSet.size === 0) {
+        storeRegistry.delete(sessionId)
+      }
     }
+
+    if (cleanupOpts.resetRegistry) {
+      // Reset the global store registry if requested
+      storeRegistry.clear()
+    }
+
+    window.removeEventListener('storage', storageEventHandler)
   }
 
   // Register store
