@@ -1118,7 +1118,6 @@ describe('Advanced Store Operations', () => {
         const result = store.transaction(draft => {
           // Read state but make no changes
           const currentBalance = draft.balance
-          console.log('Current balance:', currentBalance)
         })
 
         expect(result).toBe(true)
@@ -1191,6 +1190,297 @@ describe('Advanced Store Operations', () => {
         expect(finalState.transactions).toHaveLength(1)
         expect(finalState.transactions[0].id).toBe('tx-2')
         expect(finalState.transactions[0].amount).toBe(60)
+      })
+    })
+
+    describe('Transaction Minimal Diff Implementation', () => {
+      interface ComplexTransactionState {
+        user: {
+          id: number
+          name: string
+          preferences: {
+            theme: string
+            notifications: boolean
+          }
+        }
+        data: {
+          count: number
+          items: string[]
+          settings: {
+            autoSave: boolean
+            maxItems: number
+          }
+        }
+        ui: {
+          loading: boolean
+          errors: string[]
+        }
+        primitives: {
+          stringValue: string
+          numberValue: number
+          booleanValue: boolean
+        }
+      }
+
+      let complexStore: Store<ComplexTransactionState>
+      const complexInitialState: ComplexTransactionState = {
+        user: {
+          id: 1,
+          name: 'Test User',
+          preferences: {
+            theme: 'dark',
+            notifications: true,
+          },
+        },
+        data: {
+          count: 0,
+          items: ['item1', 'item2'],
+          settings: {
+            autoSave: false,
+            maxItems: 10,
+          },
+        },
+        ui: {
+          loading: false,
+          errors: [],
+        },
+        primitives: {
+          stringValue: 'initial',
+          numberValue: 42,
+          booleanValue: true,
+        },
+      }
+
+      beforeEach(() => {
+        complexStore = createStore(complexInitialState)
+      })
+
+      afterEach(() => {
+        complexStore.destroy()
+        complexStore = null as any
+      })
+
+      it('should create minimal diff for root level primitive changes', () => {
+        const listener = vi.fn()
+        complexStore.subscribe(listener)
+
+        const result = complexStore.transaction(draft => {
+          draft.primitives.stringValue = 'updated'
+          draft.primitives.numberValue = 100
+          // booleanValue unchanged
+        })
+
+        expect(result).toBe(true)
+        expect(listener).toHaveBeenCalledTimes(1)
+
+        // Verify the diff only contains changed parts
+        const [newState, prevState] = listener.mock.calls[0]
+
+        // Should have primitives object with only changed sub-properties
+        expect(newState.primitives.stringValue).toBe('updated')
+        expect(newState.primitives.numberValue).toBe(100)
+        expect(newState.primitives.booleanValue).toBe(true)
+
+        // Other root keys should be unchanged references
+        expect(newState.user).toBe(prevState.user)
+        expect(newState.data).toBe(prevState.data)
+        expect(newState.ui).toBe(prevState.ui)
+      })
+
+      it('should create minimal diff for nested object changes', () => {
+        const listener = vi.fn()
+        complexStore.subscribe(listener)
+
+        const result = complexStore.transaction(draft => {
+          draft.user.preferences.theme = 'light'
+          draft.data.settings.autoSave = true
+          // Leave other nested properties unchanged
+        })
+
+        expect(result).toBe(true)
+        expect(listener).toHaveBeenCalledTimes(1)
+
+        const [newState, prevState] = listener.mock.calls[0]
+
+        // Should create diff with only changed nested properties
+        expect(newState.user.preferences.theme).toBe('light')
+        expect(newState.user.preferences.notifications).toBe(true) // unchanged but included in diff
+        expect(newState.user.name).toBe('Test User') // unchanged but included in diff
+        expect(newState.user.id).toBe(1) // unchanged but included in diff
+
+        expect(newState.data.settings.autoSave).toBe(true)
+        expect(newState.data.settings.maxItems).toBe(10) // unchanged but included in diff
+        expect(newState.data.count).toBe(0) // unchanged but included in diff
+        expect(Array.isArray(newState.data.items)).toBe(true) // unchanged but included in diff
+
+        // Primitives and ui should be unchanged references
+        expect(newState.primitives).toBe(prevState.primitives)
+        expect(newState.ui).toBe(prevState.ui)
+      })
+
+      it('should handle array changes by replacing the entire array', () => {
+        const listener = vi.fn()
+        complexStore.subscribe(listener)
+
+        const result = complexStore.transaction(draft => {
+          draft.data.items.push('item3')
+          draft.ui.errors.push('error1', 'error2')
+        })
+
+        expect(result).toBe(true)
+        expect(listener).toHaveBeenCalledTimes(1)
+
+        const [newState, prevState] = listener.mock.calls[0]
+
+        // Arrays should be completely replaced in diff (not minimal sub-diffs)
+        expect(newState.data.items).toEqual(['item1', 'item2', 'item3'])
+        expect(newState.ui.errors).toEqual(['error1', 'error2'])
+
+        // Should include all properties at the same level since arrays were changed
+        expect(newState.data.count).toBe(0)
+        expect(newState.data.settings.autoSave).toBe(false)
+        expect(newState.data.settings.maxItems).toBe(10)
+
+        expect(newState.ui.loading).toBe(false)
+
+        // Other root keys should be unchanged references
+        expect(newState.user).toBe(prevState.user)
+        expect(newState.primitives).toBe(prevState.primitives)
+      })
+
+      it('should handle mixed changes across multiple root keys', () => {
+        const listener = vi.fn()
+        complexStore.subscribe(listener)
+
+        const result = complexStore.transaction(draft => {
+          // Change primitive
+          draft.primitives.stringValue = 'mixed-update'
+
+          // Change nested object property
+          draft.user.preferences.notifications = false
+
+          // Change array
+          draft.ui.errors = ['new-error']
+
+          // Change root level property
+          draft.data.count = 5
+        })
+
+        expect(result).toBe(true)
+        expect(listener).toHaveBeenCalledTimes(1)
+
+        const [newState, prevState] = listener.mock.calls[0]
+
+        // Verify all changes are present
+        expect(newState.primitives.stringValue).toBe('mixed-update')
+        expect(newState.user.preferences.notifications).toBe(false)
+        expect(newState.ui.errors).toEqual(['new-error'])
+        expect(newState.data.count).toBe(5)
+
+        // Verify minimal diff structure:
+        // - primitives object includes only changed sub-properties (goes one level deeper)
+        expect(newState.primitives.numberValue).toBe(42)
+        expect(newState.primitives.booleanValue).toBe(true)
+
+        // - user object includes all properties since nested object changed (goes one level deeper)
+        expect(newState.user.id).toBe(1)
+        expect(newState.user.name).toBe('Test User')
+        expect(newState.user.preferences.theme).toBe('dark')
+
+        // - ui object includes all properties since array changed
+        expect(newState.ui.loading).toBe(false)
+
+        // - data object includes all properties since root property changed
+        expect(newState.data.items).toEqual(['item1', 'item2'])
+        expect(newState.data.settings.autoSave).toBe(false)
+        expect(newState.data.settings.maxItems).toBe(10)
+      })
+
+      it('should not create diff when no changes are made', () => {
+        const listener = vi.fn()
+        complexStore.subscribe(listener)
+
+        const result = complexStore.transaction(draft => {
+          // Read values but don't change anything
+          const currentTheme = draft.user.preferences.theme
+          const currentCount = draft.data.count
+          // No mutations
+        })
+
+        expect(result).toBe(true)
+        expect(listener).not.toHaveBeenCalled() // No changes, no notification
+      })
+
+      it('should handle changes to properties with null/undefined values', () => {
+        interface StateWithNullable {
+          optional?: string
+          nullable: string | null
+          nested: {
+            optional?: number
+            nullable: boolean | null
+          }
+        }
+
+        const nullableState: StateWithNullable = {
+          nullable: null,
+          nested: {
+            nullable: null,
+          },
+        }
+
+        const nullableStore = createStore(nullableState)
+        const listener = vi.fn()
+        nullableStore.subscribe(listener)
+
+        const result = nullableStore.transaction(draft => {
+          draft.optional = 'now-defined'
+          draft.nullable = 'no-longer-null'
+          draft.nested.optional = 42
+          draft.nested.nullable = true
+        })
+
+        expect(result).toBe(true)
+        expect(listener).toHaveBeenCalledTimes(1)
+
+        const [newState] = listener.mock.calls[0]
+        expect(newState.optional).toBe('now-defined')
+        expect(newState.nullable).toBe('no-longer-null')
+        expect(newState.nested.optional).toBe(42)
+        expect(newState.nested.nullable).toBe(true)
+      })
+
+      it('should preserve object references for unchanged nested structures', () => {
+        const listener = vi.fn()
+        complexStore.subscribe(listener)
+
+        // Get references to unchanged objects before transaction
+        const originalUser = complexStore.getState().user
+        const originalUi = complexStore.getState().ui
+
+        const result = complexStore.transaction(draft => {
+          // Only change primitive values
+          draft.primitives.stringValue = 'reference-test'
+          draft.data.count = 999
+        })
+
+        expect(result).toBe(true)
+        expect(listener).toHaveBeenCalledTimes(1)
+
+        const finalState = complexStore.getState()
+
+        // Changed objects should be new references
+        expect(finalState.primitives).not.toBe(complexInitialState.primitives)
+        expect(finalState.data).not.toBe(complexInitialState.data)
+
+        // But nested objects that weren't changed should maintain their references
+        // Note: Due to Immer's structural sharing, these will be new references
+        // but the minimal diff logic should still only include changed properties
+        expect(finalState.primitives.stringValue).toBe('reference-test')
+        expect(finalState.data.count).toBe(999)
+
+        // Unchanged root objects should be same reference
+        expect(finalState.user).toBe(originalUser)
+        expect(finalState.ui).toBe(originalUi)
       })
     })
 

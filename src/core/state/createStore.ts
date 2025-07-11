@@ -140,10 +140,32 @@ export function createStore<S extends object>(
    * @see {@link https://immerjs.github.io/immer/produce | Immer produce documentation}
    */
   const notifyListeners = (prevState: S, actionApplied: ActionPayload<S> | null = null): void => {
-    // Use Immer to create deeply immutable state copies for external consumption
-    // This prevents listeners from accidentally mutating nested objects
+    // Create safe immutable copies while preserving structural sharing for unchanged properties
     const safeCurrentState = assignState(state, state) as S
-    const safePrevState = assignState(prevState, prevState) as S
+
+    // For prevState, create a copy that preserves structural sharing with currentState
+    // for properties that weren't modified
+    let safePrevState: S
+    if (actionApplied && Object.keys(actionApplied).length > 0) {
+      // Build prevState copy with selective structural sharing
+      safePrevState = immer.produce(prevState, draft => {
+        // For each property not in the action, try to preserve the reference
+        // from the current state if the values are equivalent
+        for (const key in state) {
+          if (!(key in actionApplied)) {
+            const currentValue = (state as any)[key]
+            const prevValue = (prevState as any)[key]
+
+            // If the values are the same reference (unchanged), use the safe current value
+            if (currentValue === prevValue) {
+              ;(draft as any)[key] = (safeCurrentState as any)[key]
+            }
+          }
+        }
+      }) as S
+    } else {
+      safePrevState = assignState(prevState, prevState) as S
+    }
 
     pluginManager.onStateChange(safeCurrentState, safePrevState, actionApplied, storeInstance)
 
@@ -167,7 +189,8 @@ export function createStore<S extends object>(
   const _applyStateChange = (payload: ActionPayload<S>, fromSync = false): void => {
     if (isDestroyed) return
 
-    const prevState = assignState(state, state) as S // Capture state before change
+    // Capture the current state reference (not a copy) for comparison
+    const prevState = state
     let newPartialState = payload
 
     // Plugin: beforeStateChange
@@ -182,8 +205,9 @@ export function createStore<S extends object>(
        or generate useless listener notifications. */
     if (Object.keys(newPartialState).length === 0) return
 
-    // Immer: Apply the new state change
-    state = assignState(state, newPartialState, typeRegistry) as S
+    // Apply the new state change while preserving structural sharing
+    // Use shallow merge to preserve references for unchanged root-level keys
+    state = {...state, ...newPartialState} as S
 
     // --- Notifications and History ---
     if (!fromSync && persistKey && storageType !== StorageType.None) {
@@ -244,10 +268,10 @@ export function createStore<S extends object>(
         (acc, curr) => assignState(acc as S, curr),
         state as S
       )
-      return freezeDev(intermediateState as S)
+      return freezeDev(intermediateState) as S
     }
-    // Always return a copy before freezing to prevent mutation issues with Immer
-    return freezeDev(state)
+    // Return a safe immutable copy that preserves structural sharing
+    return freezeDev(state) as S
   }
 
   storeInstance.dispatch = (action: ActionPayload<S> | Thunk<S, any>): void | Promise<any> => {
@@ -422,6 +446,7 @@ export function createStore<S extends object>(
     if (result === false) return false
 
     if (path) {
+      //@ts-ignore
       if (false === true) {
         // if (path.length > 1) {
         //const pathSubLevel = path.slice(1)
@@ -659,19 +684,6 @@ export function createStore<S extends object>(
         }
         // Use _internalDispatch to go through the full middleware/plugin flow
         _internalDispatch(diff as ActionPayload<S>, false)
-      } else {
-        // No changes were made, but transaction was successful
-        // TODO: add a logger that i can disable in production
-        // eslint-disable-next-line no-console
-        if (typeof console !== 'undefined' && console.debug) {
-          // eslint-disable-next-line no-console
-          console.debug(
-            `[Store: ${name || 'Unnamed'}] Transaction completed with no state changes.`,
-            {
-              operation: 'transaction',
-            }
-          )
-        }
       }
 
       // Call onTransactionEnd for all plugins with success

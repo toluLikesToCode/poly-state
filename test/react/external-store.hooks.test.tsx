@@ -1,5 +1,5 @@
 import React from 'react'
-import {describe, it, expect, beforeEach, vi} from 'vitest'
+import {describe, it, expect, beforeEach, vi, afterEach} from 'vitest'
 import {render, screen, fireEvent, waitFor} from '@testing-library/react'
 import {createStore} from '../../src/core'
 import {createStoreContext, useStoreHooks} from '../../src/react/index'
@@ -19,20 +19,25 @@ interface TestState {
 
 describe('useSyncExternalStore Integration Functionality', () => {
   let store: ReturnType<typeof createStore<TestState>>
+  const initialState: TestState = {
+    count: 0,
+    user: {
+      name: 'John',
+      email: 'john@example.com',
+    },
+    nested: {
+      deep: {
+        value: 'test',
+      },
+    },
+  }
 
   beforeEach(() => {
-    store = createStore<TestState>({
-      count: 0,
-      user: {
-        name: 'John',
-        email: 'john@example.com',
-      },
-      nested: {
-        deep: {
-          value: 'test',
-        },
-      },
-    })
+    store = createStore<TestState>(initialState)
+  })
+
+  afterEach(() => {
+    store.destroy()
   })
 
   describe('Basic functionality with improved performance', () => {
