@@ -746,19 +746,22 @@ export interface Store<S extends object> extends ReadOnlyStore<S> {
    *
    * @remarks
    * This operation clears the current state and restores the initial state provided
-   * during store creation. History is preserved unless explicitly cleared through
-   * cleanup options. All subscribers are notified of the state change.
+   * during store creation. By default, history is cleared unless `clearHistory` is set to `false`.
+   * All subscribers are notified of the state change.
+   *
+   * @param clearHistory - Whether to clear the undo/redo history (defaults to `true`)
    *
    * @example
    * ```typescript
    * const store = createStore({ count: 0, name: 'Initial' });
    * store.dispatch({ count: 42, name: 'Updated' });
-   * store.reset(); // State is back to { count: 0, name: 'Initial' }
+   * store.reset(); // State is back to { count: 0, name: 'Initial' }, history cleared
+   * store.reset(false); // State is reset, history is preserved
    * ```
    *
    * @see {@link destroy} for complete store cleanup
    */
-  reset: () => void
+  reset: (clearHistory?: boolean) => void
 
   /**
    * Reverts the store state to a previous point in history.

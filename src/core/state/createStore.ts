@@ -75,6 +75,41 @@ export function createStore<S extends object>(
 
   // --- Core Store Functions ---
   const handleError = (error: StoreError) => {
+    // Custom Immer mutation error detection
+    if (
+      error.context?.error &&
+      error.context.error instanceof Error &&
+      typeof error.context.error.message === 'string' &&
+      error.context.error.message.includes('frozen and should not be mutated')
+    ) {
+      console.error(
+        `[Open Store] State mutation error: You attempted to directly mutate a frozen object (e.g., Map, Set, Array, or plain object) returned from getState().\n` +
+          `State objects are immutable and must not be mutated. To update state, always create a new object or use the store's transaction API.\n` +
+          `\nExample fixes:\n` +
+          `  // Instead of mutating:\n` +
+          `  const map = store.getState().map;\n` +
+          `  map.clear(); // ❌ This will throw\n\n` +
+          `  // Option 1: Create a new Map and dispatch it:\n` +
+          `  const newMap = new Map(map);\n` +
+          `  newMap.clear();\n` +
+          `  store.dispatch({ map: newMap }); // ✅\n\n` +
+          `  // Option 2 (Recommended): Use store.transaction for safe mutation:\n` +
+          `  store.transaction(draft => {\n` +
+          `    draft.map?.clear(); // ✅\n` +
+          `  });\n`
+      )
+
+      // Re-throw a more user-friendly error
+      throw new StoreError(
+        'Direct mutation of state is not allowed. Use store.dispatch to update state.',
+        {
+          operation: 'handleError',
+          error: error.context.error,
+          context: error.context, // Preserve original context for debugging
+        }
+      )
+    }
+
     // Call plugin onError hooks first
     pluginManager.onError(error, error.context, storeInstance)
 
@@ -124,7 +159,8 @@ export function createStore<S extends object>(
 
   /* Freeze helper – prevents accidental mutation in dev
      while keeping reference‑equality for memoisation. */
-  const freezeDev = <T>(obj: T): T => (isDevMode() ? Object.freeze(obj) : obj)
+  const freezeDev = <T>(obj: T): T => (true ? Object.freeze(obj) : obj)
+  // const freezeDev = <T>(obj: T): T => (isDevMode() ? Object.freeze(obj) : obj)
 
   /**
    * Notifies listeners with immutable state copies to prevent accidental mutations.
@@ -207,7 +243,12 @@ export function createStore<S extends object>(
 
     // Apply the new state change while preserving structural sharing
     // Use shallow merge to preserve references for unchanged root-level keys
-    state = {...state, ...newPartialState} as S
+    // only update if something actually changed
+    // const nextState = {...state, ...newPartialState} as S
+    const nextState = assignState(state, newPartialState)
+
+    if (Object.is(nextState, state)) return // No changes, exit early
+    state = nextState
 
     // --- Notifications and History ---
     if (!fromSync && persistKey && storageType !== StorageType.None) {
@@ -419,7 +460,7 @@ export function createStore<S extends object>(
     return selectorManager.createParameterizedSelector(inputSelectors, projector)
   }
 
-  storeInstance.reset = () => {
+  storeInstance.reset = (clearHistory: boolean = true) => {
     if (isDestroyed) return
     const prevState = assignState(state, state) as S // Capture state before reset
 
@@ -428,7 +469,11 @@ export function createStore<S extends object>(
     persistState(state)
 
     // Clear history when resetting the store
-    historyManager.clear(true)
+    if (clearHistory) {
+      historyManager.clear(true)
+    } else {
+      historyManager.addToHistory(initialState) // Add initial state to history if not clearing
+    }
 
     notifyListeners(prevState, null) // Notify with state before reset as prevState
   }

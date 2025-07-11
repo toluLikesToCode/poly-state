@@ -81,6 +81,11 @@ function deepMerge(target: any, source: any, typeRegistry?: {findTypeFor: (value
 
     // Handle Map
     if (srcVal instanceof Map) {
+      if (srcVal === tgtVal) {
+        console.warn(
+          '[Open Store] Warning: Map reference reused in state update. This may indicate an in-place mutation, which is not supported. Always dispatch a new Map instance.'
+        )
+      }
       target[key] = new Map(srcVal)
       continue
     }

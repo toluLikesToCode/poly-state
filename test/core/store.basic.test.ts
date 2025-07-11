@@ -17,11 +17,12 @@ import {
   historyChangePluginOptions,
   type Middleware,
 } from '../../src/core'
-import {Profiler} from 'react'
+import {WritableDraft} from 'immer'
 
 interface BasicTestState {
   count: number
   name?: string
+  map?: Map<string, number>
 }
 
 interface NestedTestState {
@@ -79,7 +80,7 @@ describe('Store Core Functionality', () => {
 
   describe('Initialization and Basic State Management', () => {
     it('should initialize with the provided initial state', () => {
-      const initialState: BasicTestState = {count: 0, name: 'test'}
+      const initialState: BasicTestState = {count: 0, name: 'test', map: new Map()}
       store = createStore(initialState)
 
       expect(store.getState()).toEqual(initialState)
@@ -93,13 +94,47 @@ describe('Store Core Functionality', () => {
     })
 
     it('should update state with partial updates via dispatch', () => {
-      store = createStore({count: 0})
+      const initialState: BasicTestState = {
+        count: 0,
+        map: new Map<string, number>([
+          ['key1', 1],
+          ['key2', 2],
+        ]),
+      }
+
+      store = createStore<BasicTestState>(initialState, {
+        historyLimit: 10,
+      })
 
       store.dispatch({count: 5})
       expect(store.getState().count).toBe(5)
 
       store.dispatch({name: 'updated'})
-      expect(store.getState()).toEqual({count: 5, name: 'updated'})
+      const selectNotMap = store.select(state => {
+        return {count: state.count, name: state.name}
+      })
+      expect(selectNotMap()).toEqual({count: 5, name: 'updated'})
+
+      const updater = (draft: WritableDraft<BasicTestState>) => {
+        draft.map?.clear()
+      }
+
+      store.transaction(updater)
+
+      expect(store.getState().map).toEqual(new Map<string, number>())
+
+      store.dispatch({map: new Map<string, number>([['key3', 3]])})
+      expect(store.getState().map).toEqual(new Map<string, number>([['key3', 3]]))
+
+      const stateB4Reset = store.getState()
+
+      store.reset(false)
+      expect(store.getState()).toEqual(initialState)
+      const didUndoMap = store.undo(1, ['map'])
+      expect(didUndoMap).toBe(true)
+      expect(store.getState().map).toEqual(stateB4Reset.map)
+      expect(store.getState().count).toBe(initialState.count)
+      expect(store.getState().name).toBe(initialState.name)
     })
 
     it('should handle multiple rapid updates correctly', () => {
@@ -396,9 +431,7 @@ describe('Store Core Functionality', () => {
       const currentState = store.getState()
       store.dispatch(currentState) // Dispatch same state
 
-      // Depending on implementation, this might or might not call listeners
-      // This test documents the expected behavior
-      expect(listener).toHaveBeenCalledTimes(1)
+      expect(listener).toHaveBeenCalledTimes(0)
     })
   })
 

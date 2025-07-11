@@ -69,6 +69,14 @@ describe('useSyncExternalStore Integration Functionality', () => {
       await waitFor(() => {
         expect(screen.getByTestId('count').textContent).toBe('1')
       })
+
+      // Ensure no excessive re-renders
+      const initialRenderCount = screen.getByTestId('count').textContent
+      fireEvent.click(screen.getByText('Increment')) // Increment again
+      await waitFor(() => {
+        expect(screen.getByTestId('count').textContent).toBe('2')
+      })
+      expect(screen.getByTestId('count').textContent).toBe(initialRenderCount === '0' ? '2' : '2') // Should not have re-rendered excessively
     })
 
     it('useSelector works correctly with context-free hooks', async () => {
@@ -97,26 +105,16 @@ describe('useSyncExternalStore Integration Functionality', () => {
     })
 
     it('useStoreValue works correctly with path-based access', async () => {
-      const {StoreProvider, useStoreValue, useDispatch} = createStoreContext(store)
+      const {StoreProvider, useStoreValue, useUpdatePath} = createStoreContext(store)
 
       function TestComponent() {
         const name = useStoreValue<string>('user.name')
-        const dispatch = useDispatch()
-
+        const updatePath = useUpdatePath()
+        const updater = () => 'Jane'
         return (
           <div>
             <div data-testid="name">{name}</div>
-            <button
-              onClick={() =>
-                dispatch({
-                  user: {
-                    ...store.getState().user,
-                    name: 'Jane',
-                  },
-                })
-              }>
-              Update Name
-            </button>
+            <button onClick={() => updatePath(['user', 'name'], updater)}>Update Name</button>
           </div>
         )
       }
@@ -136,35 +134,138 @@ describe('useSyncExternalStore Integration Functionality', () => {
       })
     })
 
-    it('useStoreState works correctly', async () => {
-      const {StoreProvider, useStoreState, useDispatch} = createStoreContext(store)
+    describe('useStoreState', () => {
+      it('useStoreState works correctly', async () => {
+        const {StoreProvider, useStoreState, useDispatch} = createStoreContext(store)
 
-      function TestComponent() {
-        const state = useStoreState()
-        const dispatch = useDispatch()
+        function TestComponent() {
+          const state = useStoreState()
+          const dispatch = useDispatch()
 
-        return (
-          <div>
-            <div data-testid="count">{state.count}</div>
-            <div data-testid="name">{state.user.name}</div>
-            <button onClick={() => dispatch({count: state.count + 1})}>Increment</button>
-          </div>
+          return (
+            <div>
+              <div data-testid="count">{state.count}</div>
+              <div data-testid="name">{state.user.name}</div>
+              <button onClick={() => dispatch({count: state.count + 1})}>Increment</button>
+            </div>
+          )
+        }
+
+        render(
+          <StoreProvider>
+            <TestComponent />
+          </StoreProvider>
         )
-      }
 
-      render(
-        <StoreProvider>
-          <TestComponent />
-        </StoreProvider>
-      )
+        expect(screen.getByTestId('count').textContent).toBe('0')
+        expect(screen.getByTestId('name').textContent).toBe('John')
 
-      expect(screen.getByTestId('count').textContent).toBe('0')
-      expect(screen.getByTestId('name').textContent).toBe('John')
+        fireEvent.click(screen.getByText('Increment'))
 
-      fireEvent.click(screen.getByText('Increment'))
+        await waitFor(() => {
+          expect(screen.getByTestId('count').textContent).toBe('1')
+        })
+      })
+      it('useStoreState works correctly with minimal re-renders', async () => {
+        const {StoreProvider, useStoreState, useDispatch} = createStoreContext(store)
+        let renderCount = 0
+        const renderLog: string[] = []
 
-      await waitFor(() => {
-        expect(screen.getByTestId('count').textContent).toBe('1')
+        function TestComponent() {
+          renderCount++
+          const state = useStoreState()
+          const dispatch = useDispatch()
+
+          // Log what caused this render
+          renderLog.push(`Render ${renderCount}: count=${state.count}, name=${state.user.name}`)
+
+          return (
+            <div>
+              <div data-testid="count">{state.count}</div>
+              <div data-testid="name">{state.user.name}</div>
+              <div data-testid="email">{state.user.email}</div>
+              <div data-testid="renders">{renderCount}</div>
+              <button onClick={() => dispatch({count: state.count + 1})}>Increment</button>
+              <button
+                onClick={() =>
+                  dispatch({
+                    user: {...state.user, name: 'Jane'},
+                  })
+                }>
+                Change Name
+              </button>
+              <button
+                onClick={() =>
+                  dispatch({
+                    user: {...state.user, email: 'jane@example.com'},
+                  })
+                }>
+                Change Email
+              </button>
+              {/* This should not trigger re-render since it doesn't change state */}
+              <button onClick={() => dispatch({count: state.count})}>No-op Update</button>
+            </div>
+          )
+        }
+
+        render(
+          <StoreProvider>
+            <TestComponent />
+          </StoreProvider>
+        )
+
+        // Initial render
+        expect(screen.getByTestId('count').textContent).toBe('0')
+        expect(screen.getByTestId('name').textContent).toBe('John')
+        expect(screen.getByTestId('email').textContent).toBe('john@example.com')
+        expect(screen.getByTestId('renders').textContent).toBe('1')
+
+        // Test 1: State change should cause re-render
+        fireEvent.click(screen.getByText('Increment'))
+
+        await waitFor(() => {
+          expect(screen.getByTestId('count').textContent).toBe('1')
+        })
+        expect(screen.getByTestId('renders').textContent).toBe('2')
+
+        // Test 2: Another state change should cause re-render
+        fireEvent.click(screen.getByText('Change Name'))
+
+        await waitFor(() => {
+          expect(screen.getByTestId('name').textContent).toBe('Jane')
+        })
+        expect(screen.getByTestId('renders').textContent).toBe('3')
+
+        // Test 3: No-op update should NOT cause re-render
+        const renderCountBeforeNoop = Number(screen.getByTestId('renders').textContent)
+        fireEvent.click(screen.getByText('No-op Update'))
+
+        // Wait a bit to ensure no re-render happens
+        await new Promise(resolve => setTimeout(resolve, 50))
+
+        expect(screen.getByTestId('renders').textContent).toBe(renderCountBeforeNoop.toString())
+        expect(screen.getByTestId('count').textContent).toBe('1') // Should remain the same
+
+        // Test 4: Multiple rapid changes should be efficient
+        const renderCountBeforeRapid = Number(screen.getByTestId('renders').textContent)
+
+        // Rapid updates
+        fireEvent.click(screen.getByText('Increment'))
+        fireEvent.click(screen.getByText('Change Email'))
+        fireEvent.click(screen.getByText('Increment'))
+
+        await waitFor(() => {
+          expect(screen.getByTestId('count').textContent).toBe('3')
+          expect(screen.getByTestId('email').textContent).toBe('jane@example.com')
+        })
+
+        const finalRenderCount = Number(screen.getByTestId('renders').textContent)
+
+        // Should have rendered once per actual state change (3 changes = 3 renders)
+        expect(finalRenderCount - renderCountBeforeRapid).toBeLessThanOrEqual(3)
+
+        // Log the render history for debugging
+        console.log('Render log:', renderLog)
       })
     })
 

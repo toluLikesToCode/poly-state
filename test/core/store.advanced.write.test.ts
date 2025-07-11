@@ -1253,6 +1253,7 @@ describe('Advanced Store Operations', () => {
 
       beforeEach(() => {
         complexStore = createStore(complexInitialState)
+        store.destroy() // Ensure no interference from previous tests
       })
 
       afterEach(() => {
