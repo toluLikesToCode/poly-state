@@ -271,12 +271,16 @@ describe('Store Core Functionality', () => {
         },
         tags: ['tag1'],
       }
-      const store = createStore(initialState, {historyLimit: 10})
+      const store = createStore(initialState, {
+        historyLimit: 10,
+        name: 'redo-and-undo-with-a-provided-path',
+      })
       const {dispatch, updatePath, undo, redo, reset, destroy, getState, transaction, select} =
         store
       const selectProfile = select(state => state.profile)
       const selectName = select(selectProfile, profile => profile.name)
       const selectAdress = select(selectProfile, profile => profile.address)
+      const selectTags = select(state => state.tags)
       let newProfile = {
         name: 'user2',
         address: {
@@ -304,6 +308,31 @@ describe('Store Core Functionality', () => {
 
       undo()
       expect(getState()).toEqual(initialState)
+
+      // reset the store
+      reset()
+
+      expect(getState()).toEqual(initialState)
+      const newAddy = {
+        city: 'city2',
+        zip: 2,
+      }
+      transaction(draft => {
+        draft.profile.address = newAddy
+        draft.tags.push('tag2')
+        draft.profile.name = 'user2'
+      })
+      expect(selectAdress()).toEqual(newAddy)
+      expect(selectName()).toEqual('user2')
+      expect(selectTags()).toEqual(['tag1', 'tag2'])
+
+      let lastSuccessfulUndo = undo(1, ['profile', 'address'])
+
+      expect(lastSuccessfulUndo).toBe(true)
+
+      expect(selectAdress()).toEqual(initialState.profile.address)
+      //expect(selectName()).toEqual('user2')
+      //expect(selectTags()).toEqual(['tag1', 'tag2'])
     })
   })
 

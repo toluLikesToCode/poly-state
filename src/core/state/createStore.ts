@@ -108,6 +108,7 @@ export function createStore<S extends object>(
   const pluginManager = new PluginManager<S>(plugins, handleError, name)
 
   function persistState(dataToPersist: S): void {
+    if (!persistKey || storageType === StorageType.None) return
     const success = persistenceManager.persistState(
       persistKey,
       dataToPersist,
@@ -421,9 +422,18 @@ export function createStore<S extends object>(
     if (result === false) return false
 
     if (path) {
-      const diff = buildMinimalDiff(result, path)
-      state = assignState(state, diff)
-      return true
+      if (false === true) {
+        // if (path.length > 1) {
+        //const pathSubLevel = path.slice(1)
+        const subValue = getPath(result, path)
+        const diff = buildMinimalDiff(subValue, path)
+        state = assignState(state, diff) // Update only the sub-path
+        return true
+      } else {
+        const diff = buildMinimalDiff(result, path)
+        state = assignState(state, diff)
+        return true
+      }
     }
 
     state = assignState(state, result) // Update the store's state, ensuring reference equality
