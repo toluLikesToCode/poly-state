@@ -1,8 +1,11 @@
 {
-  "name": "poly-state",
+  "name": "@tolulikestocode/poly-state",
   "version": "1.0.0",
   "type": "module",
   "description": "Universal state management library for TypeScript and React",
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com/"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ToluLikesToCode/poly-state.git"
