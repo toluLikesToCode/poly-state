@@ -1,5 +1,5 @@
 /**
- * Advanced Selector Tests for Open Store
+ * Advanced Selector Tests for Poly State
  *
  * Comprehensive test suite covering advanced selector functionality including:
  * - Memoized selectors with performance optimization

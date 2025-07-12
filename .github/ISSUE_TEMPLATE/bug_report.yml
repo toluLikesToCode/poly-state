@@ -1,7 +1,7 @@
 # GitHub Issue Templates
 
 name: Bug Report
-description: Report a bug in Open Store
+description: Report a bug in Poly State
 title: '[Bug]: '
 labels: ['bug', 'needs-triage']
 body:
@@ -26,8 +26,8 @@ body:
   - type: input
     id: version
     attributes:
-      label: Open Store Version
-      description: What version of Open Store are you using?
+      label: Poly State Version
+      description: What version of Poly State are you using?
       placeholder: '1.0.0'
     validations:
       required: true
@@ -99,7 +99,7 @@ body:
       description: Minimal code example that reproduces the issue
       render: typescript
       placeholder: |
-        import { createStore } from 'open-store';
+        import { createStore } from 'poly-state';
 
         // Your code here
     validations:

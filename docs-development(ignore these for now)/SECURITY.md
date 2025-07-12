@@ -1,6 +1,6 @@
 # Security Policy
 
-Hey there! Thanks for checking out Open Store. I'm still learning and building this project, so your
+Hey there! Thanks for checking out Poly State. I'm still learning and building this project, so your
 help with security is super appreciated.
 
 ## Supported Versions
@@ -34,7 +34,7 @@ helpful.
 
 ## Tips for Staying Secure
 
-Some things to keep in mind when using Open Store:
+Some things to keep in mind when using Poly State:
 
 ### Data Stuff
 
@@ -64,10 +64,10 @@ I try to keep things safe by checking dependencies:
 ## Non-Security Issues?
 
 If you find a regular bug or have a question, please use
-[GitHub Issues](https://github.com/toluLikesToCode/open-store/issues).
+[GitHub Issues](https://github.com/toluLikesToCode/poly-state/issues).
 
 ## Contact
 
 Got a security question? Email me at [tolu.adegbehingbe@icloud.com].
 
-Thanks for helping me make Open Store better!
+Thanks for helping me make Poly State better!

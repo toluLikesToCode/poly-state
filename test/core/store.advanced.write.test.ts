@@ -1,7 +1,7 @@
 /**
  * Advanced Store Functionality Tests
  *
- * Comprehensive test suite for the Open Store's advanced features including:
+ * Comprehensive test suite for the Poly State's advanced features including:
  * - Thunk actions (synchronous and asynchronous)
  * - Batch operations for grouping multiple updates
  * - Transaction support with rollback capabilities

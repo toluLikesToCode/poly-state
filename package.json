@@ -1,15 +1,15 @@
 {
-  "name": "open-store",
+  "name": "poly-state",
   "version": "1.0.0",
   "type": "module",
   "description": "Universal state management library for TypeScript and React",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ToluLikesToCode/open-store.git"
+    "url": "git+https://github.com/ToluLikesToCode/poly-state.git"
   },
-  "homepage": "https://github.com/ToluLikesToCode/open-store#readme",
+  "homepage": "https://github.com/ToluLikesToCode/poly-state#readme",
   "bugs": {
-    "url": "https://github.com/ToluLikesToCode/open-store/issues"
+    "url": "https://github.com/ToluLikesToCode/poly-state/issues"
   },
   "main": "dist/index.js",
   "module": "dist/index.esm.js",

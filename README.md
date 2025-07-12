@@ -1,15 +1,15 @@
-# Open Store
+# Poly State
 
 > **Development Notice**: This project is currently under active development and hasn't been
 > published to npm yet. The API is stabilizing but may still change before the first release.
 
 A lightweight, TypeScript-first state management solution that works seamlessly with both vanilla
-JavaScript/TypeScript projects and React applications. Open Store is designed to be a powerful yet
+JavaScript/TypeScript projects and React applications. Poly State is designed to be a powerful yet
 simple alternative to other state management libraries, offering a rich feature set out of the box.
 
-## Why Open Store?
+## Why Poly State?
 
-**Universal Compatibility**: Write your state logic once and use it everywhere. Open Store's core is
+**Universal Compatibility**: Write your state logic once and use it everywhere. Poly State's core is
 framework-agnostic, allowing you to manage state in any JavaScript environment, from vanilla browser
 scripts and server-side Node.js applications to complex React projects. This unified approach
 simplifies your architecture and reduces cognitive load.
@@ -23,13 +23,13 @@ exceptional TypeScript support with strong type inference for state, actions, an
 catches errors at compile time. The library also features robust, centralized error handling and a
 rich set of utilities that simplify complex state management tasks.
 
-**Lightweight & Performant**: Open Store is built for speed. It has a minimal footprint and supports
+**Lightweight & Performant**: Poly State is built for speed. It has a minimal footprint and supports
 tree-shaking to keep your application lean. It's highly optimized, memoized selector system that
 prevents expensive re-computations of derived data, while batched updates ensure that multiple state
 changes result in a single, efficient UI re-render, a common performance bottleneck in other
 libraries.
 
-**Immutable by Default**: State updates are safe, predictable, and easy to debug. Open Store
+**Immutable by Default**: State updates are safe, predictable, and easy to debug. Poly State
 enforces immutability, but with the power of Immer under the hood, you can write complex logic using
 a familiar, mutable style API while the library handles the immutable updates safely and
 efficiently.
@@ -45,7 +45,7 @@ are built-in and ready to use with simple configuration.
 - **Atomic Transactions**: Group multiple state changes into a single, atomic update. This is
   crucial for complex operations, ensuring the UI never reflects an intermediate or invalid state.
 - **Context-Free React Hooks**: A major differentiator that offers unparalleled flexibility. Use all
-  of Open Store's powerful React hooks without needing to wrap your application in a
+  of Poly State's powerful React hooks without needing to wrap your application in a
   `<StoreProvider>`, which is perfect for testing, component libraries, or micro-frontends.
 
 **Extensible**: Tailor the store to your specific needs with a simple yet powerful plugin system.
@@ -61,10 +61,10 @@ When published, you can install it via npm:
 
 ```bash
 # For Vanilla TypeScript/JavaScript projects
-npm install open-store
+npm install poly-state
 
 # For React projects
-npm install open-store react
+npm install poly-state react
 ```
 
 ## Getting Started
@@ -72,7 +72,7 @@ npm install open-store react
 ### For Vanilla TypeScript/JavaScript
 
 ```typescript
-import {createStore} from 'open-store'
+import {createStore} from 'poly-state'
 
 // 1. Define your state shape
 interface AppState {
@@ -91,16 +91,16 @@ store.dispatch({count: 1}) // logs: State updated: { count: 1 }
 
 ### For React Applications
 
-Open Store offers two flexible ways to integrate with React.
+Poly State offers two flexible ways to integrate with React.
 
 #### 1. Context-Free Hooks (Recommended for Simplicity & Testing)
 
-Use all of Open Store's hooks without a `<StoreProvider>`. This is great for component libraries,
+Use all of Poly State's hooks without a `<StoreProvider>`. This is great for component libraries,
 testing, or simpler applications.
 
 ```tsx
-import {createStore} from 'open-store'
-import {useStoreHooks} from 'open-store/react'
+import {createStore} from 'poly-state'
+import {useStoreHooks} from 'poly-state/react'
 
 // Create a store instance (e.g., in store.ts)
 const appStore = createStore({count: 0})
@@ -126,8 +126,8 @@ For larger applications, you can use the traditional provider pattern.
 
 ```tsx
 import React from 'react'
-import {createStore} from 'open-store'
-import {createStoreContext} from 'open-store/react'
+import {createStore} from 'poly-state'
+import {createStoreContext} from 'poly-state/react'
 
 // 1. Create a store instance
 const store = createStore({count: 0})
@@ -411,8 +411,8 @@ Requirements: Node.js 18+ and npm.
 
 ```bash
 # Clone the repository
-git clone https://github.com/ToluLikesToCode/open-store.git
-cd open-store
+git clone https://github.com/ToluLikesToCode/poly-state.git
+cd poly-state
 
 # Install dependencies
 npm install

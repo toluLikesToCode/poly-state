@@ -83,7 +83,7 @@ export function createStore<S extends object>(
       error.context.error.message.includes('frozen and should not be mutated')
     ) {
       console.error(
-        `[Open Store] State mutation error: You attempted to directly mutate a frozen object (e.g., Map, Set, Array, or plain object) returned from getState().\n` +
+        `[Poly State] State mutation error: You attempted to directly mutate a frozen object (e.g., Map, Set, Array, or plain object) returned from getState().\n` +
           `State objects are immutable and must not be mutated. To update state, always create a new object or use the store's transaction API.\n` +
           `\nExample fixes:\n` +
           `  // Instead of mutating:\n` +

@@ -1,6 +1,6 @@
-# Contributing to Open Store
+# Contributing to Poly State
 
-Thank you for your interest in contributing to Open Store! This document provides guidelines and
+Thank you for your interest in contributing to Poly State! This document provides guidelines and
 information for contributors.
 
 ## Development Setup
@@ -8,8 +8,8 @@ information for contributors.
 1. **Fork and Clone**
 
    ```bash
-   git clone https://github.com/yourusername/open-store.git
-   cd open-store
+   git clone https://github.com/yourusername/poly-state.git
+   cd poly-state
    ```
 
 2. **Install Dependencies**
@@ -165,4 +165,4 @@ If you have questions about contributing:
 - Focus on constructive feedback
 - Help maintain a welcoming environment for all contributors
 
-Thank you for contributing to Open Store!
+Thank you for contributing to Poly State!

@@ -1,7 +1,7 @@
 /**
  * @fileoverview Example demonstrating context-free React integration
  *
- * This example shows how to use Open Store with React without any context setup,
+ * This example shows how to use Poly State with React without any context setup,
  * making it perfect for simple components, testing, or when you prefer direct
  * store passing over context providers.
  */
@@ -168,8 +168,8 @@ function TodoList() {
 export default function App() {
   return (
     <div style={{padding: '20px'}}>
-      <h1>Open Store Context-Free Demo</h1>
-      <p>This demo shows using Open Store with React without any context setup!</p>
+      <h1>Poly State Context-Free Demo</h1>
+      <p>This demo shows using Poly State with React without any context setup!</p>
 
       <div
         style={{

@@ -2,13 +2,13 @@
  * Example: React Usage
  *
  * This example demonstrates the complete React integration capabilities
- * of the Open Store, including all available hooks and features.
+ * of the Poly State, including all available hooks and features.
  *
  * Note: The imports below use relative paths for development purposes.
  * In a real application, you would import from the published package:
  *
- * import { createStore } from "open-store";
- * import { createStoreContext } from "open-store/react";
+ * import { createStore } from "poly-state";
+ * import { createStoreContext } from "poly-state/react";
  */
 
 import React, {useState} from 'react'
@@ -234,7 +234,7 @@ const App: React.FC = () => {
           padding: '20px',
           minHeight: '100vh',
         }}>
-        <h1>Open Store React Example</h1>
+        <h1>Poly State React Example</h1>
         <Counter />
         <hr />
         <UserProfile />

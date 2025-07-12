@@ -1,5 +1,5 @@
 /**
- * Plugins for Open Store
+ * Plugins for Poly State
  *
  * @remarks
  * This module exports plugin implementations for extending store functionality.

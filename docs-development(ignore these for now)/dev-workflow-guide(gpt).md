@@ -1,6 +1,6 @@
 # Development Workflow Guide
 
-This guide outlines the recommended workflows for testing the Open Store package in external
+This guide outlines the recommended workflows for testing the Poly State package in external
 projects during active development, before npm publication.
 
 > **🚧 Development Status**: This package is currently under active development and has not been
@@ -17,10 +17,10 @@ projects during active development, before npm publication.
 
 ## Overview
 
-Open Store is being built to support two main usage patterns:
+Poly State is being built to support two main usage patterns:
 
-- **Vanilla TypeScript/JavaScript**: Import from `open-store`
-- **React Integration**: Import from `open-store/react`
+- **Vanilla TypeScript/JavaScript**: Import from `poly-state`
+- **React Integration**: Import from `poly-state/react`
 
 Since the package isn't published yet, you have two ways to test it in your projects:
 
@@ -37,17 +37,17 @@ Since the package isn't published yet, you have two ways to test it in your proj
 
 NPM Link creates symbolic links between your local package and test projects. This means:
 
-- Changes you make to Open Store are immediately available in linked projects
+- Changes you make to Poly State are immediately available in linked projects
 - No need to rebuild or reinstall manually
 - Great for testing features as you build them
 
 ### Setting Up NPM Link
 
-#### 1. Prepare Open Store
+#### 1. Prepare Poly State
 
 ```bash
-# Navigate to the Open Store directory
-cd /Users/toluadegbehingbe/projects/open-store
+# Navigate to the Poly State directory
+cd /Users/toluadegbehingbe/projects/poly-state
 
 # Build the current state
 npm run build
@@ -56,7 +56,7 @@ npm run build
 npm link
 ```
 
-This makes `open-store` available globally for linking to other projects.
+This makes `poly-state` available globally for linking to other projects.
 
 #### 2. Link to Your Test Project
 
@@ -64,19 +64,19 @@ This makes `open-store` available globally for linking to other projects.
 # Go to your test project
 cd /path/to/your/test/project
 
-# Link Open Store
-npm link open-store
+# Link Poly State
+npm link poly-state
 ```
 
-Now your test project will use your local development version of Open Store.
+Now your test project will use your local development version of Poly State.
 
 ### Development Loop
 
 #### 1. Start Watch Mode
 
 ```bash
-# In the Open Store directory
-cd /Users/toluadegbehingbe/projects/open-store
+# In the Poly State directory
+cd /Users/toluadegbehingbe/projects/poly-state
 
 # Start building automatically on changes
 npm run dev
@@ -97,7 +97,7 @@ npm start
 
 #### 3. Edit and See Changes
 
-1. **Make changes** to Open Store source code (`src/` folder)
+1. **Make changes** to Poly State source code (`src/` folder)
 2. **Watch the build** complete automatically
 3. **Refresh your test project** to see the changes
 
@@ -111,7 +111,7 @@ npm start
 
 ```typescript
 // In your test project
-import {createStore} from 'open-store'
+import {createStore} from 'poly-state'
 
 interface AppState {
   count: number
@@ -137,8 +137,8 @@ store.dispatch({count: store.getState().count + 1})
 ```tsx
 // App.tsx - Set up the provider
 import React from 'react'
-import {createStore} from 'open-store'
-import {createStoreContext} from 'open-store/react'
+import {createStore} from 'poly-state'
+import {createStoreContext} from 'poly-state/react'
 import Counter from './Counter'
 
 const store = createStore({count: 0})
@@ -148,7 +148,7 @@ function App() {
   return (
     <StoreProvider>
       <div className="app">
-        <h1>Testing Open Store</h1>
+        <h1>Testing Poly State</h1>
         <Counter />
       </div>
     </StoreProvider>
@@ -161,7 +161,7 @@ export default App
 ```tsx
 // Counter.tsx - Use the store in components
 import React from 'react'
-import {createStoreContext} from 'open-store/react'
+import {createStoreContext} from 'poly-state/react'
 
 // You'll need to export this context from your store setup
 const {useSelector, useDispatch} = createStoreContext(store)
@@ -210,7 +210,7 @@ NPM Pack creates a tarball (`.tgz` file) that simulates what would be published 
 
 ```bash
 # Navigate to your package directory
-cd /Users/toluadegbehingbe/projects/open-store
+cd /Users/toluadegbehingbe/projects/poly-state
 
 # Clean previous builds
 npm run clean
@@ -222,7 +222,7 @@ npm run build
 npm pack
 ```
 
-**This creates**: `tolulikescode-open-store-1.0.0.tgz` in your package directory
+**This creates**: `tolulikescode-poly-state-1.0.0.tgz` in your package directory
 
 #### 2. Install in External Projects
 
@@ -231,7 +231,7 @@ npm pack
 cd /path/to/your/external/project
 
 # Install the tarball
-npm install /Users/toluladegbehingbe/projects/open-store/tolulikescode-open-store-1.0.0.tgz
+npm install /Users/toluladegbehingbe/projects/poly-state/tolulikescode-poly-state-1.0.0.tgz
 ```
 
 ### Testing Iteration Cycle
@@ -240,7 +240,7 @@ npm install /Users/toluladegbehingbe/projects/open-store/tolulikescode-open-stor
 
 ```bash
 # In your package directory
-cd /Users/toluadegbehingbe/projects/open-store
+cd /Users/toluadegbehingbe/projects/poly-state
 
 # Edit your source files
 # ...make your changes...
@@ -266,10 +266,10 @@ npm pack
 cd /path/to/your/external/project
 
 # Remove old version
-npm uninstall open-store
+npm uninstall poly-state
 
 # Install new version
-npm install /Users/toluladegbehingbe/projects/open-store/tolulikescode-open-store-1.0.1.tgz
+npm install /Users/toluladegbehingbe/projects/poly-state/tolulikescode-poly-state-1.0.1.tgz
 ```
 
 ### Pack File Inspection
@@ -278,10 +278,10 @@ You can inspect what's included in your pack:
 
 ```bash
 # View contents without extracting
-tar -tzf tolulikescode-open-store-1.0.0.tgz
+tar -tzf tolulikescode-poly-state-1.0.0.tgz
 
 # Extract to see actual structure
-tar -xzf tolulikescode-open-store-1.0.0.tgz
+tar -xzf tolulikescode-poly-state-1.0.0.tgz
 ```
 
 **Expected contents:**
@@ -344,14 +344,14 @@ package/
 
 ```bash
 # Check if link exists
-ls -la node_modules/open-store
-# Should show: ... -> /Users/toluadegbehingbe/projects/open-store
+ls -la node_modules/poly-state
+# Should show: ... -> /Users/toluadegbehingbe/projects/poly-state
 
 # Restart TypeScript server (VS Code)
 # Cmd+Shift+P → "TypeScript: Restart TS Server"
 
 # Check if dev mode is running
-cd /Users/toluadegbehingbe/projects/open-store
+cd /Users/toluadegbehingbe/projects/poly-state
 npm run dev  # Should be watching for changes
 ```
 
@@ -359,11 +359,11 @@ npm run dev  # Should be watching for changes
 
 ```bash
 # Re-link the package
-npm unlink open-store
-npm link open-store
+npm unlink poly-state
+npm link poly-state
 
 # Check global links
-npm ls -g --depth=0 | grep open-store
+npm ls -g --depth=0 | grep poly-state
 ```
 
 #### TypeScript Declaration Issues
@@ -447,10 +447,10 @@ npx tsc --noEmit
 
    ```typescript
    // Test vanilla
-   import {createStore} from 'open-store'
+   import {createStore} from 'poly-state'
 
    // Test React
-   import {useStore} from 'open-store/react'
+   import {useStore} from 'poly-state/react'
    ```
 
 4. **Keep external project's dev server running**
@@ -490,8 +490,8 @@ npx tsc --noEmit
 ### General Best Practices
 
 1. **Maintain both entry points**
-   - Test vanilla TypeScript usage: `import from 'open-store'`
-   - Test React usage: `import from 'open-store/react'`
+   - Test vanilla TypeScript usage: `import from 'poly-state'`
+   - Test React usage: `import from 'poly-state/react'`
 
 2. **Use proper TypeScript configuration**
    - Ensure `tsconfig.build.json` is properly configured
@@ -528,13 +528,13 @@ npx tsc --noEmit
 npm run build && npm link
 
 # External project setup (one time)
-npm link open-store
+npm link poly-state
 
 # Development (daily)
 npm run dev  # In package directory
 
 # Cleanup
-npm unlink open-store  # In external project
+npm unlink poly-state  # In external project
 ```
 
 ### NPM Pack Workflow
@@ -548,9 +548,9 @@ npm install /path/to/package.tgz
 
 # Update after changes
 npm version patch && npm pack
-npm uninstall open-store
+npm uninstall poly-state
 npm install /path/to/new-package.tgz
 ```
 
-This workflow ensures you can efficiently develop and test your Open Store package while maintaining
+This workflow ensures you can efficiently develop and test your Poly State package while maintaining
 high quality and production readiness.

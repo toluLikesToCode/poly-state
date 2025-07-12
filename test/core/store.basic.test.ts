@@ -1,7 +1,7 @@
 /**
  * Core Store Functionality Tests
  *
- * Comprehensive test suite for the Open Store's core functionality including:
+ * Comprehensive test suite for the Poly State's core functionality including:
  * - Basic state management (initialization, updates, subscriptions)
  * - Path-based updates (updatePath functionality)
  * - Selector memoization and optimization

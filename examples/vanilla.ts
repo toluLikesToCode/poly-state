@@ -2,12 +2,12 @@
  * Example: Vanilla TypeScript Usage
  *
  * This example demonstrates the complete vanilla TypeScript usage
- * of the Open Store, showcasing all core features and capabilities.
+ * of the Poly State, showcasing all core features and capabilities.
  *
  * Note: The import below uses a relative path for development purposes.
  * In a real application, you would import from the published package:
  *
- * import { createStore } from "open-store";
+ * import { createStore } from "poly-state";
  */
 
 import {createStore, Thunk} from '../src/index.js'
@@ -72,7 +72,7 @@ store.dispatch({
 // Add todos
 store.dispatch({
   todos: [
-    {id: 1, text: 'Learn Open Store', completed: false},
+    {id: 1, text: 'Learn Poly State', completed: false},
     {id: 2, text: 'Build awesome app', completed: false},
   ],
 })
@@ -117,7 +117,7 @@ const loadTodosThunk: Thunk<AppState, Promise<ToDo>> = async ({dispatch}) => {
   // Simulate fetching todos from an API
   await new Promise(resolve => setTimeout(resolve, 1000))
   const todos = [
-    {id: 1, text: 'Learn Open Store', completed: true},
+    {id: 1, text: 'Learn Poly State', completed: true},
     {id: 2, text: 'Build awesome app', completed: false},
     {id: 3, text: 'Write documentation', completed: false},
   ]
@@ -196,7 +196,7 @@ const completedTodosSelector = store.select(state => state.todos.filter(todo => 
 console.log('Current user:', userSelector())
 // Output: Current user: { id: 1, name: 'Batched Name', email: 'jane@example.com' }
 console.log('Completed todos:', completedTodosSelector())
-// Output: Completed todos: [ { id: 1, text: 'Learn Open Store', completed: true } ]
+// Output: Completed todos: [ { id: 1, text: 'Learn Poly State', completed: true } ]
 
 // subscribe to specific state slice
 const selectUser = (state: AppState) => state.user // Selector function to get user state
