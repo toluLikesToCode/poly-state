@@ -2,32 +2,68 @@
 
 > **Development Notice**: This project is currently under active development and hasn't been
 > published to npm yet. The API is stabilizing but may still change before the first release.
->
-> Project name is also subject to change before release.
 
 A lightweight, TypeScript-first state management solution that works seamlessly with both vanilla
-JavaScript/TypeScript projects and React applications.
+JavaScript/TypeScript projects and React applications. Open Store is designed to be a powerful yet
+simple alternative to other state management libraries, offering a rich feature set out of the box.
 
 ## Why Open Store?
 
-- **Universal compatibility** - One store, multiple environments
-- **Zero dependencies** - React is optional, everything else is built-in
-- **Developer friendly** - Great TypeScript support and debugging experience
-- **Lightweight** - Small bundle with tree-shaking support
-- **Immutable by default** - Safe state updates with automatic freezing in dev mode
-- **Persistent state** - Built-in localStorage, sessionStorage, and cookie support
-- **Time travel** - Undo/redo functionality out of the box
-- **Extensible** - Plugin system for custom functionality
+**Universal Compatibility**: Write your state logic once and use it everywhere. Open Store's core is
+framework-agnostic, allowing you to manage state in any JavaScript environment, from vanilla browser
+scripts and server-side Node.js applications to complex React projects. This unified approach
+simplifies your architecture and reduces cognitive load.
+
+**Zero Dependencies for Core**: The core library is pure TypeScript with zero external dependencies,
+resulting in a smaller bundle size and eliminating the risk of version conflicts from third-party
+packages. React is treated as an optional peer dependency, so you only include it when you need it.
+
+**Developer-Friendly**: Designed with the developer experience as a top priority. You get
+exceptional TypeScript support with strong type inference for state, actions, and selectors, which
+catches errors at compile time. The library also features robust, centralized error handling and a
+rich set of utilities that simplify complex state management tasks.
+
+**Lightweight & Performant**: Open Store is built for speed. It has a minimal footprint and supports
+tree-shaking to keep your application lean. It's highly optimized, memoized selector system that
+prevents expensive re-computations of derived data, while batched updates ensure that multiple state
+changes result in a single, efficient UI re-render, a common performance bottleneck in other
+libraries.
+
+**Immutable by Default**: State updates are safe, predictable, and easy to debug. Open Store
+enforces immutability, but with the power of Immer under the hood, you can write complex logic using
+a familiar, mutable style API while the library handles the immutable updates safely and
+efficiently.
+
+**Feature-Rich Out of the Box**: Many features that require separate libraries in other ecosystems
+are built-in and ready to use with simple configuration.
+
+- **State Persistence**: Effortlessly persist state to localStorage, sessionStorage, or cookies with
+  a single configuration flag. No extra packages needed.
+- **Time Travel**: Undo/redo functionality is a first-class citizen, not just a developer tool. You
+  can easily expose this powerful feature to your end-users in applications like document editors or
+  design tools.
+- **Atomic Transactions**: Group multiple state changes into a single, atomic update. This is
+  crucial for complex operations, ensuring the UI never reflects an intermediate or invalid state.
+- **Context-Free React Hooks**: A major differentiator that offers unparalleled flexibility. Use all
+  of Open Store's powerful React hooks without needing to wrap your application in a
+  `<StoreProvider>`, which is perfect for testing, component libraries, or micro-frontends.
+
+**Extensible**: Tailor the store to your specific needs with a simple yet powerful plugin system.
+Plugins can hook into the store's lifecycle to add custom functionality like advanced logging,
+analytics, or even entirely new persistence layers.
 
 ## Installation
 
-> **Note**: Package not yet published to npm. For now, you can clone and build locally.
+> **Note**: This package is not yet published to npm. For local development, please see the
+> Contributing section.
+
+When published, you can install it via npm:
 
 ```bash
-# When published:
+# For Vanilla TypeScript/JavaScript projects
 npm install open-store
 
-# For React projects:
+# For React projects
 npm install open-store react
 ```
 
@@ -38,249 +74,363 @@ npm install open-store react
 ```typescript
 import {createStore} from 'open-store'
 
-const store = createStore({count: 0})
+// 1. Define your state shape
+interface AppState {
+  count: number
+}
 
-// Listen for changes
+// 2. Create a store
+const store = createStore<AppState>({count: 0})
+
+// 3. Subscribe to changes
 store.subscribe(state => console.log('State updated:', state))
 
-// Update state
-store.dispatch({count: 1})
+// 4. Dispatch actions to update state
+store.dispatch({count: 1}) // logs: State updated: { count: 1 }
 ```
 
 ### For React Applications
+
+Open Store offers two flexible ways to integrate with React.
+
+#### 1. Context-Free Hooks (Recommended for Simplicity & Testing)
+
+Use all of Open Store's hooks without a `<StoreProvider>`. This is great for component libraries,
+testing, or simpler applications.
+
+```tsx
+import {createStore} from 'open-store'
+import {useStoreHooks} from 'open-store/react'
+
+// Create a store instance (e.g., in store.ts)
+const appStore = createStore({count: 0})
+
+// Use it in any component
+function Counter() {
+  const {useSelector, useDispatch} = useStoreHooks(appStore)
+  const count = useSelector(state => state.count)
+  const dispatch = useDispatch()
+
+  return <button onClick={() => dispatch({count: count + 1})}>Count: {count}</button>
+}
+
+// No provider needed in your App root!
+function App() {
+  return <Counter />
+}
+```
+
+#### 2. Traditional Context Provider
+
+For larger applications, you can use the traditional provider pattern.
 
 ```tsx
 import React from 'react'
 import {createStore} from 'open-store'
 import {createStoreContext} from 'open-store/react'
 
-const store = createStore({
-  count: 0,
-  user: {name: '', email: ''},
-  todos: [],
-})
+// 1. Create a store instance
+const store = createStore({count: 0})
 
-const {StoreProvider, useSelector, useDispatch, useStoreHistory, useTransaction, useAsyncThunk} =
-  createStoreContext(store)
+// 2. Create the context and hooks
+const {StoreProvider, useSelector, useDispatch} = createStoreContext(store)
 
+// 3. Use the hooks in your components
 function Counter() {
   const count = useSelector(state => state.count)
   const dispatch = useDispatch()
-  const {undo, redo, canUndo, canRedo} = useStoreHistory()
 
-  return (
-    <div>
-      <button onClick={() => dispatch({count: count + 1})}>Count: {count}</button>
-      <button onClick={() => undo()} disabled={!canUndo}>
-        Undo
-      </button>
-      <button onClick={() => redo()} disabled={!canRedo}>
-        Redo
-      </button>
-    </div>
-  )
+  return <button onClick={() => dispatch({count: count + 1})}>Count: {count}</button>
 }
 
-function UserForm() {
-  const user = useSelector(state => state.user)
-  const transaction = useTransaction()
-
-  const handleSave = () => {
-    transaction(draft => {
-      draft.user.name = 'John Doe'
-      draft.user.email = 'john@example.com'
-    })
-  }
-
-  return (
-    <div>
-      <p>User: {user.name || 'No name'}</p>
-      <button onClick={handleSave}>Save User</button>
-    </div>
-  )
-}
-
+// 4. Wrap your app with the provider
 function App() {
   return (
     <StoreProvider>
       <Counter />
-      <UserForm />
     </StoreProvider>
   )
 }
 ```
 
-## API Reference
+## Core API Reference
 
-### Core Store API
+### createStore(initialState, options?)
 
-#### Creating a Store
-
-```typescript
-const store = createStore(initialState, options?)
-```
-
-The main function to create a store instance. Pass your initial state and optional configuration.
+Creates a new store instance.
 
 ```typescript
 const store = createStore(
+  {user: null, settings: {theme: 'light'}},
   {
-    user: {name: '', email: ''},
-    settings: {theme: 'light'},
-  },
-  {
-    persistKey: 'my-app-state', // Key for persisting state in storage
-    storageType: StorageType.Local, // Storage type: Local, Session, Cookie, or None
-    cookieOptions: {path: '/', secure: true}, // Cookie storage options (if using cookies)
-    cookiePrefix: 'os_', // Prefix for cookie keys (for cleanup)
-    syncAcrossTabs: true, // Enable cross-tab state sync
-    middleware: [myMiddleware], // Array of middleware functions
-    historyLimit: 50, // Max undo/redo steps to keep
-    name: 'MyStore', // Optional store name (for debugging/tools)
-    staleAge: 3600_000, // State is considered stale after this many ms
-    cleanupStaleStatesOnLoad: true, // Remove old states on load
-    cleanupOptions: {removePersistedState: true, clearHistory: true}, // Cleanup behavior on destroy/reset
-    plugins: [myPlugin], // Array of store plugins
-    onError: error => {
-      /* handle errors */
-    }, // Centralized error handler
+    name: 'MyStore',
+    persistKey: 'my-app-state',
+    storageType: 'local', // 'local', 'session', or 'cookie'
+    historyLimit: 50, // Enable undo/redo
+    syncAcrossTabs: true,
+    plugins: [myPlugin],
+    onError: error => console.error(error.message, error.context),
   }
 )
 ```
 
-**Store Options:**
+| Option           | Type                               | Description                                                  |
+| ---------------- | ---------------------------------- | ------------------------------------------------------------ |
+| `name`           | `string`                           | Optional name for debugging and DevTools.                    |
+| `persistKey`     | `string`                           | Key for persisting state in storage.                         |
+| `storageType`    | `'local' \| 'session' \| 'cookie'` | The storage mechanism to use for persistence.                |
+| `historyLimit`   | `number`                           | The maximum number of undo/redo steps to store.              |
+| `syncAcrossTabs` | `boolean`                          | Enables automatic state synchronization across browser tabs. |
+| `plugins`        | `Plugin<S>[]`                      | An array of plugins to extend store functionality.           |
+| `middleware`     | `Middleware<S>[]`                  | An array of middleware for intercepting actions.             |
+| `onError`        | `(error: StoreError) => void`      | A centralized error handler for the store.                   |
 
-| Option                     | Type                          | Description                                                                                |
-| -------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------ |
-| `persistKey`               | `string`                      | Key for persisting state in storage (local/session/cookie)                                 |
-| `storageType`              | `StorageType`                 | Where to persist state: `Local`, `Session`, `Cookie`, or `None`                            |
-| `cookieOptions`            | `CookieStorageOptions`        | Cookie config: `{ expires, path, domain, secure, sameSite }`                               |
-| `cookiePrefix`             | `string`                      | Prefix for cookie keys (for easier cleanup)                                                |
-| `syncAcrossTabs`           | `boolean`                     | Enable cross-tab state sync (default: false)                                               |
-| `middleware`               | `Middleware<S>[]`             | Array of middleware functions for intercepting actions                                     |
-| `historyLimit`             | `number`                      | Max undo/redo steps to keep in history                                                     |
-| `name`                     | `string`                      | Optional store name (for debugging/dev tools)                                              |
-| `staleAge`                 | `number`                      | State is considered stale after this many ms                                               |
-| `cleanupStaleStatesOnLoad` | `boolean`                     | Remove old/stale states on load                                                            |
-| `cleanupOptions`           | `CleanupOptions`              | Cleanup behavior on destroy/reset: `{ removePersistedState, clearHistory, resetRegistry }` |
-| `plugins`                  | `Plugin<S>[]`                 | Array of store plugins for extensibility                                                   |
-| `onError`                  | `(error: StoreError) => void` | Centralized error handler for store/plugin errors                                          |
+### Store Methods
 
-See `src/core/state/types.ts` for full type definitions and advanced options.
+#### Vanilla State Updates
 
-#### Store Methods
-
-- `getState()` - Get the current state
-- `dispatch(action)` - Update state or execute thunks
-- `updatePath(path,updater)` - Update a nested property in the state using a function that takes the
-  old value and returns the new one
-- `batch(fn: () => void)` - Takes a function that can call dispatch multiple times
-- `subscribe(listener)` - Listen for state changes
-- `select(selector)` - Create a memoized selector
-- `asReadOnly()` - Get a read-only version of the store
-
-There are many more store methods detailed in `src/core/state/types.ts`. These will be documented
-here at a later date.
-
-### React Integration
-
-#### Setting Up Context
+**dispatch(action)**: The primary method for updating state. It accepts a partial state object or a
+thunk for complex logic.
 
 ```typescript
-const {StoreProvider, useSelector, useDispatch, useStore} = createStoreContext(store)
+// Simple update
+store.dispatch({count: 1})
+
+// Thunk for async logic
+store.dispatch(async ({dispatch}) => {
+  const user = await fetchUser()
+  dispatch({user})
+})
 ```
 
-This creates all the React hooks and components you need to integrate with your store.
+**transaction(recipe)**: Executes a series of mutations atomically using an Immer draft. If the
+function throws an error, all changes are rolled back.
 
-#### Available Hooks
+```typescript
+store.transaction(draft => {
+  draft.user.name = 'John Doe'
+  draft.user.lastUpdated = Date.now()
+  draft.todos.push({id: 1, text: 'Use transactions!', completed: false})
+})
+```
 
-The hooks let you interact with your store in different ways:
+**batch(fn)**: Groups multiple dispatch calls into a single update, triggering only one re-render in
+React.
 
-**Basic hooks:**
+```typescript
+store.batch(() => {
+  store.dispatch({count: 1})
+  store.dispatch({status: 'updated'})
+})
+```
 
-- `useSelector(selector)` - Subscribe to specific parts of state
-- `useDispatch()` - Get the dispatch function
-- `useStore()` - Access the store directly
-- `useStoreState()` - Get the entire state (auto-subscribes)
+**updatePath(path, updater)**: Provides a way to apply a surgical update to a nested property in the
+state.
 
-**Advanced hooks:**
+```typescript
+// Updates state.user.preferences.theme
+store.updatePath(['user', 'preferences', 'theme'], currentTheme =>
+  currentTheme === 'light' ? 'dark' : 'light'
+)
+```
 
-- `useSubscribeTo(selector, listener, options?)` - Custom state subscriptions
-- `useSubscribeToPath(path, listener, options?)` - Listen to specific paths
-- `useStoreValue(selector, deps?)` - Memoized selectors with custom deps
-- `useTransaction()` - Batch multiple updates atomically
-- `useBatch()` - Group dispatches together
-- `useUpdatePath()` - Update nested state directly
-- `useStoreHistory()` - Undo/redo functionality
-- `useThunk()` - Execute sync thunks
-- `useAsyncThunk()` - Execute async thunks with loading states
-- `useStoreEffect(effect, deps?)` - Side effects on state changes
+#### State Access & Subscriptions
+
+- **getState()**: Returns the current state object.
+- **subscribe(listener)**: Subscribes to all state changes. Returns an unsubscribe function.
+- **subscribeTo(selector, listener)**: Subscribes to changes in a specific slice of state, derived
+  by the selector.
+- **subscribeToPath(path, listener)**: Subscribes to changes at a specific nested path (e.g.,
+  'user.name').
+
+#### Selectors
+
+**select(selector)**: Creates a memoized selector to compute derived data. The selector only
+recomputes when its inputs change.
+
+```typescript
+// Simple selector
+const selectCount = store.select(state => state.count)
+
+// Selector with multiple inputs
+const selectCartSummary = store.select(
+  state => state.cart.items,
+  state => state.cart.taxPercent,
+  (items, taxPercent) => {
+    const subtotal = items.reduce((sum, item) => sum + item.price, 0)
+    const tax = subtotal * taxPercent
+    return {subtotal, tax, total: subtotal + tax}
+  }
+)
+```
+
+**selectWith(selectors, projector)**: Creates a parameterized selector for dynamic queries.
+
+```typescript
+const selectProductById = store.selectWith(
+  [state => state.products],
+  (productId: string) => products => products.find(p => p.id === productId)
+)
+
+const getProduct123 = selectProductById('123')
+const product = getProduct123() // Memoized for this ID
+```
+
+#### History
+
+**undo(steps?, path?)**: Reverts the state to a previous point in history. The optional path
+parameter allows for a "surgical undo," reverting only a specific part of the state while leaving
+other concurrent changes intact.
+
+**redo(steps?, path?)**: Moves forward to a state that was undone. Also supports the optional path
+parameter for partial redos.
+
+**getHistory()**: Returns an object with the history array and current index.
+
+```typescript
+// Example of path-specific undo
+const store = createStore(
+  {
+    user: {name: 'John', status: 'active'},
+    cart: {items: 1},
+  },
+  {historyLimit: 10}
+)
+
+// Change both user and cart in one transaction
+store.transaction(draft => {
+  draft.user.name = 'Jane'
+  draft.cart.items = 2
+})
+// State is now: { user: { name: 'Jane' }, cart: { items: 2 } }
+
+// Now, undo only the user name change
+store.undo(1, ['user', 'name'])
+
+// The user's name is reverted, but the cart remains updated
+console.log(store.getState())
+// Logs: { user: { name: 'John' }, cart: { items: 2 } }
+```
+
+## React Hooks API Reference
+
+### State Access
+
+**useSelector(selector)**: Subscribes a component to a slice of state. The component will only
+re-render if the selected value changes.
+
+```typescript
+const userName = useSelector(state => state.user.name)
+```
+
+**useStoreState()**: Subscribes a component to the entire state object. Use with caution, as any
+state change will cause a re-render.
+
+**useStoreValue(path)**: A convenient hook to subscribe to a nested value using a string path.
+
+```typescript
+const theme = useStoreValue('user.preferences.theme')
+```
+
+### State Updates
+
+- **useDispatch()**: Returns the dispatch function to update state.
+- **useTransaction()**: Returns the transaction function for atomic updates in components.
+- **useBatch()**: Returns the batch function to group updates.
+- **useUpdatePath()**: Returns the updatePath function for surgical nested updates.
+
+### Async Operations
+
+**useThunk()**: Returns a function to execute synchronous thunks.
+
+**useAsyncThunk()**: A powerful hook for managing async operations with built-in loading and error
+states.
+
+```typescript
+function UserProfile() {
+  const { execute, loading, error } = useAsyncThunk();
+
+  const handleFetchUser = () => {
+    execute(async ({ dispatch }) => {
+      const user = await fetchUser();
+      dispatch({ user });
+    });
+  };
+
+  if (loading) return <p>Loading...</p>;
+  if (error) return <p>Error: {error.message}</p>;
+
+  return <button onClick={handleFetchUser}>Fetch User</button>;
+}
+```
+
+### Side Effects
+
+**useStoreEffect(selector, effect)**: Runs a side effect when a selected piece of state changes,
+similar to React's useEffect.
+
+```typescript
+useStoreEffect(
+  state => state.settings.theme,
+  theme => {
+    document.body.className = `theme-${theme}`
+  }
+)
+```
+
+**useSubscribeTo(selector, listener)**: A lower-level hook to subscribe a listener function to state
+changes.
+
+**useSubscribeToPath(path, listener)**: Subscribes a listener to a specific nested path.
+
+### React History
+
+**useStoreHistory()**: Provides access to the store's history, including undo, redo, canUndo, and
+canRedo.
+
+```typescript
+function HistoryControls() {
+  const { undo, redo, canUndo, canRedo } = useStoreHistory();
+
+  return (
+    <>
+      <button onClick={() => undo()} disabled={!canUndo}>Undo</button>
+      <button onClick={() => redo()} disabled={!canRedo}>Redo</button>
+    </>
+  );
+}
+```
 
 ## Development & Contributing
 
-### Getting Set Up Locally
+This project is built with TypeScript and uses Rollup for bundling. We welcome contributions!
 
-**Requirements:** Node.js 16+ and npm/yarn
+### Local Setup
+
+Requirements: Node.js 18+ and npm.
 
 ```bash
-# Get the code
-git clone <your-repo-url>
+# Clone the repository
+git clone https://github.com/ToluLikesToCode/open-store.git
 cd open-store
 
-# Install dependencies and build
+# Install dependencies
 npm install
-npm run build
+
+# Run the development build (with watch mode)
+npm run dev
 ```
 
-### Exploring the Examples
+### Key Scripts
 
-Check out the `examples/` folder to see Open Store in action:
+- `npm run build`: Create a production build in the dist/ folder.
+- `npm run dev`: Start the development server with watch mode.
+- `npm run test`: Run the test suite with Vitest.
+- `npm run lint`: Check the code for linting errors.
+- `npm run format`: Format the code with Prettier.
+- `npm run clean`: Remove all build artifacts.
 
-- `examples/vanilla.ts` - Complete vanilla TypeScript/JavaScript usage
-- `examples/react.tsx` - React integration with all hooks demonstrated
-
-The examples use relative imports since the package isn't published yet, but they show you exactly
-how to use Open Store in your projects.
-
-### Available Scripts
-
-- `npm run build` - Create production build
-- `npm run dev` - Build in watch mode for development
-- `npm run test` - Run tests with Vitest
-- `npm run lint` - Check code with ESLint
-- `npm run format` - Format code with Prettier
-- `npm run clean` - Remove build artifacts
-
-## Project Status
-
-This project is actively being developed. The core functionality is working well, but we're still
-polishing things before the first npm release.
-
-**What's working:**
-
-- Core store functionality with TypeScript support
-- React integration with comprehensive hooks
-- State persistence and undo/redo
-- Plugin system architecture
-- Test coverage of the basic functionality
-
-**What's next:**
-
-- Performance optimizations
-- More comprehensive documentation
-- Additional storage adapters
-- Complete test coverage
-
-## Contributing
-
-Interested in contributing? Here's how:
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/cool-new-thing`)
-3. Make your changes
-4. Add tests if needed
-5. Run `npm test` and `npm run lint`
-6. Submit a pull request
+For more detailed information, please see CONTRIBUTING.md.
 
 ## License
 
