@@ -73,7 +73,12 @@ export function deepEqual<T>(a: T, b: T): boolean {
     }
 
     // Handle TypedArrays (Int8Array, Uint8Array, etc.)
-    if (ArrayBuffer.isView(x) && ArrayBuffer.isView(y) && !(x instanceof DataView) && !(y instanceof DataView)) {
+    if (
+      ArrayBuffer.isView(x) &&
+      ArrayBuffer.isView(y) &&
+      !(x instanceof DataView) &&
+      !(y instanceof DataView)
+    ) {
       if (x.byteLength !== y.byteLength) return false
       const typedX = x as any
       const typedY = y as any

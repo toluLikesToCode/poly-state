@@ -358,7 +358,7 @@ export type UseStoreHistoryHook<S extends object> = () => StoreHistoryState<S>
  * const executeThunk = useThunk();
  *
  * const loadUser = async () => {
- *   const user = await executeThunk(async (dispatch, getState) => {
+ *   const user = await executeThunk(async ({dispatch, getState}) => {
  *     const response = await fetch('/api/user');
  *     const userData = await response.json();
  *     dispatch({ user: userData });
@@ -368,7 +368,7 @@ export type UseStoreHistoryHook<S extends object> = () => StoreHistoryState<S>
  * };
  *
  * const incrementCounter = () => {
- *   executeThunk((dispatch, getState) => {
+ *   executeThunk(({dispatch, getState}) => {
  *     const current = getState().count;
  *     dispatch({ count: current + 1 });
  *   });

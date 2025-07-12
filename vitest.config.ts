@@ -23,7 +23,15 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
-      exclude: ['coverage/**', 'dist/**', 'test/**', 'examples/**', '**/*.d.ts', '**/*.config.*', '**/node_modules/**'],
+      exclude: [
+        'coverage/**',
+        'dist/**',
+        'test/**',
+        'examples/**',
+        '**/*.d.ts',
+        '**/*.config.*',
+        '**/node_modules/**',
+      ],
       thresholds: {
         global: {
           branches: 80,

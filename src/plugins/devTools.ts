@@ -243,7 +243,9 @@ class LiftedStateManager<S extends object> {
  * @param options - The configuration options for the DevTools plugin.
  * @returns The plugin instance for the store.
  */
-export function createSimpleDevToolsPlugin<S extends object>(options: ReduxDevToolsOptions): Plugin<S> {
+export function createSimpleDevToolsPlugin<S extends object>(
+  options: ReduxDevToolsOptions
+): Plugin<S> {
   const {name, jump = true, maxAge = 100, trace = true, serialize = true} = options
 
   // Check if DevTools is enabled via configuration
@@ -272,7 +274,10 @@ export function createSimpleDevToolsPlugin<S extends object>(options: ReduxDevTo
   let storeCreated = false
 
   // Helper to format an action for DevTools
-  const formatAction = (changes: Partial<S>, context: ActionNameContext = ActionNameContext.Normal): StoredAction => {
+  const formatAction = (
+    changes: Partial<S>,
+    context: ActionNameContext = ActionNameContext.Normal
+  ): StoredAction => {
     const action: StoredAction = {
       type: generateActionName(changes, name ?? '', context),
       payload: changes,
@@ -403,7 +408,9 @@ export function createSimpleDevToolsPlugin<S extends object>(options: ReduxDevTo
 
       case 'IMPORT_STATE': {
         if (payload.nextLiftedState) {
-          const importedState = liftedStateManager.importState(payload.nextLiftedState as LiftedState<S>)
+          const importedState = liftedStateManager.importState(
+            payload.nextLiftedState as LiftedState<S>
+          )
 
           if (store._setStateForDevTools) {
             isUpdatingFromDevTools = true
@@ -497,7 +504,15 @@ export function createSimpleDevToolsPlugin<S extends object>(options: ReduxDevTo
 
     onStateChange: (newState: S, prevState: S, action: Partial<S> | null) => {
       // Skip if DevTools is disabled, updating from DevTools, or paused/locked
-      if (!DevToolsHelper.enabled || isUpdatingFromDevTools || isPaused || isLocked || !action || !storeCreated) return
+      if (
+        !DevToolsHelper.enabled ||
+        isUpdatingFromDevTools ||
+        isPaused ||
+        isLocked ||
+        !action ||
+        !storeCreated
+      )
+        return
 
       // Handle batching
       if (isBatch) {
@@ -524,7 +539,13 @@ export function createSimpleDevToolsPlugin<S extends object>(options: ReduxDevTo
     },
 
     onBatchEnd: (actions: Partial<S>[], finalState: S) => {
-      if (!DevToolsHelper.enabled || isUpdatingFromDevTools || isPaused || isLocked || !storeCreated) {
+      if (
+        !DevToolsHelper.enabled ||
+        isUpdatingFromDevTools ||
+        isPaused ||
+        isLocked ||
+        !storeCreated
+      ) {
         isBatch = false
         batchedActions = []
         return
@@ -555,7 +576,12 @@ export function createSimpleDevToolsPlugin<S extends object>(options: ReduxDevTo
       isTransaction = true
     },
 
-    onTransactionEnd: (success: boolean, storeInstance: Store<S>, changes?: Partial<S>, error?: Error) => {
+    onTransactionEnd: (
+      success: boolean,
+      storeInstance: Store<S>,
+      changes?: Partial<S>,
+      error?: Error
+    ) => {
       if (
         !success ||
         !DevToolsHelper.enabled ||
@@ -595,7 +621,14 @@ export function createSimpleDevToolsPlugin<S extends object>(options: ReduxDevTo
 
     onHistoryChanged: options => {
       // Skip if DevTools is disabled or updating from DevTools
-      if (!DevToolsHelper.enabled || isUpdatingFromDevTools || isPaused || isLocked || !storeCreated) return
+      if (
+        !DevToolsHelper.enabled ||
+        isUpdatingFromDevTools ||
+        isPaused ||
+        isLocked ||
+        !storeCreated
+      )
+        return
 
       // Create a history action
       const historyAction: PerformedAction = {
@@ -631,7 +664,10 @@ export function createSimpleDevToolsPlugin<S extends object>(options: ReduxDevTo
         devTools.unsubscribe()
       }
 
-      if (window.__REDUX_DEVTOOLS_EXTENSION__ && typeof window.__REDUX_DEVTOOLS_EXTENSION__.disconnect === 'function') {
+      if (
+        window.__REDUX_DEVTOOLS_EXTENSION__ &&
+        typeof window.__REDUX_DEVTOOLS_EXTENSION__.disconnect === 'function'
+      ) {
         window.__REDUX_DEVTOOLS_EXTENSION__.disconnect()
       }
     },
@@ -688,7 +724,9 @@ export function generateActionName<S extends object>(
     }
     // Try to summarize the batch
     const allKeys = action.flatMap(a => (a && typeof a === 'object' ? Object.keys(a) : []))
-    const uniqueKeys = Array.from(new Set(allKeys.filter(k => !k.startsWith('__') && !k.startsWith('_'))))
+    const uniqueKeys = Array.from(
+      new Set(allKeys.filter(k => !k.startsWith('__') && !k.startsWith('_')))
+    )
     if (uniqueKeys.length === 0) {
       return `${storeName}/BATCH[${action.length}]_EMPTY`
     }
@@ -833,7 +871,10 @@ export const DevToolsHelper = {
         if (v === 'false') return true
       }
       // Fallback to NODE_ENV
-      return (typeof process !== 'undefined' && process.env && process.env.NODE_ENV !== 'production') || false
+      return (
+        (typeof process !== 'undefined' && process.env && process.env.NODE_ENV !== 'production') ||
+        false
+      )
     } catch {
       return false
     }

@@ -72,13 +72,20 @@ export class PersistenceManager<S extends object> {
    */
   private getStorageKey(persistKey: string | undefined): string | null {
     if (!persistKey) return null
-    return this.storageType === StorageType.Cookie ? `${this.cookiePrefix}${persistKey}` : persistKey
+    return this.storageType === StorageType.Cookie
+      ? `${this.cookiePrefix}${persistKey}`
+      : persistKey
   }
 
   /**
    * Persist state to the configured storage
    */
-  public persistState(persistKey: string | undefined, state: S, plugins: PluginManager<S>, store: Store<S>): boolean {
+  public persistState(
+    persistKey: string | undefined,
+    state: S,
+    plugins: PluginManager<S>,
+    store: Store<S>
+  ): boolean {
     const storageKey = this.getStorageKey(persistKey)
     if (!storageKey || !this.isStorageAvailable()) return false
 
@@ -95,7 +102,11 @@ export class PersistenceManager<S extends object> {
       }
       try {
         // Apply any plugin transformations
-        const beforePersistedState = plugins.beforePersist(persistedState.data, this.storageType, store)
+        const beforePersistedState = plugins.beforePersist(
+          persistedState.data,
+          this.storageType,
+          store
+        )
         if (beforePersistedState) {
           persistedState.data = beforePersistedState
         }
@@ -168,7 +179,10 @@ export class PersistenceManager<S extends object> {
           wrappedState = getLocalStorage<PersistedState<any>>(storageKey, {} as PersistedState<any>)
           break
         case StorageType.Session:
-          wrappedState = getSessionStorage<PersistedState<any>>(storageKey, {} as PersistedState<any>)
+          wrappedState = getSessionStorage<PersistedState<any>>(
+            storageKey,
+            {} as PersistedState<any>
+          )
           break
         case StorageType.Cookie:
           const cookieValue = getCookie(storageKey)

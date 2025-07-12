@@ -84,7 +84,13 @@ store.updatePath(['todos', 0, 'completed'], () => true)
 // Thunk type definition, must match the store's state type
 // This thunk can access the store's state, dispatch actions, and perform async operations
 // Thunks can be defined anywhere, but its reccomended to define them in a separate file for better organization
-const asyncThunk: Thunk<AppState> = async ({dispatch, getState, updatePath, transaction, batch}) => {
+const asyncThunk: Thunk<AppState> = async ({
+  dispatch,
+  getState,
+  updatePath,
+  transaction,
+  batch,
+}) => {
   console.log('Running async thunk...')
 
   // Simulate API call

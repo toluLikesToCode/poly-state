@@ -1,4 +1,4 @@
-import React from 'react'
+import React, {Profiler, ProfilerOnRenderCallback, useCallback} from 'react'
 import {describe, it, expect, beforeEach, vi} from 'vitest'
 import {render, screen, fireEvent} from '@testing-library/react'
 import {act} from 'react'
@@ -29,11 +29,9 @@ describe('React Integration', () => {
   it('should create store context successfully', () => {
     const context = createStoreContext(store)
 
-    expect(context.StoreProvider).toBeDefined()
-    expect(context.useStore).toBeDefined()
-    expect(context.useDispatch).toBeDefined()
-    expect(context.useSelector).toBeDefined()
-    expect(context.StoreContext).toBeDefined()
+    for (const key of Object.keys(context)) {
+      expect((context as any)[key]).toBeDefined()
+    }
   })
 
   it('should create StoreProvider component', () => {
@@ -86,9 +84,21 @@ describe('React Integration – UI', () => {
   }
 
   it('should update UI when store state changes via dispatch', () => {
+    let renderCount = 0
+    function onRender(
+      id: string,
+      phase: 'mount' | 'update' | 'nested-update',
+      ...rest: any[]
+    ): void {
+      if (phase === 'update' || phase === 'nested-update') {
+        renderCount++
+      }
+    }
     render(
       <StoreProvider>
-        <Counter />
+        <Profiler id="Counter" onRender={onRender}>
+          <Counter />
+        </Profiler>
       </StoreProvider>
     )
     const count = screen.getByTestId('count')
@@ -96,21 +106,23 @@ describe('React Integration – UI', () => {
     const result = fireEvent.click(screen.getByText('Increment'))
     expect(result).toBe(true)
     expect(count.textContent).toBe('1')
+    expect(renderCount).toBe(1)
   })
 })
 
 describe('React Integration – Complete Basic Usage', () => {
+  interface Todo {
+    id: number
+    text: string
+    completed: boolean
+  }
   interface AppState {
     user: {
       id: number | null
       name: string
       email: string
     }
-    todos: Array<{
-      id: number
-      text: string
-      completed: boolean
-    }>
+    todos: Todo[]
     settings: {
       theme: 'light' | 'dark'
       notifications: boolean
@@ -123,8 +135,24 @@ describe('React Integration – Complete Basic Usage', () => {
   let useStore: UseStoreHook<AppState>
   let useDispatch: UseDispatchHook<AppState>
   let useSelector: UseSelectorHook<AppState>
+  let useThunk: UseThunkHook<AppState>
+  let useTransaction: UseTransactionHook<AppState>
+  let useUpdatePath: UseUpdatePathHook
 
   let selectorSpy = vi.fn()
+  let selectors: {
+    selectUser: (state: AppState) => AppState['user']
+    selectUserId: (state: AppState) => AppState['user']['id']
+    selectName: (state: AppState) => AppState['user']['name']
+    selectEmail: (state: AppState) => AppState['user']['email']
+    selectTodos: (state: AppState) => AppState['todos']
+    selectTodoIds: (state: AppState) => number[]
+    selectCompletedTodos: (state: AppState) => AppState['todos']
+    selectSettings: (state: AppState) => AppState['settings']
+    selectTheme: (state: AppState) => AppState['settings']['theme']
+    selectNotifications: (state: AppState) => AppState['settings']['notifications']
+    selectCounter: (state: AppState) => AppState['counter']
+  }
 
   beforeEach(() => {
     store = createStore<AppState>({
@@ -141,11 +169,62 @@ describe('React Integration – Complete Basic Usage', () => {
       counter: 0,
     })
 
+    interface AppState {
+      user: {
+        id: number | null
+        name: string
+        email: string
+      }
+      todos: Array<{
+        id: number
+        text: string
+        completed: boolean
+      }>
+      settings: {
+        theme: 'light' | 'dark'
+        notifications: boolean
+      }
+      counter: number
+    }
+
+    selectors = (() => {
+      const selectUser = store.select(state => state.user)
+      const selectUserId = store.select(selectUser, user => user.id)
+      const selectName = store.select(selectUser, user => user.name)
+      const selectEmail = store.select(selectUser, user => user.email)
+      const selectTodos = store.select(state => state.todos)
+      const selectTodoIds = store.select(selectTodos, todos => todos.map(todo => todo.id))
+      const selectCompletedTodos = store.select(selectTodos, todos =>
+        todos.filter(todo => todo.completed)
+      )
+      const selectSettings = store.select(state => state.settings)
+      const selectTheme = store.select(selectSettings, settings => settings.theme)
+      const selectNotifications = store.select(selectSettings, settings => settings.notifications)
+      const selectCounter = store.select(state => state.counter)
+
+      return {
+        selectUserId,
+        selectName,
+        selectEmail,
+        selectTodos,
+        selectSettings,
+        selectCounter,
+        selectUser,
+        selectTodoIds,
+        selectCompletedTodos,
+        selectTheme,
+        selectNotifications,
+      }
+    })()
+
     const context = createStoreContext(store)
     StoreProvider = context.StoreProvider
     useStore = context.useStore
     useDispatch = context.useDispatch
     useSelector = context.useSelector
+    useThunk = context.useThunk
+    useTransaction = context.useTransaction
+    useUpdatePath = context.useUpdatePath
   })
 
   // Component that demonstrates basic counter functionality
@@ -171,16 +250,13 @@ describe('React Integration – Complete Basic Usage', () => {
 
   // Component that demonstrates user management
   function UserProfile() {
-    const user = useSelector(
-      (state: AppState) => state.user,
-      user => {
-        selectorSpy()
-        return {
-          ...user,
-          hasEmail: user.email.length > 0,
-        }
+    const user = useSelector(selectors.selectUser, user => {
+      selectorSpy()
+      return {
+        ...user,
+        hasEmail: user.email.length > 0,
       }
-    )
+    })
     const dispatch = useDispatch()
 
     const updateUser = () => {
@@ -218,48 +294,22 @@ describe('React Integration – Complete Basic Usage', () => {
     )
   }
 
-  // Component that demonstrates todo list functionality
-  function TodoList() {
-    const todos = useSelector(state => state.todos)
-    const dispatch = useDispatch()
-
-    const addTodo = () => {
-      const newTodo = {
-        id: Date.now(),
-        text: `Todo ${todos.length + 1}`,
-        completed: false,
-      }
-      dispatch({
-        todos: [...todos, newTodo],
-      })
-    }
-
-    const toggleTodo = (id: number) => {
-      dispatch({
-        todos: todos.map(todo => (todo.id === id ? {...todo, completed: !todo.completed} : todo)),
-      })
-    }
-
-    const removeTodo = (id: number) => {
-      dispatch({
-        todos: todos.filter(todo => todo.id !== id),
-      })
-    }
-
+  // Component that maps todos to UI elements
+  function TodoMap({todos, handleToggleTodo, handleRemoveTodo}) {
     return (
       <div>
-        <div data-testid="todo-count">{todos.length}</div>
-        <button data-testid="add-todo" onClick={addTodo}>
-          Add Todo
-        </button>
-        {todos.map(todo => (
+        {todos.map((todo: Todo) => (
           <div key={todo.id} data-testid={`todo-${todo.id}`}>
             <span data-testid={`todo-text-${todo.id}`}>{todo.text}</span>
             <span data-testid={`todo-completed-${todo.id}`}>{todo.completed ? '✓' : '○'}</span>
-            <button data-testid={`toggle-todo-${todo.id}`} onClick={() => toggleTodo(todo.id)}>
+            <button
+              data-testid={`toggle-todo-${todo.id}`}
+              onClick={() => handleToggleTodo(todo.id)}>
               Toggle
             </button>
-            <button data-testid={`remove-todo-${todo.id}`} onClick={() => removeTodo(todo.id)}>
+            <button
+              data-testid={`remove-todo-${todo.id}`}
+              onClick={() => handleRemoveTodo(todo.id)}>
               Remove
             </button>
           </div>
@@ -268,33 +318,74 @@ describe('React Integration – Complete Basic Usage', () => {
     )
   }
 
-  // Component that demonstrates settings management
-  function Settings() {
-    const settings = useSelector(state => state.settings)
+  // Component that demonstrates todo list functionality
+  function TodoList() {
+    const todos = useSelector(selectors.selectTodos)
     const dispatch = useDispatch()
+    const transaction = useTransaction()
 
-    const toggleTheme = () => {
-      dispatch({
-        settings: {
-          ...settings,
-          theme: settings.theme === 'light' ? 'dark' : 'light',
-        },
+    const handleAddTodo = useCallback(() => {
+      transaction(draft => {
+        draft.todos.push({
+          id: Date.now(),
+          text: `Todo ${draft.todos.length + 1}`,
+          completed: false,
+        })
       })
-    }
+    }, [transaction])
 
-    const toggleNotifications = () => {
-      dispatch({
-        settings: {
-          ...settings,
-          notifications: !settings.notifications,
-        },
-      })
-    }
+    const handleToggleTodo = useCallback(
+      (id: number) => {
+        transaction(draft => {
+          const todo = draft.todos.find(todo => todo.id === id)
+          if (todo) {
+            todo.completed = !todo.completed
+          }
+        })
+      },
+      [transaction]
+    )
+
+    const handleRemoveTodo = useCallback(
+      (id: number) => {
+        dispatch({
+          todos: todos.filter(todo => todo.id !== id),
+        })
+      },
+      [dispatch, todos]
+    )
 
     return (
       <div>
-        <div data-testid="theme">{settings.theme}</div>
-        <div data-testid="notifications">{settings.notifications.toString()}</div>
+        <div data-testid="todo-count">{todos.length}</div>
+        <button data-testid="add-todo" onClick={handleAddTodo}>
+          Add Todo
+        </button>
+        <TodoMap
+          todos={todos}
+          handleToggleTodo={handleToggleTodo}
+          handleRemoveTodo={handleRemoveTodo}
+        />
+      </div>
+    )
+  }
+
+  // Component that demonstrates settings management
+  function Settings() {
+    const theme = useSelector(selectors.selectTheme)
+    const notifications = useSelector(selectors.selectNotifications)
+    const updatePath = useUpdatePath()
+
+    const toggleTheme = () =>
+      updatePath(['settings', 'theme'], theme => (theme === 'light' ? 'dark' : 'light'))
+
+    const toggleNotifications = () =>
+      updatePath(['settings', 'notifications'], notifications => !notifications)
+
+    return (
+      <div>
+        <div data-testid="theme">{theme}</div>
+        <div data-testid="notifications">{notifications.toString()}</div>
         <button data-testid="toggle-theme" onClick={toggleTheme}>
           Toggle Theme
         </button>
@@ -307,10 +398,13 @@ describe('React Integration – Complete Basic Usage', () => {
 
   // Component that uses multiple selectors
   function Dashboard() {
-    const userCount = useSelector(state => (state.user.id ? 1 : 0))
-    const todoCount = useSelector(state => state.todos.length)
-    const completedTodos = useSelector(state => state.todos.filter(todo => todo.completed).length)
-    const isDarkMode = useSelector(state => state.settings.theme === 'dark')
+    const userCount = useSelector(selectors.selectUserId, userId => (userId ? 1 : 0))
+    const todoCount = useSelector(selectors.selectTodos, todos => todos.length)
+    const completedTodos = useSelector(
+      selectors.selectTodos,
+      todos => todos.filter(todo => todo.completed).length
+    )
+    const isDarkMode = useSelector(selectors.selectTheme, theme => theme === 'dark')
 
     return (
       <div>
@@ -363,6 +457,22 @@ describe('React Integration – Complete Basic Usage', () => {
     // Reset
     fireEvent.click(resetBtn)
     expect(counter.textContent).toBe('0')
+
+    // increment 50 times
+    for (let i = 0; i < 50; i++) {
+      fireEvent.click(incrementBtn)
+    }
+    expect(counter.textContent).toBe('50')
+
+    // decrement 20 times
+    for (let i = 0; i < 20; i++) {
+      fireEvent.click(decrementBtn)
+    }
+    expect(counter.textContent).toBe('30')
+
+    // Reset again
+    fireEvent.click(resetBtn)
+    expect(counter.textContent).toBe('0')
   })
 
   it('should handle user profile management', () => {
@@ -380,17 +490,13 @@ describe('React Integration – Complete Basic Usage', () => {
     expect(userEmail.textContent).toBe('No Email')
 
     // Update user
-    act(() => {
-      fireEvent.click(updateBtn)
-    })
+    act(() => fireEvent.click(updateBtn))
     expect(userId.textContent).toBe('1')
     expect(userName.textContent).toBe('John Doe')
     expect(userEmail.textContent).toBe('john@example.com')
 
     // Clear user
-    act(() => {
-      fireEvent.click(clearBtn)
-    })
+    act(() => fireEvent.click(clearBtn))
     expect(userId.textContent).toBe('No ID')
     expect(userName.textContent).toBe('No Name')
     expect(userEmail.textContent).toBe('No Email')
@@ -406,9 +512,7 @@ describe('React Integration – Complete Basic Usage', () => {
     expect(todoCount.textContent).toBe('0')
 
     // Add first todo
-    act(() => {
-      fireEvent.click(addBtn)
-    })
+    act(() => fireEvent.click(addBtn))
     expect(todoCount.textContent).toBe('1')
 
     // Get all todo elements (we can't predict the exact IDs since they use Date.now())
@@ -417,9 +521,7 @@ describe('React Integration – Complete Basic Usage', () => {
     expect(todoElements[0].textContent).toBe('Todo 1')
 
     // Add second todo
-    act(() => {
-      fireEvent.click(addBtn)
-    })
+    act(() => fireEvent.click(addBtn))
     expect(todoCount.textContent).toBe('2')
 
     // Should now have 2 todos

@@ -1,6 +1,12 @@
 import {describe, it, expect, beforeEach, vi} from 'vitest'
 import {PluginManager} from '../../src/plugins/pluginManager'
-import {Plugin, ActionPayload, StorageType, Store, historyChangePluginOptions} from '../../src/core/state/types'
+import {
+  Plugin,
+  ActionPayload,
+  StorageType,
+  Store,
+  historyChangePluginOptions,
+} from '../../src/core/state/types'
 import {MiddlewareError, StoreError} from '../../src/shared/errors'
 import {Draft} from 'immer'
 

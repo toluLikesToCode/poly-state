@@ -26,7 +26,9 @@ export function setCookie(name: string, value: string, options?: CookieOptions):
     if (options) {
       if (options.expires) {
         const expires =
-          typeof options.expires === 'number' ? new Date(Date.now() + options.expires * 864e5) : options.expires
+          typeof options.expires === 'number'
+            ? new Date(Date.now() + options.expires * 864e5)
+            : options.expires
         cookieStr += `; expires=${expires.toUTCString()}`
       }
       if (options.path) cookieStr += `; path=${options.path}`

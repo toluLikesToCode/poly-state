@@ -67,7 +67,11 @@ function handleStorageError(operation: string, key: string, error: unknown): voi
 /**
  * Gets a value from localStorage and parses it from JSON.
  */
-export function getLocalStorage<T>(key: string, fallback: T, reviver?: (this: any, key: string, value: any) => any): T {
+export function getLocalStorage<T>(
+  key: string,
+  fallback: T,
+  reviver?: (this: any, key: string, value: any) => any
+): T {
   try {
     const saved = localStorage.getItem(key)
     if (saved !== null) {
@@ -87,7 +91,12 @@ export function setLocalStorage(key: string, value: unknown): void {
     localStorage.setItem(key, JSON.stringify(value))
   } catch (error) {
     handleStorageError('set localStorage', key, error)
-    throw new StorageError(`Failed to set localStorage for key '${key}'`, 'setLocalStorage', key, error)
+    throw new StorageError(
+      `Failed to set localStorage for key '${key}'`,
+      'setLocalStorage',
+      key,
+      error
+    )
   }
 }
 
