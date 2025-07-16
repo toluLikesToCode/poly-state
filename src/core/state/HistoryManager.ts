@@ -47,7 +47,6 @@ export class HistoryManager<S extends object> {
   undo(options: historyChangePluginOptions<S>): S | false {
     if (!this.canUndo(options.steps)) return false
     const {persistFn, ...rest} = options
-    const {persistFn, ...rest} = options
 
     if (this.historyPlugin.beforeChange(rest) === false) return false
 
@@ -69,7 +68,6 @@ export class HistoryManager<S extends object> {
    */
   redo(options: historyChangePluginOptions<S>): S | false {
     if (!this.canRedo(options.steps)) return false
-    const {persistFn, ...rest} = options
     const {persistFn, ...rest} = options
 
     if (this.historyPlugin.beforeChange(rest) === false) return false
