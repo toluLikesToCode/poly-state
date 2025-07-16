@@ -314,10 +314,7 @@ export type SupportedLogger =
       child?: (childContextSuffix: string, childDefaultMeta?: Record<string, any>) => any
     }
 
-/**
- * Log levels supported by the logger middleware.
- */
-export type LoggerLevel =
+type StandardLoggerLevel =
   | 'log'
   | 'info'
   | 'success'
@@ -327,6 +324,8 @@ export type LoggerLevel =
   | 'trace'
   | 'silly'
 
+// Allows any string, but gives autocomplete for standard levels
+export type LoggerLevel = StandardLoggerLevel | (string & {})
 /**
  * Configuration options for the logger middleware.
  */

@@ -29,6 +29,8 @@ import {getPath} from '../core/utils/path'
 // Re-export all types for convenience
 export * from './types'
 
+import {Prettify} from '../shared'
+
 // Import types from the dedicated types file
 import type {StoreContextValue, StoreContextResult, UseSubscribeToHook} from './types'
 
@@ -82,7 +84,9 @@ const globalStoreHooks = new WeakMap<
  * @see {@link StoreContextResult} for all available hooks and their documentation
  * @see {@link Store} for the store interface
  */
-export function createStoreContext<S extends object>(store: Store<S>): StoreContextResult<S> {
+export function createStoreContext<S extends object>(
+  store: Store<S>
+): Prettify<StoreContextResult<S>> {
   const StoreContext = createContext<StoreContextValue<S> | null>(null)
   StoreContext.displayName = 'StoreContext'
 
@@ -547,7 +551,7 @@ export function withStore<S extends object, P extends object>(
  */
 export function useStoreHooks<S extends object>(
   store: Store<S>
-): Omit<StoreContextResult<S>, 'StoreContext' | 'StoreProvider'> {
+): Prettify<Omit<StoreContextResult<S>, 'StoreContext' | 'StoreProvider'>> {
   if (!globalStoreHooks.has(store)) {
     // Create standalone hooks that work directly with the store
     const hooks = {
