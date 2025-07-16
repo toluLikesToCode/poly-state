@@ -479,6 +479,7 @@ export function createStore<S extends object>(
   }
 
   storeInstance.undo = (steps: number = 1, path?: (string | number)[]) => {
+    const prevState = {...state}
     const result = historyManager.undo({
       operation: 'undo',
       steps,
@@ -486,7 +487,6 @@ export function createStore<S extends object>(
       oldState: state,
       newState: historyManager.getUndoState(steps) || state,
       persistFn: persistState,
-      notifyFn: prevState => notifyListeners(prevState, null),
     })
     if (result === false) return false
 
@@ -507,10 +507,12 @@ export function createStore<S extends object>(
     }
 
     state = assignState(state, result) // Update the store's state, ensuring reference equality
+    notifyListeners(prevState, null) // Notify with the state before undo as prevState
     return true
   }
 
   storeInstance.redo = (steps = 1, path?: (string | number)[]) => {
+    const prevState = {...state}
     const result = historyManager.redo({
       operation: 'redo',
       steps,
@@ -518,7 +520,6 @@ export function createStore<S extends object>(
       newState: historyManager.getRedoState(steps) || state,
       store: storeInstance,
       persistFn: persistState,
-      notifyFn: prevState => notifyListeners(prevState, null),
     })
 
     if (result === false) return false
@@ -530,6 +531,7 @@ export function createStore<S extends object>(
     }
 
     state = assignState(state, result) // Update the store's state, ensuring reference equality
+    notifyListeners(prevState, null) // Notify with the state before redo as prevState
     return true
   }
 

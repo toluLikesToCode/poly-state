@@ -46,19 +46,19 @@ export class HistoryManager<S extends object> {
    */
   undo(options: historyChangePluginOptions<S>): S | false {
     if (!this.canUndo(options.steps)) return false
-    const {persistFn, notifyFn, ...rest} = options
+    const {persistFn, ...rest} = options
 
     if (this.historyPlugin.beforeChange(rest) === false) return false
 
     this.isHistoryMutation = true
-    const prevStateForNotification = {...rest.oldState}
+    //const prevStateForNotification = {...rest.oldState}
 
     this.historyIndex -= options.steps
     const state = {...this.history[this.historyIndex]}
     this.applyTrimRule()
 
     if (persistFn) persistFn(state)
-    if (notifyFn) notifyFn(prevStateForNotification, null)
+    //if (notifyFn) notifyFn(prevStateForNotification, null)
 
     this.isHistoryMutation = false
     this.historyPlugin.afterChange({...rest, newState: state})
@@ -70,19 +70,17 @@ export class HistoryManager<S extends object> {
    */
   redo(options: historyChangePluginOptions<S>): S | false {
     if (!this.canRedo(options.steps)) return false
-    const {persistFn, notifyFn, ...rest} = options
+    const {persistFn, ...rest} = options
 
     if (this.historyPlugin.beforeChange(rest) === false) return false
 
     this.isHistoryMutation = true
-    const prevStateForNotification = {...rest.oldState}
 
     this.historyIndex += options.steps
     const state = {...this.history[this.historyIndex]}
     this.applyTrimRule()
 
     if (persistFn) persistFn(state)
-    if (notifyFn) notifyFn(prevStateForNotification, null)
 
     this.isHistoryMutation = false
     this.historyPlugin.afterChange({...rest, newState: state})

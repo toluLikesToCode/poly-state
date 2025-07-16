@@ -125,7 +125,6 @@ export interface historyChangePluginOptions<S extends object> {
   oldState: S
   newState: S
   persistFn?: (state: S) => void // Optional function to persist state after history change
-  notifyFn?: (prevState: S, actionApplied?: ActionPayload<S> | null) => void // Optional function to notify about history change
 }
 
 export interface Plugin<S extends object> {
