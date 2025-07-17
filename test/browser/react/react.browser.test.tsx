@@ -1,9 +1,15 @@
 import {describe, it, expect, beforeEach} from 'vitest'
 import {render, fireEvent, waitFor} from '@testing-library/react'
-import React from 'react'
-import {createStore} from '../../../src/core/state/createStore'
+import {act} from 'react'
+import {
+  createStore,
+  StorageType,
+  getLocalStorage,
+  setLocalStorage,
+  PersistedState,
+  Thunk,
+} from '../../../src/core'
 import {useStoreHooks, createStoreContext} from '../../../src/react'
-import {StorageType} from '../../../src/core/state/types'
 
 describe('React Integration Browser Tests', () => {
   beforeEach(() => {
@@ -52,12 +58,23 @@ describe('React Integration Browser Tests', () => {
 
     const parsedData = JSON.parse(stored!)
     expect(parsedData.data.count).toBe(1)
+
+    const parsedValue = getLocalStorage('react-browser-test', {} as PersistedState<{count: number}>)
+    expect(parsedValue.data).toMatchObject({
+      count: 1,
+    })
   })
 
   it('should restore state in React components from real storage', () => {
+    interface state {
+      count: number
+      name: string
+    }
+
+    const initialState: state = {count: 0, name: 'initial'}
     // Pre-populate localStorage
-    const testData = {
-      data: {count: 42, name: 'restored'},
+    const testData: PersistedState<state> = {
+      data: {count: 42, name: 'restored'} as state,
       meta: {
         lastUpdated: Date.now(),
         sessionId: 'test-session',
@@ -66,13 +83,10 @@ describe('React Integration Browser Tests', () => {
     }
     localStorage.setItem('react-restore-test', JSON.stringify(testData))
 
-    const store = createStore(
-      {count: 0, name: 'initial'},
-      {
-        persistKey: 'react-restore-test',
-        storageType: StorageType.Local,
-      }
-    )
+    const store = createStore(initialState, {
+      persistKey: 'react-restore-test',
+      storageType: StorageType.Local,
+    })
 
     function TestComponent() {
       const {useSelector} = useStoreHooks(store)
@@ -92,29 +106,41 @@ describe('React Integration Browser Tests', () => {
     // Should show restored values
     expect(getByTestId('count').textContent).toBe('42')
     expect(getByTestId('name').textContent).toBe('restored')
+
+    // verify localStorage has the restored state
+    const stored = getLocalStorage('react-restore-test', {} as PersistedState<state>)
+    expect(stored).toBeTruthy()
+    expect(stored.data).toMatchObject({
+      count: 42,
+      name: 'restored',
+    })
   })
 
   it('should work with StoreProvider and multiple components', async () => {
-    const store = createStore(
-      {shared: 0},
-      {
-        persistKey: 'react-provider-test',
-        storageType: StorageType.Local,
-      }
-    )
+    interface state {
+      readonly shared: number
+    }
+    const initialState: state = {shared: 0}
+    const store = createStore(initialState, {
+      persistKey: 'react-provider-test',
+      storageType: StorageType.Local,
+    })
 
-    const {StoreProvider, useSelector, useDispatch} = createStoreContext(store)
+    const {StoreProvider, useStoreValue, useThunk} = createStoreContext(store)
 
     function DisplayComponent() {
-      const shared = useSelector(state => state.shared)
+      const shared = useStoreValue('shared')
       return <span data-testid="display">{shared}</span>
     }
 
     function ButtonComponent() {
-      const shared = useSelector(state => state.shared)
-      const dispatch = useDispatch()
+      const run = useThunk()
+      const increment: Thunk<state> = ({getState, dispatch}) => {
+        const current = getState().shared
+        dispatch({shared: current + 1})
+      }
       return (
-        <button data-testid="button" onClick={() => dispatch({shared: shared + 1})}>
+        <button data-testid="button" onClick={() => run(increment)}>
           Increment
         </button>
       )
@@ -134,8 +160,10 @@ describe('React Integration Browser Tests', () => {
     // Initial state
     expect(getByTestId('display').textContent).toBe('0')
 
-    // Click button
-    fireEvent.click(getByTestId('button'))
+    // Click button (wrap in act)
+    await act(async () => {
+      fireEvent.click(getByTestId('button'))
+    })
 
     // Wait for update
     await waitFor(() => {
@@ -143,26 +171,47 @@ describe('React Integration Browser Tests', () => {
     })
 
     // Verify persistence
-    const stored = localStorage.getItem('react-provider-test')
+    const stored = getLocalStorage('react-provider-test', {} as PersistedState<state>)
     expect(stored).toBeTruthy()
+    expect(stored.data.shared).toBe(1)
 
-    const parsedData = JSON.parse(stored!)
-    expect(parsedData.data.shared).toBe(1)
+    // Reset store (wrap in act)
+    await act(async () => {
+      store.reset()
+    })
+
+    // fire 100 events to ensure persistence works under load (wrap in act)
+    await act(async () => {
+      for (let i = 0; i < 100; i++) {
+        fireEvent.click(getByTestId('button'))
+      }
+    })
+
+    // Verify state after multiple updates
+    await waitFor(() => {
+      expect(getByTestId('display').textContent).toBe('100')
+    })
+
+    // Verify persistence after multiple updates
+    const finalStored = getLocalStorage('react-provider-test', {} as PersistedState<state>)
+    expect(finalStored).toBeTruthy()
+    expect(finalStored.data.shared).toBe(100)
   })
 
   it('should handle cross-tab synchronization in React components', async () => {
-    const store = createStore(
-      {synced: 0},
-      {
-        persistKey: 'react-sync-test',
-        storageType: StorageType.Local,
-        syncAcrossTabs: true,
-      }
-    )
+    interface state {
+      synced: number
+    }
+    const initialState: state = {synced: 0}
+    const store = createStore(initialState, {
+      persistKey: 'react-sync-test',
+      storageType: StorageType.Local,
+      syncAcrossTabs: true,
+    })
 
     function TestComponent() {
-      const {useSelector} = useStoreHooks(store)
-      const synced = useSelector(state => state.synced)
+      const {useStoreValue} = useStoreHooks(store)
+      const synced = useStoreValue('synced')
       return <span data-testid="synced">{synced}</span>
     }
 
@@ -180,19 +229,21 @@ describe('React Integration Browser Tests', () => {
         storeName: 'TestStore',
       },
     }
-    localStorage.setItem('react-sync-test', JSON.stringify(externalData))
 
-    // Trigger storage event
-    window.dispatchEvent(
-      new StorageEvent('storage', {
-        key: 'react-sync-test',
-        newValue: localStorage.getItem('react-sync-test'),
-        oldValue: null,
-        storageArea: localStorage,
-      })
-    )
+    setLocalStorage('react-sync-test', externalData)
 
-    // Wait for React component to update
+    // Wrap dispatch in act
+    await act(async () => {
+      window.dispatchEvent(
+        new StorageEvent('storage', {
+          key: 'react-sync-test',
+          newValue: localStorage.getItem('react-sync-test'),
+          oldValue: null,
+          storageArea: localStorage,
+        })
+      )
+    })
+    // Wait for React component to update after act
     await waitFor(
       () => {
         expect(getByTestId('synced').textContent).toBe('999')

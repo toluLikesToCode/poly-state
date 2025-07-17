@@ -1,17 +1,18 @@
-import {describe, it, expect, beforeEach} from 'vitest'
-import {createStore} from '../../../src/core/state/createStore'
-import {StorageType} from '../../../src/core/state/types'
+import {beforeEach, describe, expect, it} from 'vitest'
 import {
+  createStore,
+  getCookie,
   getLocalStorage,
-  setLocalStorage,
-  isLocalStorageAvailable,
-} from '../../../src/core/storage/local'
-import {
   getSessionStorage,
-  setSessionStorage,
+  isLocalStorageAvailable,
   isSessionStorageAvailable,
-} from '../../../src/core/storage/session'
-import {getCookie, setCookie, removeCookie} from '../../../src/core/storage/cookie'
+  Listener,
+  removeCookie,
+  setCookie,
+  setLocalStorage,
+  setSessionStorage,
+  StorageType,
+} from '../../../src/core'
 
 describe('Real Browser Storage Tests', () => {
   beforeEach(() => {
@@ -163,6 +164,12 @@ describe('Real Browser Storage Tests', () => {
 
       // Verify real document.cookie
       expect(document.cookie).toContain('cookie-test-store')
+
+      // Check cookie value
+      const cookieValue = getCookie('__store_cookie-test-store')
+      expect(cookieValue, 'cookie-test-store should be set in document.cookie').not.toBeUndefined()
+      const parsedData = JSON.parse(cookieValue!)
+      expect(parsedData.data).toMatchObject({cookie: 'updated'})
     })
 
     it('should use real cookie utility functions', () => {
@@ -217,9 +224,10 @@ describe('Real Browser Storage Tests', () => {
 
       // Listen for state changes
       const stateChanges: any[] = []
-      store.subscribe(state => {
-        stateChanges.push(state)
-      })
+      const listener: Listener<{shared: number}> = (newState, prevState) => {
+        stateChanges.push(newState)
+      }
+      store.subscribe(listener)
 
       // Simulate another tab changing localStorage
       const newData = {
@@ -242,12 +250,13 @@ describe('Real Browser Storage Tests', () => {
         })
       )
 
-      // Wait for event processing
+      // Wait for event processing and state update
       await new Promise(resolve => setTimeout(resolve, 100))
 
-      // Note: The actual behavior depends on how the store handles storage events
-      // This test verifies the storage event mechanism works in the browser
-      expect(localStorage.getItem('cross-tab-test')).toBeTruthy()
+      // Assert that the store's state was updated from the storage event
+      expect(store.getState().shared).toBe(999)
+      // Optionally, check that the stateChanges array captured the update
+      expect(stateChanges.some(s => s.shared === 999)).toBe(true)
     })
   })
 
@@ -292,7 +301,7 @@ describe('Real Browser Storage Tests', () => {
 
     it('should handle storage operation failures gracefully', () => {
       // Test with very long key (browser-dependent limits)
-      const longKey = 'x'.repeat(1000)
+      const longKey = 'x'.repeat(5000)
 
       expect(() => {
         setLocalStorage(longKey, 'test')
