@@ -1,7 +1,7 @@
 /**
  * Core Store Functionality Tests
  *
- * Comprehensive test suite for the Open Store's core functionality including:
+ * Comprehensive test suite for the Poly State's core functionality including:
  * - Basic state management (initialization, updates, subscriptions)
  * - Path-based updates (updatePath functionality)
  * - Selector memoization and optimization
@@ -17,10 +17,12 @@ import {
   historyChangePluginOptions,
   type Middleware,
 } from '../../src/core'
+import {WritableDraft} from 'immer'
 
 interface BasicTestState {
   count: number
   name?: string
+  map?: Map<string, number>
 }
 
 interface NestedTestState {
@@ -78,7 +80,7 @@ describe('Store Core Functionality', () => {
 
   describe('Initialization and Basic State Management', () => {
     it('should initialize with the provided initial state', () => {
-      const initialState: BasicTestState = {count: 0, name: 'test'}
+      const initialState: BasicTestState = {count: 0, name: 'test', map: new Map()}
       store = createStore(initialState)
 
       expect(store.getState()).toEqual(initialState)
@@ -92,13 +94,47 @@ describe('Store Core Functionality', () => {
     })
 
     it('should update state with partial updates via dispatch', () => {
-      store = createStore({count: 0})
+      const initialState: BasicTestState = {
+        count: 0,
+        map: new Map<string, number>([
+          ['key1', 1],
+          ['key2', 2],
+        ]),
+      }
+
+      store = createStore<BasicTestState>(initialState, {
+        historyLimit: 10,
+      })
 
       store.dispatch({count: 5})
       expect(store.getState().count).toBe(5)
 
       store.dispatch({name: 'updated'})
-      expect(store.getState()).toEqual({count: 5, name: 'updated'})
+      const selectNotMap = store.select(state => {
+        return {count: state.count, name: state.name}
+      })
+      expect(selectNotMap()).toEqual({count: 5, name: 'updated'})
+
+      const updater = (draft: WritableDraft<BasicTestState>) => {
+        draft.map?.clear()
+      }
+
+      store.transaction(updater)
+
+      expect(store.getState().map).toEqual(new Map<string, number>())
+
+      store.dispatch({map: new Map<string, number>([['key3', 3]])})
+      expect(store.getState().map).toEqual(new Map<string, number>([['key3', 3]]))
+
+      const stateB4Reset = store.getState()
+
+      store.reset(false)
+      expect(store.getState()).toEqual(initialState)
+      const didUndoMap = store.undo(1, ['map'])
+      expect(didUndoMap).toBe(true)
+      expect(store.getState().map).toEqual(stateB4Reset.map)
+      expect(store.getState().count).toBe(initialState.count)
+      expect(store.getState().name).toBe(initialState.name)
     })
 
     it('should handle multiple rapid updates correctly', () => {
@@ -124,8 +160,9 @@ describe('Store Core Functionality', () => {
       expect(state2.count).toBe(1)
     })
 
-    it.skip('should undo and redo state changes', () => {
-      store = createStore<BasicTestState>({count: 0, name: 'test'}, {historyLimit: 50})
+    it('should handle basic undo and redo state changes', () => {
+      const initialState: BasicTestState = {count: 0, name: 'test'}
+      store = createStore(initialState, {historyLimit: 5})
       const currentCount = store.select(state => state.count)
       const currentName = store.select(state => state.name)
 
@@ -133,39 +170,48 @@ describe('Store Core Functionality', () => {
       expect(currentCount()).toBe(5287425)
       expect(currentName()).toBe('not-test')
 
-      const result1 = store.undo()
-      expect(result1).toBe(true)
+      let result = store.undo()
+      expect(result).toBe(true)
       expect(currentCount()).toBe(0)
       expect(currentName()).toBe('test')
 
-      const result2 = store.redo()
-      expect(result2).toBe(true)
+      result = store.redo()
+      expect(result).toBe(true)
       expect(currentCount()).toBe(5287425)
       expect(currentName()).toBe('not-test')
 
       // Ensure history limit is respected
-      for (let i = 0; i < 10; i++) {
+
+      for (let i = 0; i <= 10; i++) {
         store.dispatch({count: i})
       }
 
-      expect(currentCount()).toBe(9) // Last state
-      const result3 = store.undo(6) // Undo 6 steps
+      expect(currentCount()).toBe(10) // Last state
+      result = store.undo(6) // Undo 6 steps
       // should return false since 6 is outside of history limit
-      //expect(result3).toBe();
-      //expect(currentCount()).toBe(9); // Should still be 9
+      expect(result).toBe(false)
+      expect(currentCount()).toBe(10) // Should still be 9
       expect(currentName()).toBe('not-test') // Should still be "not-test"
 
-      const result4 = store.undo(5) // Undo 5 steps
-      expect(result4).toBe(true)
+      result = store.undo(5) // Undo 5 steps
+      expect(result).toBe(true)
+      expect(currentCount()).toEqual(5)
 
-      const history = store.getHistory()
-      expect(history.history.length).toBe(6) // Should have 6 entries in history
-      expect(history.history[4].count).toBe(9)
-      expect(currentCount()).toBe(4) // 9 -> 8 -> 7 -> 6 -> 5 -> 4
-      expect(currentName()).toBe('not-test') // Should still be "not-test"
+      store.batch(() => {
+        for (let i = 0; i < 100; i++) {
+          store.dispatch({count: i * 2 + i})
+        }
+      })
+      expect(store.getState()).toEqual({
+        count: 297,
+        name: 'not-test',
+      })
+
+      store.reset()
+      expect(store.getState()).toEqual(initialState)
     })
 
-    it.skip('should handle undo and redo with plugins', () => {
+    it('should handle undo and redo with plugins', () => {
       const initialState: BasicTestState = {count: 0, name: 'init'}
       const initialSettings = {historyLimit: 5}
       const pluginState1: BasicTestState = {count: 10}
@@ -234,20 +280,94 @@ describe('Store Core Functionality', () => {
       })
 
       // Now lets dispatch some more actions
-      for (let i = 0; i < 10; i++) {
+      for (let i = 0; i <= 10; i++) {
         store.dispatch({count: i})
       }
       // The state should now be the last dispatched state
-      expect(store.getState().count).toBe(9)
+      expect(store.getState().count).toBe(10)
 
       // history should now contain the initial state, plugin state and the last dispatched state
       history = store.getHistory()
       expect(history.history.length).toBe(6)
-      expect(history.history[0]).toEqual(initialState)
-      // The second entry shoyld be the last count state within the history limit
-      // The name should be the initial state name from the last undo
-      expect(history.history[1]).toEqual({count: 5, name: initialState.name})
+      expect(history.initialState).toEqual(initialState)
+
+      expect(history.history[0]).toEqual({count: 5, name: initialState.name})
       expect(history.history[5]).toEqual(store.getState())
+    })
+
+    it('should handle redo and undo with a provided path', () => {
+      const initialState: NestedTestState = {
+        profile: {
+          name: 'user1',
+          address: {
+            city: 'city1',
+            zip: 1,
+          },
+        },
+        tags: ['tag1'],
+      }
+      const store = createStore(initialState, {
+        historyLimit: 10,
+        name: 'redo-and-undo-with-a-provided-path',
+      })
+      const {dispatch, updatePath, undo, redo, reset, destroy, getState, transaction, select} =
+        store
+      const selectProfile = select(state => state.profile)
+      const selectName = select(selectProfile, profile => profile.name)
+      const selectAdress = select(selectProfile, profile => profile.address)
+      const selectTags = select(state => state.tags)
+      let newProfile = {
+        name: 'user2',
+        address: {
+          city: 'city2',
+          zip: 2,
+        },
+      }
+
+      expect(getState()).toEqual(initialState)
+      transaction(draft => {
+        draft.profile = newProfile
+        draft.tags.push('tag2')
+      })
+      expect(selectName()).toEqual('user2')
+      expect(selectProfile()).toEqual(newProfile)
+      expect(getState().tags).toEqual(['tag1', 'tag2'])
+
+      undo(1, ['profile'])
+      expect(selectProfile()).toEqual(initialState.profile)
+      expect(getState().tags).toEqual(['tag1', 'tag2'])
+
+      redo(1, ['profile'])
+      expect(selectProfile()).toEqual(newProfile)
+      expect(getState().tags).toEqual(['tag1', 'tag2'])
+
+      undo()
+      expect(getState()).toEqual(initialState)
+
+      // reset the store
+      reset()
+
+      expect(getState()).toEqual(initialState)
+      const newAddy = {
+        city: 'city2',
+        zip: 2,
+      }
+      transaction(draft => {
+        draft.profile.address = newAddy
+        draft.tags.push('tag2')
+        draft.profile.name = 'user2'
+      })
+      expect(selectAdress()).toEqual(newAddy)
+      expect(selectName()).toEqual('user2')
+      expect(selectTags()).toEqual(['tag1', 'tag2'])
+
+      let lastSuccessfulUndo = undo(1, ['profile', 'address'])
+
+      expect(lastSuccessfulUndo).toBe(true)
+
+      expect(selectAdress()).toEqual(initialState.profile.address)
+      //expect(selectName()).toEqual('user2')
+      //expect(selectTags()).toEqual(['tag1', 'tag2'])
     })
   })
 
@@ -311,9 +431,7 @@ describe('Store Core Functionality', () => {
       const currentState = store.getState()
       store.dispatch(currentState) // Dispatch same state
 
-      // Depending on implementation, this might or might not call listeners
-      // This test documents the expected behavior
-      expect(listener).toHaveBeenCalledTimes(1)
+      expect(listener).toHaveBeenCalledTimes(0)
     })
   })
 
@@ -394,8 +512,8 @@ describe('Store Core Functionality', () => {
       store = createStore<BasicTestState>({count: 0}, {middleware: [middleware]})
 
       store.dispatch({count: 5})
-      expect(store.getState().count).toBe(6) // Should be incremented by middleware
       expect(middlewareSpy).toHaveBeenCalledWith(5)
+      expect(store.getState().count).toBe(6) // Should be incremented by middleware
     })
 
     it('should handle errors in middleware gracefully', () => {

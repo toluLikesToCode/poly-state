@@ -1,5 +1,5 @@
 /**
- * Advanced Selector Tests for Open Store
+ * Advanced Selector Tests for Poly State
  *
  * Comprehensive test suite covering advanced selector functionality including:
  * - Memoized selectors with performance optimization
@@ -214,6 +214,7 @@ describe('Advanced Selector Operations', () => {
   let store: Store<AppState>
   let initialState: AppState
   let dispatch: Dispatch<AppState>
+  let batch: Store<AppState>['batch']
   let select: Store<AppState>['select']
   let updatePath: Store<AppState>['updatePath']
   let getState: Store<AppState>['getState']
@@ -369,12 +370,13 @@ describe('Advanced Selector Operations', () => {
       subscribe,
       subscribeToMultiple,
       subscribeToPath,
+      batch,
     } = store)
   })
 
   afterEach(() => {
     vi.clearAllTimers()
-    store.destroy()
+    store.destroy({resetRegistry: true})
   })
 
   describe('Basic Memoized Selectors', () => {
@@ -967,6 +969,50 @@ describe('Advanced Selector Operations', () => {
       unsubscribeUser()
       unsubscribeProduct()
       unsubscribeUI()
+    })
+
+    it('should handled debounced multiple dependency subscriptions correctly', () => {
+      vi.useFakeTimers()
+      const listener = vi.fn(([newValues, oldValues]) => {})
+
+      // create multiple selector subscriptions
+      const unsubscribe = subscribeToMultiple(
+        [
+          state => state.users.activeUserId,
+          state => state.products.filters.category,
+          state => state.ui.loading,
+        ] as const,
+        listener,
+        {debounceMs: 100}
+      )
+
+      // Rapid changes
+      for (let i = 0; i < 5; i++) {
+        batch(() => {
+          updatePath<AppState['users']['activeUserId']>(['users', 'activeUserId'], () => i)
+          updatePath<AppState['products']['filters']['category']>(
+            ['products', 'filters', 'category'],
+            () => `category-${i}`
+          )
+          updatePath<AppState['ui']['loading']>(['ui', 'loading'], () => i % 2 === 0)
+        })
+      }
+
+      expect(listener).not.toHaveBeenCalled()
+
+      // Fast forward time
+      vi.advanceTimersByTime(150)
+
+      expect(listener).toHaveBeenCalledTimes(1)
+      expect(listener).toHaveBeenCalledWith(
+        [4, 'category-4', true], // new values
+        [
+          initialState.users.activeUserId,
+          initialState.products.filters.category,
+          initialState.ui.loading,
+        ] // old values
+      )
+      vi.useRealTimers()
     })
   })
 

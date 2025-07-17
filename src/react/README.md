@@ -1,6 +1,6 @@
-# Open Store React Integration Guide
+# Poly State React Integration Guide
 
-Open Store provides a powerful and intuitive React integration that makes state management feel
+Poly State provides a powerful and intuitive React integration that makes state management feel
 natural and performant. This guide covers both traditional context-based integration and the new
 context-free approach, giving you flexibility to choose the best pattern for your use case.
 
@@ -20,15 +20,15 @@ context-free approach, giving you flexibility to choose the best pattern for you
 
 ## Quick Start
 
-Open Store offers two approaches for React integration. Choose the one that fits your needs:
+Poly State offers two approaches for React integration. Choose the one that fits your needs:
 
 ### Context-Free Approach (Recommended for Simple Cases)
 
 Perfect for simple components, testing, and gradual migration:
 
 ```tsx
-import {createStore} from 'open-store'
-import {useStoreHooks} from 'open-store/react'
+import {createStore} from 'poly-state'
+import {useStoreHooks} from 'poly-state/react'
 
 // Create your store
 const appStore = createStore({
@@ -57,8 +57,8 @@ function App() {
 Ideal for applications with many components and centralized state management:
 
 ```tsx
-import {createStore} from 'open-store'
-import {createStoreContext} from 'open-store/react'
+import {createStore} from 'poly-state'
+import {createStoreContext} from 'poly-state/react'
 
 // Define your state shape
 interface AppState {
@@ -100,7 +100,7 @@ function App() {
 
 ## Context-Free Integration - Deep Dive
 
-The `useStoreHooks` function provides a clean, optional way to use Open Store with React components
+The `useStoreHooks` function provides a clean, optional way to use Poly State with React components
 without requiring any context setup. This approach is useful for:
 
 - **Simple components** that need direct store access
@@ -111,8 +111,8 @@ without requiring any context setup. This approach is useful for:
 ### Basic Context-Free Usage
 
 ```tsx
-import {createStore} from 'open-store'
-import {useStoreHooks} from 'open-store/react'
+import {createStore} from 'poly-state'
+import {useStoreHooks} from 'poly-state/react'
 
 // Create your store
 const appStore = createStore({
@@ -189,8 +189,8 @@ Context-free hooks make testing much simpler:
 
 ```tsx
 import {render, screen, fireEvent} from '@testing-library/react'
-import {createStore} from 'open-store'
-import {useStoreHooks} from 'open-store/react'
+import {createStore} from 'poly-state'
+import {useStoreHooks} from 'poly-state/react'
 
 function TestComponent() {
   const testStore = createStore({count: 5})
@@ -247,7 +247,7 @@ management:
 
 ### Understanding the Architecture
 
-Open Store's React integration is built around a few key concepts that work together to provide
+Poly State's React integration is built around a few key concepts that work together to provide
 efficient state management:
 
 **Store Creation**: You start by creating a store instance that holds your application state. This
@@ -257,7 +257,7 @@ store exists outside of React and can be used independently.
 and components tailored to your specific store. This approach provides excellent TypeScript
 inference and prevents common mistakes.
 
-**Selective Subscriptions**: Unlike many state management solutions, Open Store allows components to
+**Selective Subscriptions**: Unlike many state management solutions, Poly State allows components to
 subscribe only to the specific parts of state they need. This means components re-render only when
 their relevant data changes.
 
@@ -273,23 +273,23 @@ for performance. The library uses Immer under the hood for complex updates.
 npm install -g yalc
 
 # Then publish the package locally
-cd path/to/open-store
+cd path/to/poly-state
 yalc publish
 
 # Now you can add it to your project
 cd path/to/your/project
-yalc add open-store
+yalc add poly-state
 
 
 # When available on npm, you can install it directly:
-npm install open-store
+npm install poly-state
 # or
-yarn add open-store
+yarn add poly-state
 # or
-pnpm add open-store
+pnpm add poly-state
 ```
 
-Open Store requires React 16.8 or later for hook support. TypeScript is strongly recommended for the
+Poly State requires React 16.8 or later for hook support. TypeScript is strongly recommended for the
 best development experience, though not required.
 
 ## Core Hooks and Usage
@@ -328,7 +328,7 @@ function UserProfile() {
 ```
 
 The selector function receives the entire state but should return only the data the component needs.
-Open Store automatically compares the returned values using deep equality, so your component won't
+Poly State automatically compares the returned values using deep equality, so your component won't
 re-render unless the selected data actually changes.
 
 ### useDispatch - Updating State
@@ -678,7 +678,7 @@ function ConnectionManager() {
 
 ### useAsyncThunk - Centralized Async State
 
-Open Store provides built-in patterns for handling async operations with loading and error states:
+Poly State provides built-in patterns for handling async operations with loading and error states:
 
 ```tsx
 function DataLoader() {
@@ -755,7 +755,7 @@ function DataLoader() {
 
 ## History and Time Travel
 
-Open Store includes built-in undo/redo functionality that integrates seamlessly with React:
+Poly State includes built-in undo/redo functionality that integrates seamlessly with React:
 
 ```tsx
 function HistoryControls() {
@@ -935,7 +935,7 @@ function TodoApp() {
 
 ### Performance Optimization Patterns
 
-Open Store includes several patterns for optimizing performance in React applications:
+Poly State includes several patterns for optimizing performance in React applications:
 
 ```tsx
 // Selector optimization - avoid creating new objects in selectors
@@ -948,7 +948,7 @@ function TodoList() {
 
   // ✅ Best - use store's built-in selector memoization
   const incompleteTodos = useSelector(state => state.todos.filter(todo => !todo.completed))
-  // Open Store automatically memoizes this selector
+  // Poly State automatically memoizes this selector
 
   return (
     <div>
@@ -1000,7 +1000,7 @@ function UserProfileDisplay() {
 
 ## TypeScript Integration
 
-Open Store provides excellent TypeScript support with full type inference:
+Poly State provides excellent TypeScript support with full type inference:
 
 ```tsx
 // Define your state shape with TypeScript
@@ -1096,14 +1096,14 @@ function TypedComponent() {
 
 ## Testing Patterns
 
-Open Store integrates well with React testing patterns for both approaches:
+Poly State integrates well with React testing patterns for both approaches:
 
 ### Testing Context-Based Components
 
 ```tsx
 import {render, screen, fireEvent, waitFor} from '@testing-library/react'
-import {createStore} from 'open-store'
-import {createStoreContext} from 'open-store/react'
+import {createStore} from 'poly-state'
+import {createStoreContext} from 'poly-state/react'
 
 // Create test utilities
 function createTestStore(initialState?: Partial<AppState>) {
@@ -1145,8 +1145,8 @@ describe('Counter Component', () => {
 
 ```tsx
 import {render, screen, fireEvent} from '@testing-library/react'
-import {createStore} from 'open-store'
-import {useStoreHooks} from 'open-store/react'
+import {createStore} from 'poly-state'
+import {useStoreHooks} from 'poly-state/react'
 
 function TestComponent() {
   const testStore = createStore({count: 5})

@@ -46,7 +46,12 @@ export function setSessionStorage(key: string, value: unknown): void {
     sessionStorage.setItem(key, JSON.stringify(value))
   } catch (error) {
     handleStorageError('set sessionStorage', key, error)
-    throw new StorageError(`Failed to set sessionStorage for key '${key}'`, 'setSessionStorage', key, error)
+    throw new StorageError(
+      `Failed to set sessionStorage for key '${key}'`,
+      'setSessionStorage',
+      key,
+      error
+    )
   }
 }
 

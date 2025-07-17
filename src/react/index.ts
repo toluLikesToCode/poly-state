@@ -1,8 +1,8 @@
 /**
- * @fileoverview React integration utilities for Open Store
+ * @fileoverview React integration utilities for Poly State
  *
  * This module provides React hooks and context providers that enable seamless integration
- * of the Open Store with React applications. It includes hooks for state selection,
+ * of the Poly State with React applications. It includes hooks for state selection,
  * dispatching actions, transactions, path-based operations, and more.
  */
 import React, {
@@ -29,6 +29,8 @@ import {getPath} from '../core/utils/path'
 // Re-export all types for convenience
 export * from './types'
 
+import {Prettify} from '../shared'
+
 // Import types from the dedicated types file
 import type {StoreContextValue, StoreContextResult, UseSubscribeToHook} from './types'
 
@@ -41,7 +43,7 @@ const globalStoreHooks = new WeakMap<
 /**
  * Creates React context and hooks for a store instance
  *
- * This is the main function for integrating Open Store with React applications.
+ * This is the main function for integrating Poly State with React applications.
  * It creates a complete set of React hooks and context providers that allow components
  * to interact with the store using React patterns.
  *
@@ -52,8 +54,8 @@ const globalStoreHooks = new WeakMap<
  * @example
  * **Basic Usage**
  * ```tsx
- * import { createStore } from 'open-store';
- * import { createStoreContext } from 'open-store/react';
+ * import { createStore } from 'poly-state';
+ * import { createStoreContext } from 'poly-state/react';
  *
  * const store = createStore({ count: 0, user: { name: '' } });
  * const { StoreProvider, useSelector, useDispatch } = createStoreContext(store);
@@ -82,7 +84,9 @@ const globalStoreHooks = new WeakMap<
  * @see {@link StoreContextResult} for all available hooks and their documentation
  * @see {@link Store} for the store interface
  */
-export function createStoreContext<S extends object>(store: Store<S>): StoreContextResult<S> {
+export function createStoreContext<S extends object>(
+  store: Store<S>
+): Prettify<StoreContextResult<S>> {
   const StoreContext = createContext<StoreContextValue<S> | null>(null)
   StoreContext.displayName = 'StoreContext'
 
@@ -418,8 +422,8 @@ export function createStoreContext<S extends object>(store: Store<S>): StoreCont
  * @example
  * **Basic Usage**
  * ```tsx
- * import { createStore } from 'open-store';
- * import { withStore } from 'open-store/react';
+ * import { createStore } from 'poly-state';
+ * import { withStore } from 'poly-state/react';
  *
  * interface Props {
  *   title: string;
@@ -480,7 +484,7 @@ export function withStore<S extends object, P extends object>(
  * @example
  * **Simple Usage - No Provider Needed**
  * ```tsx
- * import { useStoreHooks } from 'open-store/react';
+ * import { useStoreHooks } from 'poly-state/react';
  * import { appStore } from './store';
  *
  * function Counter() {
@@ -505,8 +509,8 @@ export function withStore<S extends object, P extends object>(
  * **Perfect for Testing**
  * ```tsx
  * import { render, screen } from '@testing-library/react';
- * import { createStore } from 'open-store';
- * import { useStoreHooks } from 'open-store/react';
+ * import { createStore } from 'poly-state';
+ * import { useStoreHooks } from 'poly-state/react';
  *
  * function TestComponent() {
  *   const testStore = createStore({ count: 5 });
@@ -547,7 +551,7 @@ export function withStore<S extends object, P extends object>(
  */
 export function useStoreHooks<S extends object>(
   store: Store<S>
-): Omit<StoreContextResult<S>, 'StoreContext' | 'StoreProvider'> {
+): Prettify<Omit<StoreContextResult<S>, 'StoreContext' | 'StoreProvider'>> {
   if (!globalStoreHooks.has(store)) {
     // Create standalone hooks that work directly with the store
     const hooks = {

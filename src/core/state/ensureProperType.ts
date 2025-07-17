@@ -15,7 +15,11 @@
  * );
  * ```
  */
-export function ensureProperType<T>(value: any, expectedType: 'Set' | 'Map', fallbackTransform?: (v: any) => any): T {
+export function ensureProperType<T>(
+  value: any,
+  expectedType: 'Set' | 'Map',
+  fallbackTransform?: (v: any) => any
+): T {
   if (expectedType === 'Set') {
     if (value instanceof Set) {
       return value as unknown as T

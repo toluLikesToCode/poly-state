@@ -31,7 +31,13 @@ export class MiddlewareExecutor<S extends object> {
       if (middlewareIndex < this.middleware.length) {
         const currentMiddleware = this.middleware[middlewareIndex++]
         try {
-          const result = currentMiddleware(currentPayload, prevState, nextMiddleware, getState, reset)
+          const result = currentMiddleware(
+            currentPayload,
+            prevState,
+            nextMiddleware,
+            getState,
+            reset
+          )
           // If the middleware returns a promise, await it
           if (result && typeof result.then === 'function') {
             await result

@@ -1,14 +1,14 @@
 /**
- * @fileoverview React integration type definitions for Open Store
+ * @fileoverview React integration type definitions for Poly State
  *
  * This module contains all TypeScript type definitions and interfaces for the React
- * integration of Open Store. These types provide comprehensive IntelliSense
+ * integration of Poly State. These types provide comprehensive IntelliSense
  * support and documentation for developers using the package.
  *
  * @example
  * ```tsx
- * import type { StoreContextResult, StoreHooks } from 'open-store/react';
- * import { createStoreContext } from 'open-store/react';
+ * import type { StoreContextResult, StoreHooks } from 'poly-state/react';
+ * import { createStoreContext } from 'poly-state/react';
  *
  * // Type-safe store context creation
  * interface AppState { count: number; user: { name: string } }
@@ -358,7 +358,7 @@ export type UseStoreHistoryHook<S extends object> = () => StoreHistoryState<S>
  * const executeThunk = useThunk();
  *
  * const loadUser = async () => {
- *   const user = await executeThunk(async (dispatch, getState) => {
+ *   const user = await executeThunk(async ({dispatch, getState}) => {
  *     const response = await fetch('/api/user');
  *     const userData = await response.json();
  *     dispatch({ user: userData });
@@ -368,7 +368,7 @@ export type UseStoreHistoryHook<S extends object> = () => StoreHistoryState<S>
  * };
  *
  * const incrementCounter = () => {
- *   executeThunk((dispatch, getState) => {
+ *   executeThunk(({dispatch, getState}) => {
  *     const current = getState().count;
  *     dispatch({ count: current + 1 });
  *   });
@@ -517,16 +517,16 @@ export interface StoreHooks<S extends object> {
  * Complete result object returned by {@link createStoreContext}
  *
  * This interface provides all the React context and hooks needed for full
- * Open Store integration with React applications.
+ * Poly State integration with React applications.
  *
  * @template S - The shape of the state object
  * @public
  *
  * @example
  * ```tsx
- * import { createStore } from 'open-store';
- * import { createStoreContext } from 'open-store/react';
- * import type { StoreContextResult } from 'open-store/react';
+ * import { createStore } from 'poly-state';
+ * import { createStoreContext } from 'poly-state/react';
+ * import type { StoreContextResult } from 'poly-state/react';
  *
  * interface AppState {
  *   count: number;

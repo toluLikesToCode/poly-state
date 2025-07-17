@@ -1,4 +1,10 @@
-import {ActionPayload, type Plugin, StorageType, Store, historyChangePluginOptions} from '../core/state/types'
+import {
+  ActionPayload,
+  type Plugin,
+  StorageType,
+  Store,
+  historyChangePluginOptions,
+} from '../core/state/types'
 import {ErrorContext, MiddlewareError, StoreError} from '../shared/errors'
 
 /**
@@ -8,7 +14,11 @@ export class PluginManager<S extends object> implements Plugin<S> {
   public name: string
   private plugins: Plugin<S>[] = []
   private handleError: (error: StoreError) => void
-  constructor(plugins: Plugin<S>[], handleError: (error: StoreError) => void, StoreName: string = 'PluginManager') {
+  constructor(
+    plugins: Plugin<S>[],
+    handleError: (error: StoreError) => void,
+    StoreName: string = 'PluginManager'
+  ) {
     this.name = StoreName
     this.plugins = plugins
     this.handleError = handleError
@@ -87,7 +97,12 @@ export class PluginManager<S extends object> implements Plugin<S> {
     }
   }
 
-  public beforeStateChange(action: ActionPayload<S>, prevState: S, store: Store<S>): ActionPayload<S> | void {
+  public beforeStateChange(
+    action: ActionPayload<S>,
+    prevState: S,
+    store: Store<S>
+  ): ActionPayload<S> | void {
+    if (this.plugins.length === 0) return
     let currentAction = action
 
     for (const plugin of this.plugins) {
@@ -114,7 +129,12 @@ export class PluginManager<S extends object> implements Plugin<S> {
     return currentAction
   }
 
-  public onStateChange(newState: S, prevState: S, action: ActionPayload<S> | null, store: Store<S>): void {
+  public onStateChange(
+    newState: S,
+    prevState: S,
+    action: ActionPayload<S> | null,
+    store: Store<S>
+  ): void {
     this.executeHook('onStateChange', [newState, prevState, action, store])
   }
 
@@ -149,7 +169,11 @@ export class PluginManager<S extends object> implements Plugin<S> {
     this.executeHook('onPersisted', [state, storageType, store])
   }
 
-  public onStateLoaded(loadedState: Partial<S>, storageType: StorageType, store: Store<S>): Partial<S> | void {
+  public onStateLoaded(
+    loadedState: Partial<S>,
+    storageType: StorageType,
+    store: Store<S>
+  ): Partial<S> | void {
     let currentState = loadedState
 
     for (const plugin of this.plugins) {
@@ -204,6 +228,7 @@ export class PluginManager<S extends object> implements Plugin<S> {
   }
 
   public beforeHistoryChange(options: historyChangePluginOptions<S>): boolean | void {
+    if (this.plugins.length === 0) return
     const result = this.executeHook('beforeHistoryChange', [options], {
       abortOnFalse: true,
     })
@@ -226,7 +251,12 @@ export class PluginManager<S extends object> implements Plugin<S> {
     this.executeHook('onTransactionStart', [store])
   }
 
-  public onTransactionEnd(success: boolean, store: Store<S>, changes?: Partial<S>, error?: Error): void {
+  public onTransactionEnd(
+    success: boolean,
+    store: Store<S>,
+    changes?: Partial<S>,
+    error?: Error
+  ): void {
     this.executeHook('onTransactionEnd', [success, store, changes, error])
   }
 }

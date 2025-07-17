@@ -75,6 +75,41 @@ export function createStore<S extends object>(
 
   // --- Core Store Functions ---
   const handleError = (error: StoreError) => {
+    // Custom Immer mutation error detection
+    if (
+      error.context?.error &&
+      error.context.error instanceof Error &&
+      typeof error.context.error.message === 'string' &&
+      error.context.error.message.includes('frozen and should not be mutated')
+    ) {
+      console.error(
+        `[Poly State] State mutation error: You attempted to directly mutate a frozen object (e.g., Map, Set, Array, or plain object) returned from getState().\n` +
+          `State objects are immutable and must not be mutated. To update state, always create a new object or use the store's transaction API.\n` +
+          `\nExample fixes:\n` +
+          `  // Instead of mutating:\n` +
+          `  const map = store.getState().map;\n` +
+          `  map.clear(); // ❌ This will throw\n\n` +
+          `  // Option 1: Create a new Map and dispatch it:\n` +
+          `  const newMap = new Map(map);\n` +
+          `  newMap.clear();\n` +
+          `  store.dispatch({ map: newMap }); // ✅\n\n` +
+          `  // Option 2 (Recommended): Use store.transaction for safe mutation:\n` +
+          `  store.transaction(draft => {\n` +
+          `    draft.map?.clear(); // ✅\n` +
+          `  });\n`
+      )
+
+      // Re-throw a more user-friendly error
+      throw new StoreError(
+        'Direct mutation of state is not allowed. Use store.dispatch to update state.',
+        {
+          operation: 'handleError',
+          error: error.context.error,
+          context: error.context, // Preserve original context for debugging
+        }
+      )
+    }
+
     // Call plugin onError hooks first
     pluginManager.onError(error, error.context, storeInstance)
 
@@ -108,6 +143,7 @@ export function createStore<S extends object>(
   const pluginManager = new PluginManager<S>(plugins, handleError, name)
 
   function persistState(dataToPersist: S): void {
+    if (!persistKey || storageType === StorageType.None) return
     const success = persistenceManager.persistState(
       persistKey,
       dataToPersist,
@@ -123,7 +159,8 @@ export function createStore<S extends object>(
 
   /* Freeze helper – prevents accidental mutation in dev
      while keeping reference‑equality for memoisation. */
-  const freezeDev = <T>(obj: T): T => (isDevMode() ? Object.freeze(obj) : obj)
+  const freezeDev = <T>(obj: T): T => (true ? Object.freeze(obj) : obj)
+  // const freezeDev = <T>(obj: T): T => (isDevMode() ? Object.freeze(obj) : obj)
 
   /**
    * Notifies listeners with immutable state copies to prevent accidental mutations.
@@ -139,10 +176,32 @@ export function createStore<S extends object>(
    * @see {@link https://immerjs.github.io/immer/produce | Immer produce documentation}
    */
   const notifyListeners = (prevState: S, actionApplied: ActionPayload<S> | null = null): void => {
-    // Use Immer to create deeply immutable state copies for external consumption
-    // This prevents listeners from accidentally mutating nested objects
+    // Create safe immutable copies while preserving structural sharing for unchanged properties
     const safeCurrentState = assignState(state, state) as S
-    const safePrevState = assignState(prevState, prevState) as S
+
+    // For prevState, create a copy that preserves structural sharing with currentState
+    // for properties that weren't modified
+    let safePrevState: S
+    if (actionApplied && Object.keys(actionApplied).length > 0) {
+      // Build prevState copy with selective structural sharing
+      safePrevState = immer.produce(prevState, draft => {
+        // For each property not in the action, try to preserve the reference
+        // from the current state if the values are equivalent
+        for (const key in state) {
+          if (!(key in actionApplied)) {
+            const currentValue = (state as any)[key]
+            const prevValue = (prevState as any)[key]
+
+            // If the values are the same reference (unchanged), use the safe current value
+            if (currentValue === prevValue) {
+              ;(draft as any)[key] = (safeCurrentState as any)[key]
+            }
+          }
+        }
+      }) as S
+    } else {
+      safePrevState = assignState(prevState, prevState) as S
+    }
 
     pluginManager.onStateChange(safeCurrentState, safePrevState, actionApplied, storeInstance)
 
@@ -161,12 +220,13 @@ export function createStore<S extends object>(
   }
 
   // --- History Management ---
-  let historyManager = new HistoryManager<S>(historyLimit, pluginManager)
+  let historyManager = new HistoryManager<S>(historyLimit, pluginManager, initialState)
 
   const _applyStateChange = (payload: ActionPayload<S>, fromSync = false): void => {
     if (isDestroyed) return
 
-    const prevState = assignState(state, state) as S // Capture state before change
+    // Capture the current state reference (not a copy) for comparison
+    const prevState = state
     let newPartialState = payload
 
     // Plugin: beforeStateChange
@@ -181,15 +241,21 @@ export function createStore<S extends object>(
        or generate useless listener notifications. */
     if (Object.keys(newPartialState).length === 0) return
 
-    // Immer: Apply the new state change
-    state = assignState(state, newPartialState, typeRegistry) as S
+    // Apply the new state change while preserving structural sharing
+    // Use shallow merge to preserve references for unchanged root-level keys
+    // only update if something actually changed
+    // const nextState = {...state, ...newPartialState} as S
+    const nextState = assignState(state, newPartialState)
+
+    if (Object.is(nextState, state)) return // No changes, exit early
+    state = nextState
 
     // --- Notifications and History ---
     if (!fromSync && persistKey && storageType !== StorageType.None) {
       persistState(state)
     }
 
-    historyManager.addToHistory(state) // Add new state to history for undo/redo
+    historyManager.addToHistory(state) // Add state to history for undo/redo
     notifyListeners(prevState, newPartialState) // Notify with the state *before* this change as prevState
   }
 
@@ -220,6 +286,8 @@ export function createStore<S extends object>(
     }
 
     if (batching && !isChainedCall) {
+      // TODO: Decide if history manager should include the internals of a batch in history or
+      // just the final accumulation
       batchedActions.push(action)
       return
     }
@@ -241,10 +309,10 @@ export function createStore<S extends object>(
         (acc, curr) => assignState(acc as S, curr),
         state as S
       )
-      return freezeDev(intermediateState as S)
+      return freezeDev(intermediateState) as S
     }
-    // Always return a copy before freezing to prevent mutation issues with Immer
-    return freezeDev(state)
+    // Return a safe immutable copy that preserves structural sharing
+    return freezeDev(state) as S
   }
 
   storeInstance.dispatch = (action: ActionPayload<S> | Thunk<S, any>): void | Promise<any> => {
@@ -392,7 +460,7 @@ export function createStore<S extends object>(
     return selectorManager.createParameterizedSelector(inputSelectors, projector)
   }
 
-  storeInstance.reset = () => {
+  storeInstance.reset = (clearHistory: boolean = true) => {
     if (isDestroyed) return
     const prevState = assignState(state, state) as S // Capture state before reset
 
@@ -401,15 +469,17 @@ export function createStore<S extends object>(
     persistState(state)
 
     // Clear history when resetting the store
-    historyManager.clear()
-
-    // Add the initial state to history after reset
-    historyManager.addToHistory(state)
+    if (clearHistory) {
+      historyManager.clear(true)
+    } else {
+      historyManager.addToHistory(initialState) // Add initial state to history if not clearing
+    }
 
     notifyListeners(prevState, null) // Notify with state before reset as prevState
   }
 
-  storeInstance.undo = (steps = 1) => {
+  storeInstance.undo = (steps: number = 1, path?: (string | number)[]) => {
+    const prevState = {...state}
     const result = historyManager.undo({
       operation: 'undo',
       steps,
@@ -417,14 +487,32 @@ export function createStore<S extends object>(
       oldState: state,
       newState: historyManager.getUndoState(steps) || state,
       persistFn: persistState,
-      notifyFn: prevState => notifyListeners(prevState, null),
     })
     if (result === false) return false
+
+    if (path) {
+      //@ts-ignore
+      if (false === true) {
+        // if (path.length > 1) {
+        //const pathSubLevel = path.slice(1)
+        const subValue = getPath(result, path)
+        const diff = buildMinimalDiff(subValue, path)
+        state = assignState(state, diff) // Update only the sub-path
+        return true
+      } else {
+        const diff = buildMinimalDiff(result, path)
+        state = assignState(state, diff)
+        return true
+      }
+    }
+
     state = assignState(state, result) // Update the store's state, ensuring reference equality
+    notifyListeners(prevState, null) // Notify with the state before undo as prevState
     return true
   }
 
-  storeInstance.redo = (steps = 1) => {
+  storeInstance.redo = (steps = 1, path?: (string | number)[]) => {
+    const prevState = {...state}
     const result = historyManager.redo({
       operation: 'redo',
       steps,
@@ -432,14 +520,19 @@ export function createStore<S extends object>(
       newState: historyManager.getRedoState(steps) || state,
       store: storeInstance,
       persistFn: persistState,
-      notifyFn: prevState => notifyListeners(prevState, null),
     })
 
-    if (result !== false) {
-      state = assignState(state, result) // Update the store's state, ensuring reference equality
+    if (result === false) return false
+
+    if (path) {
+      const diff = buildMinimalDiff(result, path)
+      state = assignState(state, diff)
       return true
     }
-    return false
+
+    state = assignState(state, result) // Update the store's state, ensuring reference equality
+    notifyListeners(prevState, null) // Notify with the state before redo as prevState
+    return true
   }
 
   storeInstance.updatePath = <V = any>(
@@ -492,7 +585,7 @@ export function createStore<S extends object>(
   } => {
     if (historyLimit) return historyManager.getHistory()
     return {
-      history: [],
+      history: [] as readonly S[],
       currentIndex: -1,
       initialState: null,
     }
@@ -638,19 +731,6 @@ export function createStore<S extends object>(
         }
         // Use _internalDispatch to go through the full middleware/plugin flow
         _internalDispatch(diff as ActionPayload<S>, false)
-      } else {
-        // No changes were made, but transaction was successful
-        // TODO: add a logger that i can disable in production
-        // eslint-disable-next-line no-console
-        if (typeof console !== 'undefined' && console.debug) {
-          // eslint-disable-next-line no-console
-          console.debug(
-            `[Store: ${name || 'Unnamed'}] Transaction completed with no state changes.`,
-            {
-              operation: 'transaction',
-            }
-          )
-        }
       }
 
       // Call onTransactionEnd for all plugins with success
@@ -675,34 +755,6 @@ export function createStore<S extends object>(
       pluginManager.onTransactionEnd(false, storeInstance, undefined, transactionError)
 
       return false
-    }
-  }
-
-  storeInstance.destroy = (options?: CleanupOptions) => {
-    if (isDestroyed) return
-    const cleanupOpts = {...defaultCleanupOptions, ...options}
-    isDestroyed = true
-
-    selectorManager.destroyAll()
-
-    pluginManager.onDestroy(storeInstance)
-
-    listeners = []
-    if (cleanupOpts.clearHistory) historyManager.clear()
-    if (cleanupOpts.removePersistedState) persistenceManager.removeState(persistKey)
-
-    // Unregister from global registry
-    if (sessionId && storeRegistry.has(sessionId)) {
-      const storeSet = storeRegistry.get(sessionId)!
-      storeSet.delete(storeInstance as Store<object>)
-      if (storeSet.size === 0) {
-        storeRegistry.delete(sessionId)
-      }
-    }
-
-    if (cleanupOpts.resetRegistry) {
-      // Reset the global store registry if requested
-      storeRegistry.clear()
     }
   }
 
@@ -837,53 +889,77 @@ export function createStore<S extends object>(
     historyManager.addToHistory(state)
   }
 
-  // Cross-tab sync
-  if (syncAcrossTabs && storageType === StorageType.Local && persistKey) {
-    const storageEventHandler = (event: StorageEvent) => {
-      if (event.key === persistKey && event.newValue && !isDestroyed) {
-        try {
-          const persisted = JSON.parse(event.newValue) as PersistedState<S>
-          // Ensure this update isn't from the current session to avoid loops
+  function storageEventHandler(event: StorageEvent) {
+    if (event.key === persistKey && event.newValue && !isDestroyed) {
+      try {
+        const persisted = JSON.parse(event.newValue) as PersistedState<S>
+        // Ensure this update isn't from the current session to avoid loops
 
-          // And only apply if state truly differs to prevent redundant notifications
-          if (
-            persisted.meta &&
-            persisted.meta.sessionId !== sessionId &&
-            !deepEqual(state, persisted.data)
-          ) {
-            let stateToApply = persisted.data
+        // And only apply if state truly differs to prevent redundant notifications
+        if (
+          persisted.meta &&
+          persisted.meta.sessionId !== sessionId &&
+          !deepEqual(state, persisted.data)
+        ) {
+          let stateToApply = persisted.data
 
-            // Call plugin onCrossTabSync hooks
-            const transformed = pluginManager.onCrossTabSync(
-              stateToApply,
-              persisted.meta.sessionId || 'unknown',
-              storeInstance
-            )
-            if (transformed) {
-              // If the plugin transformed the state, use it
-              stateToApply = transformed
-            }
-
-            // _applyStateChange will capture the current `state` as its `prevState`
-            _applyStateChange(stateToApply, true)
-          }
-        } catch (e: any) {
-          handleError(
-            new SyncError('Failed to sync state from another tab', {
-              error: e,
-              key: persistKey,
-            })
+          // Call plugin onCrossTabSync hooks
+          const transformed = pluginManager.onCrossTabSync(
+            stateToApply,
+            persisted.meta.sessionId || 'unknown',
+            storeInstance
           )
+          if (transformed) {
+            // If the plugin transformed the state, use it
+            stateToApply = transformed
+          }
+
+          // _applyStateChange will capture the current `state` as its `prevState`
+          _applyStateChange(stateToApply, true)
         }
+      } catch (e: any) {
+        handleError(
+          new SyncError('Failed to sync state from another tab', {
+            error: e,
+            key: persistKey,
+          })
+        )
       }
     }
+  }
+
+  // Cross-tab sync
+  if (syncAcrossTabs && storageType === StorageType.Local && persistKey)
     window.addEventListener('storage', storageEventHandler)
-    // Need to also clean this listener up in destroy()
-    const originalDestroy = storeInstance.destroy
-    storeInstance.destroy = (opts?: CleanupOptions) => {
-      window.removeEventListener('storage', storageEventHandler)
-      originalDestroy(opts)
+
+  storeInstance.destroy = (options?: CleanupOptions) => {
+    if (isDestroyed) return
+    const cleanupOpts = {...defaultCleanupOptions, ...options}
+    isDestroyed = true
+
+    selectorManager.destroyAll()
+
+    pluginManager.onDestroy(storeInstance)
+
+    listeners = []
+    if (cleanupOpts.clearHistory) historyManager.clear()
+    if (cleanupOpts.removePersistedState) persistenceManager.removeState(persistKey)
+
+    // Unregister from global registry
+    if (sessionId && storeRegistry.has(sessionId)) {
+      const storeSet = storeRegistry.get(sessionId)!
+      storeSet.delete(storeInstance as Store<object>)
+      if (storeSet.size === 0) {
+        storeRegistry.delete(sessionId)
+      }
     }
+
+    if (cleanupOpts.resetRegistry) {
+      // Reset the global store registry if requested
+      storeRegistry.clear()
+    }
+
+    window.removeEventListener('storage', storageEventHandler)
   }
 
   // Register store

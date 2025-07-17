@@ -1,5 +1,5 @@
 /**
- * Test Template for Open Store
+ * Test Template for Poly State
  *
  * Use this template when creating new test files or migrating existing tests.
  * Replace the placeholder content with your actual test cases.

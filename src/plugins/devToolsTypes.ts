@@ -227,7 +227,17 @@ export interface ConnectResponse {
 }
 
 export interface DevToolsMessage {
-  type: 'START' | 'STOP' | 'ACTION' | 'DISPATCH' | 'IMPORT' | 'EXPORT' | 'UPDATE' | 'INIT' | 'STATE' | 'OPTIONS'
+  type:
+    | 'START'
+    | 'STOP'
+    | 'ACTION'
+    | 'DISPATCH'
+    | 'IMPORT'
+    | 'EXPORT'
+    | 'UPDATE'
+    | 'INIT'
+    | 'STATE'
+    | 'OPTIONS'
   payload?: any
   state?: string
   action?: any

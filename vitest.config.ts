@@ -17,13 +17,26 @@ export default defineConfig({
       'test/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}',
       'src/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}',
     ],
-    exclude: ['node_modules', 'dist', 'examples'],
+    exclude: [
+      'node_modules',
+      'dist',
+      'examples',
+      'test/browser/**/*', // Exclude browser tests from regular unit tests
+    ],
 
     // Coverage configuration
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
-      exclude: ['coverage/**', 'dist/**', 'test/**', 'examples/**', '**/*.d.ts', '**/*.config.*', '**/node_modules/**'],
+      exclude: [
+        'coverage/**',
+        'dist/**',
+        'test/**',
+        'examples/**',
+        '**/*.d.ts',
+        '**/*.config.*',
+        '**/node_modules/**',
+      ],
       thresholds: {
         global: {
           branches: 80,

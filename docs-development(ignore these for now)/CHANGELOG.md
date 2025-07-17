@@ -24,7 +24,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
-- Package name finalized as `open-store` (pending npm publication)
+- Package name finalized as `poly-state` (pending npm publication)
 - Updated README.md with comprehensive React examples showing advanced hooks
 - Enhanced React example (`examples/react.tsx`) with:
   - Counter component with undo/redo functionality
@@ -106,5 +106,5 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **v1.0.0-rc.1**: Release candidate with final API
 - **v1.0.0**: Official stable release to npm
 
-[Unreleased]: https://github.com/yourusername/open-store/compare/v1.0.0-dev...HEAD
-[1.0.0-dev]: https://github.com/yourusername/open-store/tree/v1.0.0-dev
+[Unreleased]: https://github.com/yourusername/poly-state/compare/v1.0.0-dev...HEAD
+[1.0.0-dev]: https://github.com/yourusername/poly-state/tree/v1.0.0-dev

@@ -167,7 +167,7 @@ function consolaExample() {
   )
 
   store.dispatch({
-    todos: [{id: 1, text: 'Learn Open Store', completed: false}],
+    todos: [{id: 1, text: 'Learn Poly State', completed: false}],
   })
 }
 

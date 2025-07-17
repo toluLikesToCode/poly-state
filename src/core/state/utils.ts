@@ -46,7 +46,7 @@ export function assignState<S extends object>(
 
   if (hasCircularReference(newState)) {
     throw new ValidationError(
-      'Circular references in state are not supported by Immer or Open Store.'
+      'Circular references in state are not supported by Immer or Poly State.'
     )
   }
   return produce(state, (draft: Draft<S>) => {
@@ -81,6 +81,11 @@ function deepMerge(target: any, source: any, typeRegistry?: {findTypeFor: (value
 
     // Handle Map
     if (srcVal instanceof Map) {
+      if (srcVal === tgtVal) {
+        console.warn(
+          '[Poly State] Warning: Map reference reused in state update. This may indicate an in-place mutation, which is not supported. Always dispatch a new Map instance.'
+        )
+      }
       target[key] = new Map(srcVal)
       continue
     }
@@ -309,10 +314,7 @@ export type SupportedLogger =
       child?: (childContextSuffix: string, childDefaultMeta?: Record<string, any>) => any
     }
 
-/**
- * Log levels supported by the logger middleware.
- */
-export type LoggerLevel =
+type StandardLoggerLevel =
   | 'log'
   | 'info'
   | 'success'
@@ -322,6 +324,8 @@ export type LoggerLevel =
   | 'trace'
   | 'silly'
 
+// Allows any string, but gives autocomplete for standard levels
+export type LoggerLevel = StandardLoggerLevel | (string & {})
 /**
  * Configuration options for the logger middleware.
  */
