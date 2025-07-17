@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [main, develop]
 
+# Permissions for the workflow
+permissions:
+  contents: read
+  actions: read
+  security-events: write
+
 jobs:
   # Unit tests job - fast feedback
   unit-tests:
