@@ -1,6 +1,6 @@
 import {describe, it, expect, beforeEach} from 'vitest'
-import {createStore} from '../../src/core/state/createStore'
-import {StorageType, type Plugin} from '../../src/core/state/types'
+import {createStore} from '../../../src/core/state/createStore'
+import {StorageType, type Plugin} from '../../../src/core/state/types'
 
 describe('Plugin System Browser Tests', () => {
   beforeEach(() => {

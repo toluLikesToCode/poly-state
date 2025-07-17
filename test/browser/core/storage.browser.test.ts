@@ -1,21 +1,17 @@
-import { describe, it, expect, beforeEach } from 'vitest'
-import { createStore } from '../../src/core/state/createStore'
-import { StorageType } from '../../src/core/state/types'
-import { 
-  getLocalStorage, 
-  setLocalStorage, 
-  isLocalStorageAvailable 
-} from '../../src/core/storage/local'
+import {describe, it, expect, beforeEach} from 'vitest'
+import {createStore} from '../../../src/core/state/createStore'
+import {StorageType} from '../../../src/core/state/types'
+import {
+  getLocalStorage,
+  setLocalStorage,
+  isLocalStorageAvailable,
+} from '../../../src/core/storage/local'
 import {
   getSessionStorage,
   setSessionStorage,
-  isSessionStorageAvailable
-} from '../../src/core/storage/session'
-import {
-  getCookie,
-  setCookie,
-  removeCookie
-} from '../../src/core/storage/cookie'
+  isSessionStorageAvailable,
+} from '../../../src/core/storage/session'
+import {getCookie, setCookie, removeCookie} from '../../../src/core/storage/cookie'
 
 describe('Real Browser Storage Tests', () => {
   beforeEach(() => {
@@ -27,7 +23,7 @@ describe('Real Browser Storage Tests', () => {
   describe('localStorage Integration', () => {
     it('should persist state to real localStorage', () => {
       const store = createStore(
-        { count: 0, name: 'test' },
+        {count: 0, name: 'test'},
         {
           persistKey: 'browser-test-store',
           storageType: StorageType.Local,
@@ -35,20 +31,20 @@ describe('Real Browser Storage Tests', () => {
       )
 
       // Update state
-      store.dispatch({ count: 42, name: 'updated' })
+      store.dispatch({count: 42, name: 'updated'})
 
       // Verify real localStorage contains the data
       const stored = localStorage.getItem('browser-test-store')
       expect(stored).toBeTruthy()
-      
+
       const parsedData = JSON.parse(stored!)
-      expect(parsedData.data).toMatchObject({ count: 42, name: 'updated' })
+      expect(parsedData.data).toMatchObject({count: 42, name: 'updated'})
     })
 
     it('should restore state from real localStorage', () => {
       // Pre-populate localStorage with test data
       const testData = {
-        data: { count: 99, name: 'restored' },
+        data: {count: 99, name: 'restored'},
         meta: {
           lastUpdated: Date.now(),
           sessionId: 'test-session',
@@ -59,7 +55,7 @@ describe('Real Browser Storage Tests', () => {
 
       // Create new store that should load from localStorage
       const store = createStore(
-        { count: 0, name: 'initial' },
+        {count: 0, name: 'initial'},
         {
           persistKey: 'restore-test',
           storageType: StorageType.Local,
@@ -67,13 +63,13 @@ describe('Real Browser Storage Tests', () => {
       )
 
       // Verify state was restored
-      expect(store.getState()).toMatchObject({ count: 99, name: 'restored' })
+      expect(store.getState()).toMatchObject({count: 99, name: 'restored'})
     })
 
     it('should handle localStorage quota exceeded', () => {
       // Create large data to test quota
       const largeData = 'x'.repeat(1024 * 1024) // 1MB
-      
+
       try {
         localStorage.setItem('large-test', largeData)
         // If we get here, the test environment allows large storage
@@ -86,22 +82,22 @@ describe('Real Browser Storage Tests', () => {
     })
 
     it('should use real localStorage utility functions', () => {
-      const testData = { key: 'value', number: 42 }
-      
+      const testData = {key: 'value', number: 42}
+
       // Test setLocalStorage function
       setLocalStorage('utility-test', testData)
-      
+
       // Verify with native localStorage
       const stored = localStorage.getItem('utility-test')
       expect(JSON.parse(stored!)).toEqual(testData)
-      
+
       // Test getLocalStorage function
       const retrieved = getLocalStorage('utility-test', {})
       expect(retrieved).toEqual(testData)
-      
+
       // Test fallback
-      const fallback = getLocalStorage('non-existent', { default: true })
-      expect(fallback).toEqual({ default: true })
+      const fallback = getLocalStorage('non-existent', {default: true})
+      expect(fallback).toEqual({default: true})
     })
 
     it('should detect localStorage availability', () => {
@@ -112,33 +108,33 @@ describe('Real Browser Storage Tests', () => {
   describe('sessionStorage Integration', () => {
     it('should persist state to real sessionStorage', () => {
       const store = createStore(
-        { session: 'test' },
+        {session: 'test'},
         {
           persistKey: 'session-test-store',
           storageType: StorageType.Session,
         }
       )
 
-      store.dispatch({ session: 'updated' })
+      store.dispatch({session: 'updated'})
 
       // Verify real sessionStorage
       const stored = sessionStorage.getItem('session-test-store')
       expect(stored).toBeTruthy()
-      
+
       const parsedData = JSON.parse(stored!)
-      expect(parsedData.data).toMatchObject({ session: 'updated' })
+      expect(parsedData.data).toMatchObject({session: 'updated'})
     })
 
     it('should use real sessionStorage utility functions', () => {
-      const testData = { session: 'data', count: 24 }
-      
+      const testData = {session: 'data', count: 24}
+
       // Test setSessionStorage function
       setSessionStorage('session-utility-test', testData)
-      
+
       // Verify with native sessionStorage
       const stored = sessionStorage.getItem('session-utility-test')
       expect(JSON.parse(stored!)).toEqual(testData)
-      
+
       // Test getSessionStorage function
       const retrieved = getSessionStorage('session-utility-test', {})
       expect(retrieved).toEqual(testData)
@@ -152,7 +148,7 @@ describe('Real Browser Storage Tests', () => {
   describe('Cookie Storage Integration', () => {
     it('should persist state to real cookies', () => {
       const store = createStore(
-        { cookie: 'test' },
+        {cookie: 'test'},
         {
           persistKey: 'cookie-test-store',
           storageType: StorageType.Cookie,
@@ -163,7 +159,7 @@ describe('Real Browser Storage Tests', () => {
         }
       )
 
-      store.dispatch({ cookie: 'updated' })
+      store.dispatch({cookie: 'updated'})
 
       // Verify real document.cookie
       expect(document.cookie).toContain('cookie-test-store')
@@ -173,19 +169,19 @@ describe('Real Browser Storage Tests', () => {
       // Test setCookie function
       setCookie('test-cookie', 'test-value', {
         path: '/',
-        expires: 1 // 1 day
+        expires: 1, // 1 day
       })
-      
+
       // Verify cookie was set
       expect(document.cookie).toContain('test-cookie=test-value')
-      
+
       // Test getCookie function
       const cookieValue = getCookie('test-cookie')
       expect(cookieValue).toBe('test-value')
-      
+
       // Test removeCookie function
       removeCookie('test-cookie')
-      
+
       // Verify cookie was removed (might still exist in document.cookie but with past expiry)
       const removedValue = getCookie('test-cookie')
       expect(removedValue).toBeUndefined()
@@ -193,7 +189,7 @@ describe('Real Browser Storage Tests', () => {
 
     it('should handle cookie size limits gracefully', () => {
       const largeCookieValue = 'x'.repeat(5000) // Larger than typical 4KB limit
-      
+
       try {
         setCookie('large-cookie', largeCookieValue)
         // If successful, verify it was set
@@ -211,7 +207,7 @@ describe('Real Browser Storage Tests', () => {
   describe('Cross-Tab Synchronization', () => {
     it('should handle storage events for cross-tab sync', async () => {
       const store = createStore(
-        { shared: 0 },
+        {shared: 0},
         {
           persistKey: 'cross-tab-test',
           storageType: StorageType.Local,
@@ -221,13 +217,13 @@ describe('Real Browser Storage Tests', () => {
 
       // Listen for state changes
       const stateChanges: any[] = []
-      store.subscribe((state) => {
+      store.subscribe(state => {
         stateChanges.push(state)
       })
 
       // Simulate another tab changing localStorage
       const newData = {
-        data: { shared: 999 },
+        data: {shared: 999},
         meta: {
           lastUpdated: Date.now(),
           sessionId: 'other-tab-session',
@@ -237,12 +233,14 @@ describe('Real Browser Storage Tests', () => {
       localStorage.setItem('cross-tab-test', JSON.stringify(newData))
 
       // Trigger storage event (simulates cross-tab change)
-      window.dispatchEvent(new StorageEvent('storage', {
-        key: 'cross-tab-test',
-        newValue: localStorage.getItem('cross-tab-test'),
-        oldValue: null,
-        storageArea: localStorage,
-      }))
+      window.dispatchEvent(
+        new StorageEvent('storage', {
+          key: 'cross-tab-test',
+          newValue: localStorage.getItem('cross-tab-test'),
+          oldValue: null,
+          storageArea: localStorage,
+        })
+      )
 
       // Wait for event processing
       await new Promise(resolve => setTimeout(resolve, 100))
@@ -275,9 +273,9 @@ describe('Real Browser Storage Tests', () => {
       expect(() => {
         getLocalStorage('malformed-test', {})
       }).not.toThrow() // Should handle gracefully
-      
-      const result = getLocalStorage('malformed-test', { fallback: true })
-      expect(result).toEqual({ fallback: true })
+
+      const result = getLocalStorage('malformed-test', {fallback: true})
+      expect(result).toEqual({fallback: true})
     })
 
     it('should handle malformed data in sessionStorage', () => {
@@ -287,19 +285,19 @@ describe('Real Browser Storage Tests', () => {
       expect(() => {
         getSessionStorage('malformed-session-test', {})
       }).not.toThrow() // Should handle gracefully
-      
-      const result = getSessionStorage('malformed-session-test', { fallback: true })
-      expect(result).toEqual({ fallback: true })
+
+      const result = getSessionStorage('malformed-session-test', {fallback: true})
+      expect(result).toEqual({fallback: true})
     })
 
     it('should handle storage operation failures gracefully', () => {
       // Test with very long key (browser-dependent limits)
       const longKey = 'x'.repeat(1000)
-      
+
       expect(() => {
         setLocalStorage(longKey, 'test')
       }).not.toThrow() // Should handle gracefully or succeed
-      
+
       expect(() => {
         setSessionStorage(longKey, 'test')
       }).not.toThrow() // Should handle gracefully or succeed

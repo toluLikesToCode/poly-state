@@ -1,9 +1,9 @@
 import {describe, it, expect, beforeEach} from 'vitest'
 import {render, fireEvent, waitFor} from '@testing-library/react'
 import React from 'react'
-import {createStore} from '../../src/core/state/createStore'
-import {useStoreHooks, createStoreContext} from '../../src/react'
-import {StorageType} from '../../src/core/state/types'
+import {createStore} from '../../../src/core/state/createStore'
+import {useStoreHooks, createStoreContext} from '../../../src/react'
+import {StorageType} from '../../../src/core/state/types'
 
 describe('React Integration Browser Tests', () => {
   beforeEach(() => {
