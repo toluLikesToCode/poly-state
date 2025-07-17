@@ -1,0 +1,84 @@
+name: Test Matrix
+
+on:
+  schedule:
+    # Run every Monday at 9 AM UTC
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
+
+jobs:
+  test-matrix:
+    name: Test on Node ${{ matrix.node-version }} and ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: ['18.x', '20.x', '22.x']
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        exclude:
+          # Skip browser tests on Windows due to Playwright complexity
+          - os: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run linting
+        run: npm run lint
+
+      - name: Run type check
+        run: npx tsc --noEmit
+
+      - name: Run unit tests
+        run: npm run test:run
+
+      - name: Install Playwright browsers (Ubuntu/macOS only)
+        if: matrix.os != 'windows-latest'
+        run: npx playwright install --with-deps chromium
+
+      - name: Run browser tests (Ubuntu/macOS only)
+        if: matrix.os != 'windows-latest'
+        run: npm run test:browser:run
+
+      - name: Build package
+        run: npm run build
+
+  # Windows-specific job with unit tests only
+  test-windows:
+    name: Test on Node 18.x and Windows (Unit Tests Only)
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18.x'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run linting
+        run: npm run lint
+
+      - name: Run type check
+        run: npx tsc --noEmit
+
+      - name: Run unit tests
+        run: npm run test:run
+
+      - name: Build package
+        run: npm run build

@@ -1,0 +1,52 @@
+version: 2
+updates:
+  # Enable version updates for npm
+  - package-ecosystem: 'npm'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+      day: 'monday'
+      time: '09:00'
+      timezone: 'UTC'
+    # Group updates to reduce PR noise
+    groups:
+      vitest:
+        patterns:
+          - 'vitest*'
+          - '@vitest/*'
+      playwright:
+        patterns:
+          - 'playwright*'
+          - '@playwright/*'
+      testing:
+        patterns:
+          - '@testing-library/*'
+          - 'happy-dom'
+          - 'jsdom'
+      build-tools:
+        patterns:
+          - 'rollup*'
+          - '@rollup/*'
+          - 'typescript*'
+          - 'tslib'
+      linting:
+        patterns:
+          - 'eslint*'
+          - '@typescript-eslint/*'
+          - 'prettier*'
+    # Limit the number of open PRs
+    open-pull-requests-limit: 10
+    # Enable automatic rebasing
+    rebase-strategy: 'auto'
+    # Include commit message prefix
+    commit-message:
+      prefix: 'chore'
+      include: 'scope'
+
+  # Enable version updates for GitHub Actions
+  - package-ecosystem: 'github-actions'
+    directory: '/'
+    schedule:
+      interval: 'monthly'
+    commit-message:
+      prefix: 'ci'

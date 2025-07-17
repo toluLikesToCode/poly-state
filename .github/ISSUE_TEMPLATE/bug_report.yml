@@ -74,6 +74,42 @@ body:
     validations:
       required: true
 
+  - type: dropdown
+    id: environment
+    attributes:
+      label: Environment
+      description: Where does this bug occur?
+      options:
+        - Browser (Chrome/Chromium)
+        - Browser (Firefox)
+        - Browser (Safari)
+        - Node.js
+        - React Development
+        - TypeScript Compilation
+        - Build Process
+        - Other (please specify in additional context)
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: testing-env
+    attributes:
+      label: Testing Environment (for contributors)
+      description: If you're contributing, which tests are failing?
+      options:
+        - label: Unit tests (jsdom environment)
+          required: false
+        - label: Browser tests (real Chromium)
+          required: false
+        - label: React integration tests
+          required: false
+        - label: Storage tests (localStorage, sessionStorage, cookies)
+          required: false
+        - label: Plugin system tests
+          required: false
+        - label: Build process
+          required: false
+
   - type: textarea
     id: expected
     attributes:

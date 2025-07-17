@@ -43,15 +43,23 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # 4. Run tests to ensure the release is stable
-      - name: Run tests
+      # 4. Install Playwright browsers for comprehensive testing
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      # 5. Run comprehensive test suite before release
+      - name: Run unit tests
         run: npm run test:run
 
-      # 5. Build the package for production
+      # 6. Run browser tests for full integration validation
+      - name: Run browser tests
+        run: npm run test:browser:run
+
+      # 7. Build the package for production
       - name: Build package
         run: npm run build
 
-      # 6. Publish the package to GitHub Packages
+      # 8. Publish the package to GitHub Packages
       # The NODE_AUTH_TOKEN is automatically set to the GITHUB_TOKEN secret.
       # This token has the necessary permissions to publish to the registry.
       - name: Publish to GitHub Packages
@@ -59,7 +67,7 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # 7. Create a GitHub Release for the new version tag
+      # 9. Create a GitHub Release for the new version tag
       # This makes it easy for users to see what's new in each version.
       - name: Create GitHub Release
         uses: actions/create-release@v1
@@ -71,5 +79,13 @@ jobs:
           release_name: Release ${{ github.ref }}
           body: |
             See the [CHANGELOG.md](CHANGELOG.md) for details on what's new in this version.
+
+            ## Testing Coverage
+            This release has been validated with:
+            - ✅ Unit tests (jsdom environment)
+            - ✅ Browser tests (real Chromium browser)
+            - ✅ React integration tests
+            - ✅ Storage system tests (localStorage, sessionStorage, cookies)
+            - ✅ Plugin system tests
           draft: false
           prerelease: false

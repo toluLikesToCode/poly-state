@@ -425,12 +425,26 @@ npm run dev
 
 - `npm run build`: Create a production build in the dist/ folder.
 - `npm run dev`: Start the development server with watch mode.
-- `npm run test`: Run the test suite with Vitest.
+- `npm run test`: Run the unit test suite in watch mode.
+- `npm run test:run`: Run unit tests once.
+- `npm run test:browser`: Run browser integration tests.
+- `npm run test:all`: Run comprehensive test suite (unit + browser tests).
+- `npm run test:coverage`: Generate test coverage report.
 - `npm run lint`: Check the code for linting errors.
 - `npm run format`: Format the code with Prettier.
 - `npm run clean`: Remove all build artifacts.
 
-For more detailed information, please see CONTRIBUTING.md.
+### Testing Strategy
+
+Poly State uses a dual testing approach for comprehensive validation:
+
+- **🧪 Unit Tests**: Fast feedback with jsdom environment for core logic and React hooks
+- **🌐 Browser Tests**: Real browser integration testing with Playwright for storage systems,
+  cross-tab synchronization, and authentic browser behavior
+
+This ensures both rapid development iteration and real-world compatibility.
+
+For more detailed information, please see our [Contributing Guide](.github/CONTRIBUTING.md).
 
 ## License
 
