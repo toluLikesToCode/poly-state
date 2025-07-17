@@ -151,7 +151,7 @@ jobs:
             } catch (error) {
               console.log('Failed to post PR comment:', error.message);
               // Don't fail the workflow if commenting fails
-            }  # Security scanning
+            }
   security-scan:
     name: Security Scan
     runs-on: ubuntu-latest
