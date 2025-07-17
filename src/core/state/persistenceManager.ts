@@ -15,10 +15,16 @@ import {
   isSessionStorageAvailable,
   generateSessionId,
 } from '../storage/index'
+import {
+  LocalStorageAdapter,
+  SessionStorageAdapter,
+  CookieStorageAdapter,
+  type StorageAdapter,
+} from '../storage/adapters'
 import type {PluginManager} from '../../plugins/pluginManager'
 
 /**
- * Manages state persistence across different storage types
+ * Manages state persistence across different storage types with unified adapter support
  */
 export class PersistenceManager<S extends object> {
   private readonly storageType: StorageType
@@ -28,6 +34,7 @@ export class PersistenceManager<S extends object> {
   private readonly handleError: (error: StoreError) => void
   private readonly name: string
   private readonly sessionId: string
+  private readonly adapter?: StorageAdapter
 
   constructor(
     storageType: StorageType,
@@ -49,12 +56,39 @@ export class PersistenceManager<S extends object> {
     } else {
       this.sessionId = sessionId
     }
+
+    // Optional: Initialize the appropriate adapter for unified interface
+    // This allows gradual migration to the new adapter pattern
+    try {
+      switch (storageType) {
+        case StorageType.Local:
+          this.adapter = new LocalStorageAdapter()
+          break
+        case StorageType.Session:
+          this.adapter = new SessionStorageAdapter()
+          break
+        case StorageType.Cookie:
+          this.adapter = new CookieStorageAdapter(this.cookieOptions)
+          break
+        default:
+          this.adapter = undefined
+      }
+    } catch (error) {
+      // If adapter creation fails, fall back to existing implementation
+      this.adapter = undefined
+      console.warn('Failed to create storage adapter, using legacy implementation:', error)
+    }
   }
 
   /**
    * Check if the configured storage type is available
    */
   public isStorageAvailable(): boolean {
+    if (this.adapter) {
+      return this.adapter.isAvailable()
+    }
+
+    // Fallback to existing implementation
     switch (this.storageType) {
       case StorageType.Local:
         return isLocalStorageAvailable()
