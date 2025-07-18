@@ -26,7 +26,9 @@ export class LocalStorageAdapter implements StorageAdapter {
     try {
       localStorage.setItem(key, JSON.stringify(value))
       return true
-    } catch {
+    } catch (error) {
+      // Return false for basic adapter interface compatibility
+      // Specific error types can be handled by wrapping with withErrorRecovery
       return false
     }
   }
@@ -79,11 +81,12 @@ export class SessionStorageAdapter implements StorageAdapter {
     try {
       sessionStorage.setItem(key, JSON.stringify(value))
       return true
-    } catch {
+    } catch (error) {
+      // Return false for basic adapter interface compatibility
+      // Specific error types can be handled by wrapping with withErrorRecovery
       return false
     }
   }
-
   async remove(key: string): Promise<boolean> {
     try {
       sessionStorage.removeItem(key)

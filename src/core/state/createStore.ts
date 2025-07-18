@@ -1,7 +1,15 @@
 import * as immer from 'immer'
 import {Draft} from 'immer'
 import {PluginManager} from '../../plugins/pluginManager'
-import {MiddlewareError, StoreError, SyncError, TransactionError} from '../../shared/errors'
+import {
+  MiddlewareError,
+  StoreError,
+  SyncError,
+  TransactionError,
+  withErrorRecovery,
+  StorageUnavailableError,
+  StorageQuotaExceededError,
+} from '../../shared/errors'
 import {
   type DependencyListener,
   type DependencySubscriptionOptions,
@@ -144,16 +152,49 @@ export function createStore<S extends object>(
 
   function persistState(dataToPersist: S): void {
     if (!persistKey || storageType === StorageType.None) return
-    const success = persistenceManager.persistState(
-      persistKey,
-      dataToPersist,
-      pluginManager,
-      storeInstance
-    )
-    if (!success && isDevMode()) {
-      console.warn(
-        `[Store: ${name || 'Unnamed'}] Failed to persist state. Check storage availability or configuration.`
+
+    try {
+      const success = persistenceManager.persistState(
+        persistKey,
+        dataToPersist,
+        pluginManager,
+        storeInstance
       )
+      if (!success && isDevMode()) {
+        console.warn(
+          `[Store: ${name || 'Unnamed'}] Failed to persist state. Check storage availability or configuration.`
+        )
+      }
+    } catch (error) {
+      if (error instanceof StorageQuotaExceededError) {
+        handleError(
+          new StoreError('Storage quota exceeded during persist', {
+            operation: 'persistState',
+            error,
+            storageType,
+            persistKey,
+          })
+        )
+        // Optionally trigger cleanup or notify user
+      } else if (error instanceof StorageUnavailableError) {
+        handleError(
+          new StoreError('Storage unavailable during persist', {
+            operation: 'persistState',
+            error,
+            storageType,
+            persistKey,
+          })
+        )
+      } else {
+        handleError(
+          new StoreError('Unexpected error during persist', {
+            operation: 'persistState',
+            error,
+            storageType,
+            persistKey,
+          })
+        )
+      }
     }
   }
 
@@ -891,40 +932,47 @@ export function createStore<S extends object>(
 
   function storageEventHandler(event: StorageEvent) {
     if (event.key === persistKey && event.newValue && !isDestroyed) {
-      try {
-        const persisted = JSON.parse(event.newValue) as PersistedState<S>
-        // Ensure this update isn't from the current session to avoid loops
+      withErrorRecovery(
+        async () => {
+          const persisted = JSON.parse(event.newValue!) as PersistedState<S>
+          // Ensure this update isn't from the current session to avoid loops
+          // And only apply if state truly differs to prevent redundant notifications
+          if (
+            persisted.meta &&
+            persisted.meta.sessionId !== sessionId &&
+            !deepEqual(state, persisted.data)
+          ) {
+            let stateToApply = persisted.data
+            // Call plugin onCrossTabSync hooks
+            const transformed = pluginManager.onCrossTabSync(
+              stateToApply,
+              persisted.meta.sessionId || 'unknown',
+              storeInstance
+            )
+            if (transformed) {
+              // If the plugin transformed the state, use it
+              stateToApply = transformed
+            }
 
-        // And only apply if state truly differs to prevent redundant notifications
-        if (
-          persisted.meta &&
-          persisted.meta.sessionId !== sessionId &&
-          !deepEqual(state, persisted.data)
-        ) {
-          let stateToApply = persisted.data
-
-          // Call plugin onCrossTabSync hooks
-          const transformed = pluginManager.onCrossTabSync(
-            stateToApply,
-            persisted.meta.sessionId || 'unknown',
-            storeInstance
-          )
-          if (transformed) {
-            // If the plugin transformed the state, use it
-            stateToApply = transformed
+            // _applyStateChange will capture the current `state` as its `prevState`
+            _applyStateChange(stateToApply, true)
           }
-
-          // _applyStateChange will capture the current `state` as its `prevState`
-          _applyStateChange(stateToApply, true)
+        },
+        {
+          maxRetries: 2,
+          retryDelay: 100,
+          onRetry: (attempt, error) => {
+            console.warn(`[Store] Cross-tab sync retry ${attempt}:`, error.message)
+          },
         }
-      } catch (e: any) {
+      ).catch(error => {
         handleError(
-          new SyncError('Failed to sync state from another tab', {
-            error: e,
+          new SyncError('Failed to sync state from another tab after retries', {
+            error,
             key: persistKey,
           })
         )
-      }
+      })
     }
   }
 

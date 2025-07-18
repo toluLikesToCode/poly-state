@@ -1,6 +1,6 @@
 import {StorageType, PersistedState, CookieStorageOptions, StateMetadata, Store} from './types'
 import {TypeRegistry} from './typeRegistry'
-import {MiddlewareError, PersistenceError, StoreError} from '../../shared/errors'
+import {MiddlewareError, PersistenceError, StoreError, withErrorRecovery} from '../../shared/errors'
 import {
   getLocalStorage,
   setLocalStorage,
@@ -194,6 +194,33 @@ export class PersistenceManager<S extends object> {
   }
 
   /**
+   * Persist state with error recovery
+   */
+  public async persistStateWithRecovery(
+    persistKey: string | undefined,
+    state: S,
+    plugins: PluginManager<S>,
+    store: Store<S>
+  ): Promise<boolean> {
+    return withErrorRecovery(
+      async () => {
+        return this.persistState(persistKey, state, plugins, store)
+      },
+      {
+        maxRetries: 3,
+        retryDelay: 100,
+        fallbackValue: false,
+        onRetry: (attempt, error) => {
+          console.warn(
+            `[PersistenceManager] Retry ${attempt} for persist operation:`,
+            error.message
+          )
+        },
+      }
+    )
+  }
+
+  /**
    * Load state from the configured storage
    */
   public loadState(
@@ -264,6 +291,30 @@ export class PersistenceManager<S extends object> {
       )
       return null
     }
+  }
+
+  /**
+   * Load state with error recovery
+   */
+  public async loadStateWithRecovery(
+    persistKey: string | undefined,
+    staleAge: number,
+    plugins: PluginManager<S>,
+    store: Store<S>
+  ): Promise<Partial<S> | null> {
+    return withErrorRecovery(
+      async () => {
+        return this.loadState(persistKey, staleAge, plugins, store)
+      },
+      {
+        maxRetries: 2,
+        retryDelay: 50,
+        fallbackValue: null,
+        onRetry: (attempt, error) => {
+          console.warn(`[PersistenceManager] Retry ${attempt} for load operation:`, error.message)
+        },
+      }
+    )
   }
 
   /**
