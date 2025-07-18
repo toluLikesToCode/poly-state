@@ -2,7 +2,7 @@ import {beforeEach, describe, expect, it, vi} from 'vitest'
 
 // Mock the storage modules with proper original import
 vi.mock('../../src/core/storage/local', async importOriginal => {
-  const actual = await importOriginal<typeof import('../../src/core/storage/local')>()
+  const actual = await importOriginal<typeof import('../../../src/core/storage/local')>()
   return {
     ...actual,
     getLocalStorage: vi.fn((key: string, defaultValue: any) => {
@@ -15,7 +15,7 @@ vi.mock('../../src/core/storage/local', async importOriginal => {
 })
 
 // Import after mocking
-const devModeModule = await import('../../src/core/utils/devMode')
+const devModeModule = await import('../../../src/core/utils/devMode')
 const {
   isDevMode,
   getDevModeConfig,
