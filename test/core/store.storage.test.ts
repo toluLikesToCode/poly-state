@@ -12,7 +12,7 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest'
 import {PersistenceManager} from '../../src/core/state/persistenceManager'
 import {TypeRegistry} from '../../src/core/state/typeRegistry'
-import {StorageType} from '../../src/core/state/types'
+import {StorageType} from '../../src/core/state/state-types/types'
 import {
   CookieStorageAdapter,
   LocalStorageAdapter,
