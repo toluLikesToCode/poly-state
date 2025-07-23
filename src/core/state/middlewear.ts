@@ -1,5 +1,5 @@
 import {StoreError, MiddlewareError} from '../../shared'
-import {ActionPayload, Middleware} from './types'
+import {ActionPayload, Middleware} from './state-types/types'
 
 /**
  * Middleware chain executor

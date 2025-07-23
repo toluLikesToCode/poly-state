@@ -592,7 +592,7 @@ describe('Advanced Selector Operations', () => {
       expect(nextValue).toEqual(firstValue)
 
       // Change unrelated state shouldn't trigger recomputation
-      dispatch({ui: {...store.getState().ui, loading: true}})
+      updatePath(['ui', 'loading'], () => true)
 
       nextValue = selectFilteredProducts()
 
@@ -631,7 +631,7 @@ describe('Advanced Selector Operations', () => {
   describe('Parameterized Selectors', () => {
     it('should create selectors that accept runtime parameters', () => {
       const selectUserById = store.selectWith(
-        [state => state.users.byId] as const,
+        [state => state.users.byId],
         (userId: number) => users => users.get(userId) || null
       )
 
@@ -652,13 +652,10 @@ describe('Advanced Selector Operations', () => {
       const selectItemProps = select(selectProducts, products => products.items)
       const selectItems = select(selectItemProps, items => items)
 
-      const selectProductsByCategory = selectWith(
-        [selectItems] as const,
-        (category: string) => items => {
-          computationSpy(category)
-          return items.filter(p => p.category === category)
-        }
-      )
+      const selectProductsByCategory = selectWith([selectItems], (category: string) => items => {
+        computationSpy(category)
+        return items.filter(p => p.category === category)
+      })
 
       const getElectronics = selectProductsByCategory('electronics')
       const getAudio = selectProductsByCategory('audio')
@@ -712,7 +709,7 @@ describe('Advanced Selector Operations', () => {
       }
 
       const selectProductsWithParams = store.selectWith(
-        [state => state.products.items] as const,
+        [state => state.products.items],
         (params: ProductSearchParams) => products => {
           let filtered = products
 
@@ -760,7 +757,7 @@ describe('Advanced Selector Operations', () => {
 
     it('should support nested parameterized selectors', () => {
       const selectUsersByPreference = store.selectWith(
-        [state => state.users.byId] as const,
+        [state => state.users.byId],
         (preference: keyof UserProfile['preferences']) => users => {
           return Array.from(users.values()).reduce(
             (acc, user) => {
@@ -853,11 +850,9 @@ describe('Advanced Selector Operations', () => {
         ...initialState.users.byId.get(1)!,
         name: 'John Updated',
       }
-      store.dispatch({
-        users: {
-          ...store.getState().users,
-          byId: new Map(store.getState().users.byId).set(1, updatedUser),
-        },
+
+      transaction(draft => {
+        draft.users.byId.set(1, updatedUser)
       })
 
       expect(listener).not.toHaveBeenCalled()
@@ -875,11 +870,8 @@ describe('Advanced Selector Operations', () => {
         },
       }
 
-      store.dispatch({
-        users: {
-          ...store.getState().users,
-          byId: new Map(store.getState().users.byId).set(3, newUser),
-        },
+      transaction(draft => {
+        draft.users.byId.set(3, newUser)
       })
 
       expect(listener).toHaveBeenCalledTimes(1)
@@ -894,25 +886,21 @@ describe('Advanced Selector Operations', () => {
       })
 
       // Rapid changes
-      store.dispatch({
-        products: {
-          ...store.getState().products,
-          filters: {...store.getState().products.filters, searchTerm: 'g'},
-        },
+
+      transaction(draft => {
+        draft.products.filters.searchTerm = 'g'
       })
 
-      store.dispatch({
-        products: {
-          ...store.getState().products,
-          filters: {...store.getState().products.filters, searchTerm: 'ga'},
-        },
+      transaction(draft => {
+        draft.products.filters.searchTerm = 'ga'
       })
 
-      store.dispatch({
-        products: {
-          ...store.getState().products,
-          filters: {...store.getState().products.filters, searchTerm: 'gam'},
-        },
+      transaction(draft => {
+        draft.products.filters.searchTerm = 'gam'
+      })
+
+      transaction(draft => {
+        draft.products.filters.searchTerm = 'game'
       })
 
       // Should not have been called yet
@@ -923,7 +911,7 @@ describe('Advanced Selector Operations', () => {
 
       // Should be called once with the final value
       expect(listener).toHaveBeenCalledTimes(1)
-      expect(listener).toHaveBeenCalledWith('gam', '')
+      expect(listener).toHaveBeenCalledWith('game', '')
 
       vi.useRealTimers()
     })
@@ -943,24 +931,11 @@ describe('Advanced Selector Operations', () => {
       const unsubscribeUI = store.subscribeTo(state => state.ui.loading, uiListener)
 
       // Make changes to each
-      store.dispatch({
-        users: {...store.getState().users, activeUserId: 2},
+      transaction(draft => {
+        draft.users.activeUserId = 2
+        draft.products.filters.category = 'electronics'
+        draft.ui.loading = true
       })
-
-      store.dispatch({
-        products: {
-          ...store.getState().products,
-          filters: {
-            ...store.getState().products.filters,
-            category: 'electronics',
-          },
-        },
-      })
-
-      store.dispatch({
-        ui: {...store.getState().ui, loading: true},
-      })
-
       expect(userListener).toHaveBeenCalledWith(2, 1)
       expect(productListener).toHaveBeenCalledWith('electronics', null)
       expect(uiListener).toHaveBeenCalledWith(true, false)
@@ -1012,6 +987,7 @@ describe('Advanced Selector Operations', () => {
           initialState.ui.loading,
         ] // old values
       )
+      unsubscribe()
       vi.useRealTimers()
     })
   })
@@ -1030,8 +1006,9 @@ describe('Advanced Selector Operations', () => {
       )
 
       // Change one of the watched values
-      store.dispatch({
-        users: {...store.getState().users, activeUserId: 2},
+
+      transaction(draft => {
+        draft.users.activeUserId = 2
       })
 
       expect(listener).toHaveBeenCalledWith(
@@ -1040,9 +1017,10 @@ describe('Advanced Selector Operations', () => {
       )
 
       // Change multiple values at once
-      store.dispatch({
-        users: {...store.getState().users, activeUserId: 1},
-        ui: {...store.getState().ui, loading: true},
+
+      transaction(draft => {
+        draft.users.activeUserId = 1
+        draft.ui.loading = true
       })
 
       expect(listener).toHaveBeenCalledWith(
@@ -1309,7 +1287,7 @@ describe('Advanced Selector Operations', () => {
 
     it('should handle parameterized selector errors', () => {
       const selectUserWithValidation = selectWith(
-        [state => state.users.byId] as const,
+        [state => state.users.byId],
         (userId: number) => users => {
           if (userId <= 0) {
             throw new Error('Invalid user ID')

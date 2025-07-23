@@ -6,9 +6,8 @@ import {
   StorageType,
   Store,
   historyChangePluginOptions,
-} from '../../src/core/state/types'
+} from '../../src/core/state/state-types/types'
 import {MiddlewareError, StoreError} from '../../src/shared/errors'
-import {Draft} from 'immer'
 
 interface TestState {
   count: number

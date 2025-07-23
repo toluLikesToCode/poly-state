@@ -1,6 +1,6 @@
 {
   "name": "@tolulikestocode/poly-state",
-  "version": "1.0.1",
+  "version": "1.0.3",
   "type": "module",
   "description": "Universal state management library for TypeScript and React",
   "publishConfig": {

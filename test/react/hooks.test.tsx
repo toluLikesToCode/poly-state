@@ -720,6 +720,7 @@ describe('React Integration – Advanced Features', () => {
   let useThunk: UseThunkHook<TestState>
   let useAsyncThunk: UseAsyncThunkHook<TestState>
   let useSelector: UseSelectorHook<TestState>
+  let useStore: UseStoreHook<TestState>
 
   beforeEach(() => {
     store = createStore<TestState>({
@@ -742,11 +743,42 @@ describe('React Integration – Advanced Features', () => {
     useThunk = context.useThunk as any
     useAsyncThunk = context.useAsyncThunk
     useSelector = context.useSelector
+    useStore = context.useStore
   })
 
   it('should provide access to full store state with useStoreState', () => {
     function TestComponent() {
       const state = useStoreState()
+      return (
+        <div>
+          <div data-testid="count">{state.count}</div>
+          <div data-testid="user-name">{state.user.name}</div>
+          <div data-testid="user-age">{state.user.age}</div>
+          <div data-testid="todos-length">{state.todos.length}</div>
+        </div>
+      )
+    }
+
+    render(
+      <StoreProvider>
+        <TestComponent />
+      </StoreProvider>
+    )
+
+    expect(screen.getByTestId('count').textContent).toBe('0')
+    expect(screen.getByTestId('user-name').textContent).toBe('John')
+    expect(screen.getByTestId('user-age').textContent).toBe('25')
+    expect(screen.getByTestId('todos-length').textContent).toBe('0')
+  })
+
+  it('should provide access to full store object with useStore', () => {
+    function TestComponent() {
+      const store = useStore()
+      const state = store.getState()
+      const select = store.select
+
+      const count = select(state => state.count)
+
       return (
         <div>
           <div data-testid="count">{state.count}</div>

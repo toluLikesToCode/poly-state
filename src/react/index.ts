@@ -32,7 +32,12 @@ export * from './types'
 import {Prettify} from '../shared'
 
 // Import types from the dedicated types file
-import type {StoreContextValue, StoreContextResult, UseSubscribeToHook} from './types'
+import type {
+  StoreContextValue,
+  StoreContextResult,
+  UseSubscribeToHook,
+  ExtractStateFromStore,
+} from './types'
 
 // Cache for store hooks to avoid recreating them
 const globalStoreHooks = new WeakMap<
@@ -47,7 +52,7 @@ const globalStoreHooks = new WeakMap<
  * It creates a complete set of React hooks and context providers that allow components
  * to interact with the store using React patterns.
  *
- * @template S - The shape of the state object managed by the store
+ * @template T - The store type, which is used to infer the state shape
  * @param store - The store instance to create React integration for
  * @returns Object containing React context and all available hooks
  *
@@ -84,9 +89,11 @@ const globalStoreHooks = new WeakMap<
  * @see {@link StoreContextResult} for all available hooks and their documentation
  * @see {@link Store} for the store interface
  */
-export function createStoreContext<S extends object>(
-  store: Store<S>
-): Prettify<StoreContextResult<S>> {
+export function createStoreContext<T extends Store<any>>(
+  store: T
+): Prettify<StoreContextResult<ExtractStateFromStore<T>>> {
+  type S = ExtractStateFromStore<T>
+
   const StoreContext = createContext<StoreContextValue<S> | null>(null)
   StoreContext.displayName = 'StoreContext'
 

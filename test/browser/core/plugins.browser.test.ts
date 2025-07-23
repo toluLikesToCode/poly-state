@@ -1,6 +1,5 @@
 import {describe, it, expect, beforeEach} from 'vitest'
-import {createStore} from '../../src/core/state/createStore'
-import {StorageType, type Plugin} from '../../src/core/state/types'
+import {createStore, StorageType, type Plugin} from '../../../src/core'
 
 describe('Plugin System Browser Tests', () => {
   beforeEach(() => {
@@ -16,14 +15,12 @@ describe('Plugin System Browser Tests', () => {
       name: 'browser-test-plugin',
       beforePersist: (state, storageType, store) => {
         pluginCalls.push(`beforePersist-${storageType}`)
-        return state
       },
       onPersisted: (state, storageType, store) => {
         pluginCalls.push(`onPersisted-${storageType}`)
       },
       onStateLoaded: (state, storageType, store) => {
         pluginCalls.push(`onStateLoaded-${storageType}`)
-        return state
       },
     }
 
@@ -45,6 +42,48 @@ describe('Plugin System Browser Tests', () => {
 
     // Verify real localStorage was updated
     expect(localStorage.getItem('plugin-test')).toBeTruthy()
+
+    // verify localStorage has the updated state
+    const stored = localStorage.getItem('plugin-test')
+    expect(stored).toBeTruthy()
+    const parsedData = JSON.parse(stored!)
+    expect(parsedData.data.test).toBe('updated')
+
+    // Create new store to test loading
+    store.destroy({removePersistedState: true})
+
+    let newStore = createStore(
+      {test: 'initial'},
+      {
+        persistKey: 'plugin-test',
+        storageType: StorageType.Local,
+      }
+    )
+
+    // Verify state was not loaded
+    expect(newStore.getState()).toMatchObject({test: 'initial'})
+
+    newStore.dispatch({test: 'updated again'})
+
+    // verify localStorage has the updated state again
+    const newStored = localStorage.getItem('plugin-test')
+    expect(newStored).toBeTruthy()
+    const newParsedData = JSON.parse(newStored!)
+    expect(newParsedData.data.test).toBe('updated again')
+
+    newStore.destroy()
+
+    // recreate newStore
+    newStore = createStore(
+      {test: 'initial'},
+      {
+        persistKey: 'plugin-test',
+        storageType: StorageType.Local,
+      }
+    )
+
+    // Verify state was loaded with 'updated again'
+    expect(newStore.getState()).toMatchObject({test: 'updated again'})
   })
 
   it('should handle plugin errors gracefully during real storage operations', () => {
@@ -121,6 +160,9 @@ describe('Plugin System Browser Tests', () => {
 
     // Plugin should have been called
     expect(syncCalls).toContain('onCrossTabSync-external-session')
+
+    // Store should have updated state
+    expect(store.getState().shared).toBe(999)
   })
 
   it('should handle state transformation in plugins with real storage', () => {

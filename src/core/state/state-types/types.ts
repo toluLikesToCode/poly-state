@@ -1,6 +1,12 @@
 import type {Draft} from 'immer'
-import {ErrorContext, StoreError, ValidationError} from '../../shared/errors'
-import {DependencyListener, DependencySubscriptionOptions, Selector} from '../selectors/types'
+import type {ErrorContext, StoreError} from '../../../shared/errors'
+import type {
+  DependencyListener,
+  DependencySubscriptionOptions,
+  Selector,
+} from '../../selectors/types'
+import type {Middleware} from './middlewear-types'
+export type {Middleware}
 
 /**
  * Type definition for custom serialization/deserialization of complex objects
@@ -41,18 +47,6 @@ export interface TypeDefinition<T> {
 export type Listener<S extends object> = (newState: S, prevState?: S) => void
 
 /**
- * Function that intercepts and potentially modifies state updates
- * @typeParam S - The type of the state
- */
-export type Middleware<S extends object> = (
-  action: ActionPayload<S>,
-  prevState: S,
-  dispatch: (action: ActionPayload<S>) => void,
-  getState: () => S,
-  reset: () => void
-) => void | Promise<void>
-
-/**
  * Dispatch function for the store with improved return type handling
  * @typeParam S – the shape of the state
  */
@@ -61,28 +55,17 @@ export type Dispatch<S extends object> = {
   (action: ActionPayload<S>): void
 }
 
+export type Path = (string | number)[]
+
 export type ThunkContext<S extends object> = {
   dispatch: Dispatch<S>
   getState: () => S
-  updatePath: <V = any>(path: (string | number)[], updater: (currentValue: V) => V) => void
+  updatePath: <V = any>(path: Path, updater: (currentValue: V) => V) => void
   transaction: (recipe: (draft: Draft<S>) => void) => boolean
   batch: (fn: () => void) => void
 }
 
 export type Thunk<S extends object, R = void> = (ctx: ThunkContext<S>) => R | Promise<R>
-
-// /**
-//  * Thunk for async/sync logic
-//  * @typeParam S – the shape of the state
-//  * @typeParam R – return type of the thunk (defaults to void)
-//  */
-// export type Thunk<S extends object, R = void> = (
-//   dispatch: Dispatch<S>,
-//   getState: () => S,
-//   updatePath: <V = any>(path: (string | number)[], updater: (currentValue: V) => V) => void,
-//   transaction: (recipe: (draft: Draft<S>) => void) => boolean,
-//   batch: (fn: () => void) => void
-// ) => R | Promise<R>
 
 /**
  * Direct state‐update payload
@@ -494,7 +477,8 @@ export interface ReadOnlyStore<S extends object> {
    * Subscribe to changes in specific state paths using dot notation.
    *
    * @template T - The type of the value at the specified path
-   * @param path - Dot-separated path to the state value (e.g., 'user.profile.name')
+   * @param path - Dot-separated path to the state value (e.g., 'user.profile.name') or a Path array
+   *               representing the path to the value to watch.
    * @param listener - Callback invoked when the path value changes
    * @param options - Optional configuration for the subscription behavior
    * @returns Unsubscribe function to stop listening to changes
@@ -522,13 +506,23 @@ export interface ReadOnlyStore<S extends object> {
    *     console.log(`First item completion: ${oldCompleted} → ${newCompleted}`);
    *   }
    * );
+   *
+   * // Subscribe to a path with a Path array
+   * store.subscribeToPath(
+   *   ['user', 'preferences', 'theme'],
+   *   (newTheme, oldTheme) => {
+   *     document.body.className = `theme-${newTheme}`;
+   *   },
+   *   { immediate: true }
+   * );
+   *
    * ```
    *
    * @see {@link Store.subscribeTo} for selector-based subscriptions
    * @see {@link Store.subscribeToMultiple} for multiple value subscriptions
    */
   subscribeToPath: <T = any>(
-    path: string | (string | number)[],
+    path: string | Path,
     listener: DependencyListener<T>,
     options?: DependencySubscriptionOptions
   ) => () => void
@@ -788,7 +782,7 @@ export interface Store<S extends object> extends ReadOnlyStore<S> {
    * @see {@link Store.redo} for forward history navigation
    * @see {@link StoreOptions.historyLimit} for enabling history tracking
    */
-  undo: (steps?: number, path?: (string | number)[]) => boolean
+  undo: (steps?: number, path?: Path) => boolean
 
   /**
    * Moves forward in the store's history to a more recent state.
@@ -815,7 +809,7 @@ export interface Store<S extends object> extends ReadOnlyStore<S> {
    * @see {@link Store.undo} for backward history navigation
    * @see {@link StoreOptions.historyLimit} for enabling history tracking
    */
-  redo: (steps?: number, path?: (string | number)[]) => boolean
+  redo: (steps?: number, path?: Path) => boolean
 
   /**
    * Completely destroys the store and performs cleanup operations.
@@ -885,7 +879,7 @@ export interface Store<S extends object> extends ReadOnlyStore<S> {
    * @see {@link https://immerjs.github.io/immer/produce | Immer produce documentation}
    * @see {@link transaction} for multiple related updates
    */
-  updatePath: <V = any>(path: (string | number)[], updater: (currentValue: V) => V) => void
+  updatePath: <V = any>(path: Path, updater: (currentValue: V) => V) => void
 
   /**
    * Batches multiple state updates into a single notification to subscribers.
@@ -1082,7 +1076,7 @@ export interface Store<S extends object> extends ReadOnlyStore<S> {
    * @see {@link Store.select} for simple selectors without parameters
    * @see {@link Selector} for the selector type definition
    */
-  selectWith: <Props, R, P extends Selector<S, any>[]>(
+  selectWith: <Props, R, const P extends Selector<S, any>[]>(
     inputSelectors: readonly [...P],
     projector: (params: Props) => (
       ...results: {
@@ -1099,42 +1093,4 @@ export interface Store<S extends object> extends ReadOnlyStore<S> {
    * @param isTimeTravel - Whether this is a time travel operation (defaults to true)
    */
   _setStateForDevTools?: (newState: S, isTimeTravel?: boolean) => void
-}
-
-/**
- * Interface for the validator function used in createValidatorMiddleware.
- *
- * @template S - The type of the state object
- * @param state - The proposed next state after applying the action
- * @param action - The action being applied
- * @param prevState - The previous state before the action
- * @returns True if the state is valid, false otherwise, or a Promise resolving to a boolean
- *
- * @example
- * ```typescript
- * const validator: ValidatorFn<AppState> = (state, action, prevState) => {
- *   return state.count >= 0;
- * };
- * ```
- */
-export interface ValidatorFn<S extends object> {
-  (state: S, action: ActionPayload<S>, prevState: S): boolean | Promise<boolean>
-}
-
-/**
- * Interface for the validation error handler used in createValidatorMiddleware.
- *
- * @template S - The type of the state object
- * @param error - The ValidationError instance
- * @param action - The action that caused the validation error
- *
- * @example
- * ```typescript
- * const errorHandler: ValidationErrorHandler<AppState> = (error, action) => {
- *   console.error(error.message, action);
- * };
- * ```
- */
-export interface ValidationErrorHandler<S extends object> {
-  (error: ValidationError, action: ActionPayload<S>): void
 }
