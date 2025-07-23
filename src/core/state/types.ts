@@ -1082,7 +1082,7 @@ export interface Store<S extends object> extends ReadOnlyStore<S> {
    * @see {@link Store.select} for simple selectors without parameters
    * @see {@link Selector} for the selector type definition
    */
-  selectWith: <Props, R, P extends Selector<S, any>[]>(
+  selectWith: <Props, R, const P extends Selector<S, any>[]>(
     inputSelectors: readonly [...P],
     projector: (params: Props) => (
       ...results: {

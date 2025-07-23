@@ -631,7 +631,7 @@ describe('Advanced Selector Operations', () => {
   describe('Parameterized Selectors', () => {
     it('should create selectors that accept runtime parameters', () => {
       const selectUserById = store.selectWith(
-        [state => state.users.byId] as const,
+        [state => state.users.byId],
         (userId: number) => users => users.get(userId) || null
       )
 
@@ -652,13 +652,10 @@ describe('Advanced Selector Operations', () => {
       const selectItemProps = select(selectProducts, products => products.items)
       const selectItems = select(selectItemProps, items => items)
 
-      const selectProductsByCategory = selectWith(
-        [selectItems] as const,
-        (category: string) => items => {
-          computationSpy(category)
-          return items.filter(p => p.category === category)
-        }
-      )
+      const selectProductsByCategory = selectWith([selectItems], (category: string) => items => {
+        computationSpy(category)
+        return items.filter(p => p.category === category)
+      })
 
       const getElectronics = selectProductsByCategory('electronics')
       const getAudio = selectProductsByCategory('audio')
@@ -712,7 +709,7 @@ describe('Advanced Selector Operations', () => {
       }
 
       const selectProductsWithParams = store.selectWith(
-        [state => state.products.items] as const,
+        [state => state.products.items],
         (params: ProductSearchParams) => products => {
           let filtered = products
 
@@ -760,7 +757,7 @@ describe('Advanced Selector Operations', () => {
 
     it('should support nested parameterized selectors', () => {
       const selectUsersByPreference = store.selectWith(
-        [state => state.users.byId] as const,
+        [state => state.users.byId],
         (preference: keyof UserProfile['preferences']) => users => {
           return Array.from(users.values()).reduce(
             (acc, user) => {
@@ -1309,7 +1306,7 @@ describe('Advanced Selector Operations', () => {
 
     it('should handle parameterized selector errors', () => {
       const selectUserWithValidation = selectWith(
-        [state => state.users.byId] as const,
+        [state => state.users.byId],
         (userId: number) => users => {
           if (userId <= 0) {
             throw new Error('Invalid user ID')
