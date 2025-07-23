@@ -7,7 +7,7 @@ export default defineConfig({
     browser: {
       enabled: true,
       provider: 'playwright',
-      headless: true, // Set to false for debugging
+      headless: false, // Set to false for debugging
       screenshotFailures: false,
       instances: [
         {

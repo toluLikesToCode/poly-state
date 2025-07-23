@@ -101,6 +101,37 @@ export interface CookieStorageOptions {
   sameSite?: 'Strict' | 'Lax' | 'None'
 }
 
+/**
+ * Defines the configuration for a single persistence strategy.
+ * @template S - The type of the store's state.
+ */
+export interface PersistenceConfig {
+  /** The key to use for this specific storage instance. */
+  persistKey: string
+
+  /** The type of storage to use (e.g., local, session, cookie). */
+  storageType: StorageType
+
+  /**
+   * Specific options for the storage type. Currently used for cookies.
+   */
+  cookieOptions?: CookieStorageOptions
+
+  /**
+   * An array of paths to explicitly include in persistence for this target.
+   * If provided, only these paths will be saved. Takes precedence over global ephemeralPaths.
+   * @example [['user', 'profile'], ['settings']]
+   */
+  includePaths?: Path[]
+
+  /**
+   * An array of paths to explicitly exclude from persistence for this target.
+   * This takes precedence over includePaths.
+   * @example [['user', 'tokens'], ['tempData']]
+   */
+  excludePaths?: Path[]
+}
+
 export interface historyChangePluginOptions<S extends object> {
   operation: 'undo' | 'redo'
   steps: number
@@ -307,6 +338,17 @@ export interface StoreOptions<S extends object> {
   storageType?: StorageType
   cookieOptions?: CookieStorageOptions
   cookiePrefix?: string // For improved cookie cleanup
+  /**
+   * An array of persistence configurations. Each object defines a storage
+   * target, its options, and the state paths it manages.
+   */
+  persistence?: PersistenceConfig[]
+  /**
+   * Paths that should always be ephemeral and never persisted to any target.
+   * This serves as a global ignore list.
+   * @example [['runtime', 'volatileState']]
+   */
+  ephemeralPaths?: Path[]
   syncAcrossTabs?: boolean
   middleware?: Middleware<S>[]
   historyLimit?: number
@@ -1084,6 +1126,35 @@ export interface Store<S extends object> extends ReadOnlyStore<S> {
       }
     ) => R
   ) => (params: Props) => (() => R) & {lastValue?: R}
+
+  /**
+   * Waits for any persisted state to finish loading.
+   *
+   * @remarks
+   * This method returns a promise that resolves when the store has completed loading
+   * any persisted state from storage. This is useful when you need to ensure that
+   * the store has its persisted state before performing operations that depend on it.
+   *
+   * The store creation itself remains synchronous, but this method allows consumers
+   * to wait for the async state loading to complete when needed.
+   *
+   * @returns Promise that resolves when state loading is complete
+   *
+   * @example
+   * ```typescript
+   * const store = createStore(initialState, { persistKey: 'myStore' });
+   *
+   * // Wait for persisted state to load before using the store
+   * await store.waitForStateLoad();
+   * console.log('Store now has persisted state loaded');
+   *
+   * // Now safe to use store with confidence that persisted state is loaded
+   * const currentState = store.getState();
+   * ```
+   *
+   * @see {@link StoreOptions.persistKey} for state persistence configuration
+   */
+  waitForStateLoad: () => Promise<void>
 
   /**
    * Internal method for Redux DevTools to set state directly without going through dispatch.

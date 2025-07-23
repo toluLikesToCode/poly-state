@@ -8,7 +8,7 @@ describe('Plugin System Browser Tests', () => {
     sessionStorage.clear()
   })
 
-  it('should execute plugins with real storage operations', () => {
+  it('should execute plugins with real storage operations', async () => {
     const pluginCalls: string[] = []
 
     const testPlugin: Plugin<any> = {
@@ -81,6 +81,8 @@ describe('Plugin System Browser Tests', () => {
         storageType: StorageType.Local,
       }
     )
+    // Wait for state to load
+    await newStore.waitForStateLoad()
 
     // Verify state was loaded with 'updated again'
     expect(newStore.getState()).toMatchObject({test: 'updated again'})
@@ -165,7 +167,7 @@ describe('Plugin System Browser Tests', () => {
     expect(store.getState().shared).toBe(999)
   })
 
-  it('should handle state transformation in plugins with real storage', () => {
+  it('should handle state transformation in plugins with real storage', async () => {
     const transformPlugin: Plugin<any> = {
       name: 'transform-plugin',
       beforePersist: state => {
@@ -209,6 +211,9 @@ describe('Plugin System Browser Tests', () => {
         plugins: [transformPlugin],
       }
     )
+
+    // wait for state to load
+    await newStore.waitForStateLoad()
 
     // Should have both transformed and loaded flags
     expect(newStore.getState()).toMatchObject({

@@ -914,15 +914,33 @@ export function createStore<S extends object>(
     cleanupStaleStates(staleAge, cookiePrefix)
   }
 
-  const savedState = persistenceManager.loadState(
+  // Create a promise to track state loading completion
+  let stateLoadingComplete: Promise<void> = Promise.resolve()
+
+  const savedStatePromise = persistenceManager.loadStateAsync(
     persistKey,
     staleAge,
     pluginManager,
     storeInstance
   )
-  if (savedState) {
-    //state = { ...state, ...savedState };
-    _internalDispatch(savedState as ActionPayload<S>, false) // allow plugins/middleware to process the loaded state
+
+  // Handle Promise savedState
+  if (typeof (savedStatePromise as any)?.then === 'function') {
+    stateLoadingComplete = (savedStatePromise as Promise<Partial<S> | null>)
+      .then(resolvedState => {
+        if (resolvedState) {
+          _internalDispatch(resolvedState as ActionPayload<S>, false)
+        }
+      })
+      .catch(error => {
+        handleError(
+          new StoreError('Failed to load persisted state', {
+            operation: 'loadStateAsync',
+            error,
+            persistKey,
+          })
+        )
+      })
   }
 
   // Initialize history with the current state
@@ -1022,9 +1040,26 @@ export function createStore<S extends object>(
   pluginManager.onStoreCreate(storeInstance)
 
   // Initial state persistence if key provided and no saved state (or saved state was stale and removed)
-  if (persistKey && !savedState) {
+  if (persistKey && !savedStatePromise) {
     persistState(state)
   }
+
+  // Add utility methods to check and wait for state loading completion
+  ;(storeInstance as any)._waitForStateLoad = () => stateLoadingComplete
+  ;(storeInstance as any)._isStateLoading = () => {
+    let isLoading = true
+    stateLoadingComplete
+      .then(() => {
+        isLoading = false
+      })
+      .catch(() => {
+        isLoading = false
+      })
+    return isLoading
+  }
+
+  // Add public method to wait for state loading completion
+  storeInstance.waitForStateLoad = () => stateLoadingComplete
 
   return storeInstance
 }

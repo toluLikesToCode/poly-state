@@ -65,7 +65,7 @@ describe('React Integration Browser Tests', () => {
     })
   })
 
-  it('should restore state in React components from real storage', () => {
+  it('should restore state in React components from real storage', async () => {
     interface state {
       count: number
       name: string
@@ -87,6 +87,8 @@ describe('React Integration Browser Tests', () => {
       persistKey: 'react-restore-test',
       storageType: StorageType.Local,
     })
+
+    await store.waitForStateLoad()
 
     function TestComponent() {
       const {useSelector} = useStoreHooks(store)

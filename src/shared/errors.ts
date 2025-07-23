@@ -83,18 +83,18 @@ export class StorageDeserializationError extends StorageError {
 /**
  * Enhanced error recovery utility
  */
-export interface ErrorRecoveryOptions {
+export interface ErrorRecoveryOptions<T> {
   maxRetries?: number
   retryDelay?: number
-  fallbackValue?: any
+  fallbackValue?: T
   onRetry?: (attempt: number, error: Error) => void
 }
 
 export async function withErrorRecovery<T>(
   operation: () => T | Promise<T>,
-  options: ErrorRecoveryOptions = {}
+  options: ErrorRecoveryOptions<T> = {}
 ): Promise<T> {
-  const {maxRetries = 3, retryDelay = 100, fallbackValue, onRetry} = options
+  const {maxRetries = 0, retryDelay = 100, fallbackValue, onRetry} = options
   let lastError: Error
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
@@ -110,7 +110,7 @@ export async function withErrorRecovery<T>(
     }
   }
 
-  if (fallbackValue !== undefined) {
+  if (typeof fallbackValue !== 'undefined') {
     return fallbackValue
   }
 
