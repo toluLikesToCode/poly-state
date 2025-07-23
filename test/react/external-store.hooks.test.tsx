@@ -1,5 +1,5 @@
 import React, {Profiler, useEffect, useRef} from 'react'
-import {describe, it, expect, beforeEach, vi, afterEach, Mock} from 'vitest'
+import {describe, it, expect, beforeEach, vi, afterEach, Mock, TestContext} from 'vitest'
 import {render, screen, fireEvent, waitFor} from '@testing-library/react'
 import {createStore} from '../../src/core'
 import {createStoreContext, useStoreHooks} from '../../src/react/index'
@@ -32,12 +32,20 @@ describe('useSyncExternalStore Integration Functionality', () => {
     },
   }
 
-  beforeEach(() => {
-    store = createStore<TestState>(initialState)
+  beforeEach(context => {
+    const testName = context.task.name
+    store = createStore<TestState>(initialState, {
+      name: testName,
+      historyLimit: 100,
+    })
   })
 
   afterEach(() => {
-    store.destroy()
+    store.destroy({
+      clearHistory: true,
+      removePersistedState: true,
+      resetRegistry: true,
+    })
   })
 
   describe('Basic functionality with improved performance', () => {
@@ -1334,6 +1342,9 @@ describe('useSyncExternalStore Integration Functionality', () => {
       expect(screen.getByTestId('count2').textContent).toBe('10')
 
       fireEvent.click(screen.getByText('Increment Store 2'))
+
+      // Store 1 should still be unchanged
+      expect(screen.getByTestId('count1').textContent).toBe('2')
 
       await waitFor(() => {
         expect(screen.getByTestId('count2').textContent).toBe('11')
