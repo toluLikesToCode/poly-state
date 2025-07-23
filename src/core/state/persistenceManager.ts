@@ -1,4 +1,10 @@
-import {StorageType, PersistedState, CookieStorageOptions, StateMetadata, Store} from './types'
+import {
+  StorageType,
+  PersistedState,
+  CookieStorageOptions,
+  StateMetadata,
+  Store,
+} from './types/types'
 import {TypeRegistry} from './typeRegistry'
 import {MiddlewareError, PersistenceError, StoreError, withErrorRecovery} from '../../shared/errors'
 import {

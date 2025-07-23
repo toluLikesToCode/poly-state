@@ -1,6 +1,6 @@
 import {ValidationError} from '../../shared/errors'
 import * as storage from '../storage/index'
-import {Middleware, PersistedState, ValidationErrorHandler, ValidatorFn} from './types'
+import {Middleware, PersistedState, ValidationErrorHandler, ValidatorFn} from './types/types'
 import {TypeRegistry} from './typeRegistry'
 
 import {produce, Draft} from 'immer'

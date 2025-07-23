@@ -1,4 +1,4 @@
-import {TypeDefinition} from './types'
+import {TypeDefinition} from './types/types'
 /**
  * Registry for custom types that need special serialization handling.
  * Handles complex objects like Sets, Maps, and other non-JSON-serializable types.

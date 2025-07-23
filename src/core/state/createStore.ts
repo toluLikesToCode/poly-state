@@ -32,8 +32,8 @@ import type {
   Store,
   StoreOptions,
   Thunk,
-} from './types'
-import {StorageType} from './types'
+} from './types/types'
+import {StorageType} from './types/types'
 import {assignState, cleanupStaleStates} from './utils'
 
 // Enable Immer features for better performance and functionality

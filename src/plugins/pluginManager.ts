@@ -4,7 +4,7 @@ import {
   StorageType,
   Store,
   historyChangePluginOptions,
-} from '../core/state/types'
+} from '../core/state/types/types'
 import {ErrorContext, MiddlewareError, StoreError} from '../shared/errors'
 
 /**

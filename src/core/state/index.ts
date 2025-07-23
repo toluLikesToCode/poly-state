@@ -1,6 +1,7 @@
 export * from './createStore'
 export * from './ensureProperType'
 export * from './typeRegistry'
-export * from './types'
+export * from './types/types'
+export * from './types/middlewear-types'
 export {createLoggerMiddleware, cleanupStaleStates, createValidatorMiddleware} from './utils'
 export * from './storeCreationHelpers'
