@@ -1,5 +1,5 @@
 import createStore from './createStore'
-import {Store, StoreOptions, StorageType} from './types/types'
+import {Store, StoreOptions, StorageType} from './state-types/types'
 
 /**
  * Creates a store with automatic persistence

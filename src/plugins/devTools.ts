@@ -1,4 +1,4 @@
-import {Store, Plugin, ActionPayload} from '../core/state/types/types'
+import {Store, Plugin, ActionPayload} from '../core/state/state-types/types'
 import type {
   EnhancerOptions,
   ConnectResponse,

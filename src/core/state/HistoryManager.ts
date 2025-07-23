@@ -1,5 +1,5 @@
 import {PluginManager} from '../../plugins/pluginManager'
-import {historyChangePluginOptions} from './types/types'
+import {historyChangePluginOptions} from './state-types/types'
 import {assignState} from './utils'
 
 /**

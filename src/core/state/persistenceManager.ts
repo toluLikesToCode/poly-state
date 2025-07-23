@@ -4,7 +4,7 @@ import {
   CookieStorageOptions,
   StateMetadata,
   Store,
-} from './types/types'
+} from './state-types/types'
 import {TypeRegistry} from './typeRegistry'
 import {MiddlewareError, PersistenceError, StoreError, withErrorRecovery} from '../../shared/errors'
 import {
