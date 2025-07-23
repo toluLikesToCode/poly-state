@@ -7,6 +7,9 @@ import {TypeRegistry} from './typeRegistry'
 import {produce, Draft} from 'immer'
 import {deepClone} from '../utils'
 
+// Special marker for property deletion
+export const DELETE_PROPERTY = Symbol('DELETE_PROPERTY')
+
 /**
  * Deeply merges newState into state using Immer, handling arrays, objects, Maps, Sets, Dates, and custom classes.
  * Arrays are replaced, not merged. Maps/Sets are replaced by default, but can be extended for custom merge logic.
@@ -67,6 +70,12 @@ function deepMerge(target: any, source: any, typeRegistry?: {findTypeFor: (value
   for (const key of Object.keys(source)) {
     const srcVal = source[key]
     const tgtVal = target[key]
+
+    // Handle deletion marker
+    if (srcVal === DELETE_PROPERTY) {
+      delete target[key]
+      continue
+    }
 
     // Handle null/undefined
     if (srcVal === null || srcVal === undefined) {

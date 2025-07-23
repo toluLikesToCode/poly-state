@@ -34,7 +34,7 @@ import type {
   Thunk,
 } from './state-types/types'
 import {StorageType} from './state-types/types'
-import {assignState, cleanupStaleStates} from './utils'
+import {assignState, cleanupStaleStates, DELETE_PROPERTY} from './utils'
 
 // Enable Immer features for better performance and functionality
 immer.enableMapSet()
@@ -576,48 +576,106 @@ export function createStore<S extends object>(
     return true
   }
 
-  storeInstance.updatePath = <V = any>(
-    path: (string | number)[],
-    updater: (currentValue: V) => V
-  ) => {
+  // Enhanced updatePath with multiple overloads for different type safety levels
+  storeInstance.updatePath = ((path: (string | number)[], updater: any) => {
     if (isDestroyed) return
 
+    // Validate path is not empty
+    if (!Array.isArray(path) || path.length === 0) {
+      handleError(
+        new StoreError('updatePath requires a non-empty path array', {
+          operation: 'updatePath',
+          path,
+        })
+      )
+      return
+    }
+
     // Use Immer to safely update the path with automatic structural sharing
-    const nextState = immer.produce(state, draft => {
+    // During batching, use the virtual state that includes batched changes
+    const baseState =
+      batching && batchedActions.length > 0
+        ? batchedActions.reduce((acc, curr) => assignState(acc as S, curr), state)
+        : state
+
+    const nextState = immer.produce(baseState, draft => {
       // Navigate to the parent of the target path
       let current: any = draft
 
-      // Navigate to the parent object/array
+      // Navigate to the parent object/array with better error handling
       for (let i = 0; i < path.length - 1; i++) {
         const key = path[i]
-        if (current[key] === undefined || current[key] === null) {
-          // Auto-create missing intermediate objects/arrays
+
+        if (current[key] === undefined) {
+          // Auto-create missing intermediate objects/arrays based on next key type
           const nextKey = path[i + 1]
           current[key] = typeof nextKey === 'number' ? [] : {}
+        } else if (
+          current[key] === null ||
+          (typeof current[key] !== 'object' && typeof current[key] !== 'function')
+        ) {
+          // Cannot navigate through null or non-object values
+          handleError(
+            new StoreError('Cannot navigate through non-object value in path', {
+              operation: 'updatePath',
+              path,
+              pathIndex: i + 1,
+              currentValue: current[key],
+            })
+          )
+          return // Exit the produce function early
         }
+
         current = current[key]
       }
 
       // Get the final key and current value
       const finalKey = path[path.length - 1]
-      const currentValue = current[finalKey] as V
+      const currentValue = current[finalKey]
 
-      // Apply the updater function
-      const newValue = updater(currentValue)
+      try {
+        // Apply the updater function with proper type handling
+        let newValue: any
+        if (typeof updater === 'function') {
+          newValue = (updater as Function)(currentValue)
+        } else {
+          newValue = updater
+        }
 
-      // Only update if the value actually changed
-      if (!Object.is(currentValue, newValue)) {
-        current[finalKey] = newValue
+        // Handle deletion (undefined means delete)
+        if (newValue === undefined) {
+          if (Array.isArray(current)) {
+            // For arrays, remove the element at the index
+            if (typeof finalKey === 'number' && finalKey >= 0 && finalKey < current.length) {
+              current.splice(finalKey, 1)
+            }
+          } else {
+            // For objects, delete the property using Immer's approach
+            delete current[finalKey]
+          }
+        } else {
+          // Only update if the value actually changed
+          current[finalKey] = newValue
+        }
+      } catch (error) {
+        handleError(
+          new StoreError('Updater function threw an error', {
+            operation: 'updatePath',
+            path,
+            error,
+            currentValue,
+          })
+        )
       }
     })
 
     // Only dispatch if state actually changed (Immer provides reference equality)
-    if (nextState !== state) {
-      // Always build and dispatch the minimal diff, even when not batching
-      const diff = buildMinimalDiff(nextState, path)
+    if (nextState !== baseState) {
+      // Always build and dispatch the minimal diff, respecting batching
+      const diff = buildMinimalDiff(nextState, path as (string | number)[])
       _internalDispatch(diff, false)
     }
-  }
+  }) as any
 
   storeInstance.getHistory = (): {
     history: readonly S[]
@@ -662,8 +720,18 @@ export function createStore<S extends object>(
       currentState = currentState[key]
     }
 
-    // Set the final changed value
-    currentDiff[path[path.length - 1]] = getPath(newState, path)
+    // For the final level, if the property exists in newState, set it; otherwise mark for deletion
+    const finalKey = path[path.length - 1]
+    const finalValue = getPath(newState, path)
+
+    if (finalKey in currentState) {
+      // Property exists in the new state (either updated or unchanged)
+      currentDiff[finalKey] = finalValue
+    } else {
+      // Property was deleted - mark it for deletion
+      currentDiff[finalKey] = DELETE_PROPERTY
+    }
+
     return diff
   }
 

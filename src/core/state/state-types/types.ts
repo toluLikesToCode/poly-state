@@ -8,6 +8,9 @@ import type {
 import type {Middleware} from './middlewear-types'
 export type {Middleware}
 
+// Import path utility types
+import type {PathValue, PathsOf, FlexiblePath} from './path-types'
+
 /**
  * Type definition for custom serialization/deserialization of complex objects
  * @template T - The type of the object being handled
@@ -60,7 +63,7 @@ export type Path = (string | number)[]
 export type ThunkContext<S extends object> = {
   dispatch: Dispatch<S>
   getState: () => S
-  updatePath: <V = any>(path: Path, updater: (currentValue: V) => V) => void
+  updatePath: <V = any>(path: FlexiblePath, updater: (currentValue: V) => V) => void
   transaction: (recipe: (draft: Draft<S>) => void) => boolean
   batch: (fn: () => void) => void
 }
@@ -684,6 +687,71 @@ export interface ReadOnlyStore<S extends object> {
 }
 
 /**
+ * Enhanced path updater that provides better type safety and supports deletion.
+ *
+ * @template V - The type of the value at the specified path
+ */
+export type EnhancedPathUpdater<V = any> =
+  | ((currentValue: V) => V)
+  | ((currentValue: V) => V | undefined) // Allow returning undefined to delete
+  | V
+  | undefined // Allow undefined to delete the property
+
+/**
+ * Type-safe path updater that ensures the updater function matches the expected value type.
+ * This version provides compile-time guarantees about the path-value relationship.
+ *
+ * @template S - The state type
+ * @template P - The path tuple type
+ */
+export type TypedPathUpdater<S extends object, P extends FlexiblePath> =
+  PathValue<S, P> extends infer V
+    ? V extends never
+      ? never // Invalid path
+      : EnhancedPathUpdater<V>
+    : never
+
+/**
+ * Flexible path updater that works with runtime path validation
+ * while still providing good type inference when possible.
+ */
+export type FlexiblePathUpdater<V = any> = EnhancedPathUpdater<V>
+
+/**
+ * Overloaded updatePath method signatures for maximum type safety and flexibility
+ */
+export interface PathUpdateMethods<S extends object> {
+  /**
+   * Type-safe updatePath with compile-time path validation.
+   * Provides the best type safety when paths are known at compile time.
+   *
+   * @template P - The path tuple type (must be a valid path in S)
+   * @param path - Strongly typed path that must exist in the state structure
+   * @param updater - Type-safe updater function that receives the correct value type
+   */
+  <P extends PathsOf<S>>(path: P, updater: TypedPathUpdater<S, P>): void
+
+  /**
+   * Flexible updatePath for runtime paths with value type inference.
+   * Provides type safety for the updater function when the value type can be inferred.
+   *
+   * @template V - The expected value type at the path
+   * @param path - Array of keys/indices representing the path
+   * @param updater - Updater function that receives and returns values of type V
+   */
+  <V = any>(path: FlexiblePath, updater: FlexiblePathUpdater<V>): void
+
+  /**
+   * Most flexible updatePath for complex runtime scenarios.
+   * Falls back to any typing when type inference isn't possible.
+   *
+   * @param path - Array of keys/indices representing the path
+   * @param updater - Updater function with minimal type constraints
+   */
+  (path: (string | number)[], updater: EnhancedPathUpdater<any>): void
+}
+
+/**
  * Store instance interface that extends {@link ReadOnlyStore} with mutation capabilities.
  * Provides comprehensive state management with persistence, history, transactions, and advanced features.
  *
@@ -886,10 +954,7 @@ export interface Store<S extends object> extends ReadOnlyStore<S> {
 
   /**
    * Updates a value at a specific path in the state using an updater function.
-   *
-   * @template V - The type of the value at the specified path
-   * @param path - Array of keys/indices representing the path to the value
-   * @param updater - Function that receives the current value and returns the new value
+   * This method provides multiple overloads for different levels of type safety.
    *
    * @remarks
    * This method uses Immer's {@link https://immerjs.github.io/immer/produce | produce} function
@@ -921,7 +986,13 @@ export interface Store<S extends object> extends ReadOnlyStore<S> {
    * @see {@link https://immerjs.github.io/immer/produce | Immer produce documentation}
    * @see {@link transaction} for multiple related updates
    */
-  updatePath: <V = any>(path: Path, updater: (currentValue: V) => V) => void
+  updatePath: {
+    <P extends PathsOf<S>>(path: P, updater: TypedPathUpdater<S, P>): void
+
+    <V = any>(path: FlexiblePath, updater: FlexiblePathUpdater<V>): void
+
+    (path: (string | number)[], updater: EnhancedPathUpdater<any>): void
+  }
 
   /**
    * Batches multiple state updates into a single notification to subscribers.
@@ -1021,7 +1092,6 @@ export interface Store<S extends object> extends ReadOnlyStore<S> {
    * @see {@link https://immerjs.github.io/immer/typescript | Immer TypeScript documentation}
    * @see {@link batch} for batching multiple state updates
    */
-
   transaction: (recipe: (draft: Draft<S>) => void) => boolean
 
   /**

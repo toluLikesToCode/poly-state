@@ -406,7 +406,7 @@ describe('Advanced Selector Operations', () => {
       expect(initialUserId).toBe(1)
 
       // Change the state
-      updatePath(['users', 'activeUserId'], () => 2)
+      updatePath(['users', 'activeUserId'], 2)
 
       const newUserId = selectActiveUserId()
       expect(newUserId).toBe(2)
@@ -592,7 +592,7 @@ describe('Advanced Selector Operations', () => {
       expect(nextValue).toEqual(firstValue)
 
       // Change unrelated state shouldn't trigger recomputation
-      updatePath(['ui', 'loading'], () => true)
+      updatePath(['ui', 'loading'], true)
 
       nextValue = selectFilteredProducts()
 
@@ -604,7 +604,10 @@ describe('Advanced Selector Operations', () => {
 
       // Change relevant state should trigger recomputation
 
-      updatePath<string | null>(['products', 'filters', 'category'], () => 'electronics')
+      updatePath<AppState['products']['filters']['category']>(
+        ['products', 'filters', 'category'],
+        'electronics'
+      )
       nextValue = selectFilteredProducts()
       expect(computationSpy).toHaveBeenCalledTimes(2)
       expect(productSpy).toHaveBeenCalledTimes(3) // base selector should recompute
