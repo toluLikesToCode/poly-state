@@ -9,7 +9,7 @@ import type {Middleware} from './middlewear-types'
 export type {Middleware}
 
 // Import path utility types
-import type {PathValue, PathsOf, FlexiblePath} from './path-types'
+import type {PathsOf, FlexiblePath} from './path-types'
 
 /**
  * Type definition for custom serialization/deserialization of complex objects
@@ -60,10 +60,18 @@ export type Dispatch<S extends object> = {
 
 export type Path = (string | number)[]
 
+type updatePathMethodType<S extends object> = {
+  <P extends PathsOf<S>>(path: P, updater: TypedPathUpdater<S, P>): void
+
+  <V = any>(path: FlexiblePath, updater: FlexiblePathUpdater<V>): void
+
+  (path: (string | number)[], updater: EnhancedPathUpdater<any>): void
+}
+
 export type ThunkContext<S extends object> = {
   dispatch: Dispatch<S>
   getState: () => S
-  updatePath: <V = any>(path: FlexiblePath, updater: (currentValue: V) => V) => void
+  updatePath: updatePathMethodType<S>
   transaction: (recipe: (draft: Draft<S>) => void) => boolean
   batch: (fn: () => void) => void
 }
@@ -697,6 +705,20 @@ export type EnhancedPathUpdater<V = any> =
   | V
   | undefined // Allow undefined to delete the property
 
+// /**
+//  * Type-safe path updater that ensures the updater function matches the expected value type.
+//  * This version provides compile-time guarantees about the path-value relationship.
+//  *
+//  * @template S - The state type
+//  * @template P - The path tuple type
+//  */
+// export type TypedPathUpdater<S extends object, P extends FlexiblePath> =
+//   PathValue<S, P> extends infer V
+//     ? V extends never
+//       ? never // Invalid path
+//       : EnhancedPathUpdater<V>
+//     : never
+
 /**
  * Type-safe path updater that ensures the updater function matches the expected value type.
  * This version provides compile-time guarantees about the path-value relationship.
@@ -704,12 +726,30 @@ export type EnhancedPathUpdater<V = any> =
  * @template S - The state type
  * @template P - The path tuple type
  */
-export type TypedPathUpdater<S extends object, P extends FlexiblePath> =
-  PathValue<S, P> extends infer V
-    ? V extends never
-      ? never // Invalid path
-      : EnhancedPathUpdater<V>
-    : never
+export type TypedPathUpdater<S extends object, P extends FlexiblePath> = P extends readonly [
+  infer K,
+  ...infer Rest,
+]
+  ? K extends keyof S
+    ? Rest extends readonly (string | number)[]
+      ? Rest extends readonly []
+        ? EnhancedPathUpdater<S[K]>
+        : Rest extends FlexiblePath
+          ? TypedPathUpdater<S[K] extends object ? S[K] : never, Rest>
+          : never
+      : never
+    : K extends number
+      ? S extends readonly (infer Item)[]
+        ? Rest extends readonly (string | number)[]
+          ? Rest extends readonly []
+            ? EnhancedPathUpdater<Item>
+            : Rest extends FlexiblePath
+              ? TypedPathUpdater<Item extends object ? Item : never, Rest>
+              : never
+          : never
+        : never
+      : never
+  : never
 
 /**
  * Flexible path updater that works with runtime path validation
@@ -986,13 +1026,7 @@ export interface Store<S extends object> extends ReadOnlyStore<S> {
    * @see {@link https://immerjs.github.io/immer/produce | Immer produce documentation}
    * @see {@link transaction} for multiple related updates
    */
-  updatePath: {
-    <P extends PathsOf<S>>(path: P, updater: TypedPathUpdater<S, P>): void
-
-    <V = any>(path: FlexiblePath, updater: FlexiblePathUpdater<V>): void
-
-    (path: (string | number)[], updater: EnhancedPathUpdater<any>): void
-  }
+  updatePath: updatePathMethodType<S>
 
   /**
    * Batches multiple state updates into a single notification to subscribers.

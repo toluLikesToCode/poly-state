@@ -7,7 +7,6 @@
  * Utility type to prevent infinite recursion in path type generation
  */
 type Prev = [never, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, ...0[]]
-
 /**
  * Extracts the value type at a given path in an object type.
  * Provides compile-time type safety for nested property access.
@@ -28,17 +27,20 @@ export type PathValue<T, P extends readonly (string | number)[]> = P extends rea
 ]
   ? Head extends keyof T
     ? Tail extends readonly (string | number)[]
-      ? PathValue<T[Head], Tail>
+      ? Tail['length'] extends 0
+        ? T[Head]
+        : PathValue<T[Head], Tail>
       : T[Head]
     : Head extends number
       ? T extends readonly (infer U)[]
         ? Tail extends readonly (string | number)[]
-          ? PathValue<U, Tail>
+          ? Tail['length'] extends 0
+            ? U
+            : PathValue<U, Tail>
           : U
         : unknown
       : unknown
   : T
-
 /**
  * Generates all possible valid paths for a given object type.
  * Limited to a specific depth to prevent infinite recursion.

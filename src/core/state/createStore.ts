@@ -26,6 +26,7 @@ import {MiddlewareExecutor} from './middlewear'
 import type {
   ActionPayload,
   CleanupOptions,
+  EnhancedPathUpdater,
   Listener,
   PersistedState,
   ReadOnlyStore,
@@ -35,6 +36,7 @@ import type {
 } from './state-types/types'
 import {StorageType} from './state-types/types'
 import {assignState, cleanupStaleStates, DELETE_PROPERTY} from './utils'
+import {FlexiblePath, PathValue} from './state-types/path-types'
 
 // Enable Immer features for better performance and functionality
 immer.enableMapSet()
@@ -577,7 +579,14 @@ export function createStore<S extends object>(
   }
 
   // Enhanced updatePath with multiple overloads for different type safety levels
-  storeInstance.updatePath = ((path: (string | number)[], updater: any) => {
+  storeInstance.updatePath = (<const P extends FlexiblePath>(
+    path: P,
+    updater: PathValue<S, P> extends infer V
+      ? V extends never
+        ? never
+        : EnhancedPathUpdater<V>
+      : never
+  ) => {
     if (isDestroyed) return
 
     // Validate path is not empty
@@ -672,7 +681,7 @@ export function createStore<S extends object>(
     // Only dispatch if state actually changed (Immer provides reference equality)
     if (nextState !== baseState) {
       // Always build and dispatch the minimal diff, respecting batching
-      const diff = buildMinimalDiff(nextState, path as (string | number)[])
+      const diff = buildMinimalDiff(nextState, path as unknown as (string | number)[])
       _internalDispatch(diff, false)
     }
   }) as any

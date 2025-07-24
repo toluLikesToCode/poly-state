@@ -1,14 +1,29 @@
-import {describe, it, expect, vi, beforeEach, afterEach, beforeAll, afterAll} from 'vitest'
-import {createStore, type Store, type Thunk, type Middleware, StorageType} from '../../src/core'
-import {StoreError, TransactionError} from '../../src/shared'
+import {afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi} from 'vitest'
+import {createStore, StorageType, type Store} from '../../src/core'
 import {
-  type UpdatePathTestState,
   createUpdatePathInitialState,
+  type UpdatePathTestState,
 } from './core-testing-utils/update-path-test-utils'
 
 describe('Advanced Path Update Operations', () => {
   let store: Store<UpdatePathTestState>
   let updatePath: Store<UpdatePathTestState>['updatePath']
+  let selectDataStructures: () => UpdatePathTestState['dataStructures']
+  let selectCounters: () => ReturnType<typeof selectDataStructures>['counters']
+  let selectPageViews: () => ReturnType<typeof selectCounters>['pageViews']
+  let selectCollections: () => UpdatePathTestState['collections']
+  let selectmixedArray: () => ReturnType<typeof selectCollections>['mixedArray']
+  let selectNestedArrays: () => ReturnType<typeof selectCollections>['nestedArrays']
+  let selectObjectArray: () => ReturnType<typeof selectCollections>['objectArray']
+  let selectsimpleArray: () => ReturnType<typeof selectCollections>['simpleArray']
+  let selectEdgeCases: () => UpdatePathTestState['edgeCases']
+  let selectDeeplyNested: () => ReturnType<typeof selectEdgeCases>['deepNesting']
+  let selectDeeplyNestedValue: () => ReturnType<
+    typeof selectDeeplyNested
+  >['level1']['level2']['level3']['level4']['level5']['value']
+  let selectDeeplyNestedData: () => ReturnType<
+    typeof selectDeeplyNested
+  >['level1']['level2']['level3']['level4']['level5']['data']
 
   beforeAll(() => {
     // Initialize the store with the initial state
@@ -18,6 +33,24 @@ describe('Advanced Path Update Operations', () => {
       historyLimit: 100,
     })
     updatePath = store.updatePath
+    selectDataStructures = store.select(state => state.dataStructures)
+    selectCounters = store.select(selectDataStructures, data => data.counters)
+    selectPageViews = store.select(selectCounters, counters => counters.pageViews)
+    selectCollections = store.select(state => state.collections)
+    selectmixedArray = store.select(selectCollections, collections => collections.mixedArray)
+    selectNestedArrays = store.select(selectCollections, collections => collections.nestedArrays)
+    selectObjectArray = store.select(selectCollections, collections => collections.objectArray)
+    selectsimpleArray = store.select(selectCollections, collections => collections.simpleArray)
+    selectEdgeCases = store.select(state => state.edgeCases)
+    selectDeeplyNested = store.select(selectEdgeCases, edgeCases => edgeCases.deepNesting)
+    selectDeeplyNestedValue = store.select(
+      selectDeeplyNested,
+      deep => deep.level1.level2.level3.level4.level5.value
+    )
+    selectDeeplyNestedData = store.select(
+      selectDeeplyNested,
+      deep => deep.level1.level2.level3.level4.level5.data
+    )
   })
 
   afterAll(() => {
@@ -40,9 +73,9 @@ describe('Advanced Path Update Operations', () => {
   })
 
   describe('Basic Path Updates - Primitive Values', () => {
-    beforeEach(() => {
-      store.reset()
-    })
+    // beforeEach(() => {
+    //   store.reset()
+    // })
 
     afterEach(() => {
       store.reset()
@@ -69,26 +102,27 @@ describe('Advanced Path Update Operations', () => {
 
     it('should update boolean values with logical operations', () => {
       updatePath(['primitives', 'booleanValue'], current => !current)
+
       expect(store.getState().primitives.booleanValue).toBe(false)
     })
 
     it('should handle nullable values correctly', () => {
       // Update null to string
-      updatePath(['primitives', 'nullableString'], () => 'now-has-value')
+      updatePath(['primitives', 'nullableString'], 'now-has-value')
       expect(store.getState().primitives.nullableString).toBe('now-has-value')
 
       // Update string back to null
-      updatePath(['primitives', 'nullableString'], () => null)
+      updatePath(['primitives', 'nullableString'], null)
       expect(store.getState().primitives.nullableString).toBe(null)
     })
 
     it('should handle optional/undefined values', () => {
       // Set undefined optional value
-      updatePath(['primitives', 'optionalNumber'], () => 123)
+      updatePath(['primitives', 'optionalNumber'], 123)
       expect(store.getState().primitives.optionalNumber).toBe(123)
 
       // Clear optional value back to undefined
-      updatePath(['primitives', 'optionalNumber'], () => undefined)
+      updatePath(['primitives', 'optionalNumber'], undefined)
       expect(store.getState().primitives.optionalNumber).toBeUndefined()
     })
 
@@ -98,7 +132,7 @@ describe('Advanced Path Update Operations', () => {
       const unsubscribe = store.subscribe(listener)
 
       // Update with same value
-      updatePath(['primitives', 'stringValue'], () => 'initial-string')
+      updatePath(['primitives', 'stringValue'], 'initial-string')
 
       expect(listener).not.toHaveBeenCalled()
       expect(store.getState()).toBe(initialState) // Reference equality
@@ -107,9 +141,9 @@ describe('Advanced Path Update Operations', () => {
   })
 
   describe('Deep Nested Object Updates', () => {
-    beforeEach(() => {
-      store.reset()
-    })
+    // beforeEach(() => {
+    //   store.reset()
+    // })
 
     afterEach(() => {
       store.reset()
@@ -134,11 +168,11 @@ describe('Advanced Path Update Operations', () => {
     })
 
     it('should update deeply nested objects', () => {
-      updatePath(['user', 'profile', 'settings', 'notifications'], current => ({
-        ...current,
-        email: false,
-        push: true,
-      }))
+      store.batch(() => {
+        const notifications = ['user', 'profile', 'settings', 'notifications'] as const
+        updatePath([...notifications, 'email'], false)
+        updatePath([...notifications, 'push'], true)
+      })
 
       const notifications = store.getState().user.profile.settings.notifications
       expect(notifications.email).toBe(false)
@@ -147,12 +181,10 @@ describe('Advanced Path Update Operations', () => {
     })
 
     it('should maintain structural sharing for unchanged paths', () => {
-      const initialState = store.getState()
-      const initialUser = initialState.user
-      const initialCollections = initialState.collections
+      const {user: initialUser, collections: initialCollections} = store.getState()
 
       // Update only user profile name
-      updatePath(['user', 'profile', 'name'], () => 'Updated Name')
+      updatePath(['user', 'profile', 'name'], 'Updated Name')
 
       const newState = store.getState()
 
@@ -163,28 +195,38 @@ describe('Advanced Path Update Operations', () => {
       expect(newState.user).not.toBe(initialUser)
       expect(newState.user.permissions).toStrictEqual(initialUser.permissions)
       expect(newState.user.roles).toStrictEqual(initialUser.roles)
+      // unchanged properties should maintain reference
+      expect(newState.user.profile).not.toBe(initialUser.profile)
+      expect(newState.user.profile.name).toBe('Updated Name')
+      expect(newState.user.profile.settings).toBe(initialUser.profile.settings)
+      expect(newState.user.profile.email).toBe(initialUser.profile.email)
+      expect(newState.user.profile?.metadata).toBe(initialUser.profile?.metadata)
+      //expect(newState.user.roles).toBe(initialUser.roles) <--- TODO: fix this, sets are not structurally shared
+      expect(newState.user.id).toBe(initialUser.id)
+      //expect(newState.user.permissions).toBe(initialUser.permissions) <--- TODO: fix this, Arrays are not structurally shared
     })
 
     it('should handle very deep nesting (5+ levels)', () => {
-      updatePath(
-        ['edgeCases', 'deepNesting', 'level1', 'level2', 'level3', 'level4', 'level5', 'value'],
-        current => {
-          expect(current).toBe('deep-nested-string')
-          return 'updated-deep-value'
-        }
-      )
+      const path = [
+        'edgeCases',
+        'deepNesting',
+        'level1',
+        'level2',
+        'level3',
+        'level4',
+        'level5',
+        'value',
+      ] as const
+      updatePath(path, current => {
+        expect(current).toBe('deep-nested-string')
+        return 'updated-deep-value'
+      })
 
-      expect(store.getState().edgeCases.deepNesting.level1.level2.level3.level4.level5.value).toBe(
-        'updated-deep-value'
-      )
+      expect(selectDeeplyNestedValue()).toBe('updated-deep-value')
     })
   })
 
   describe('Array Operations', () => {
-    beforeEach(() => {
-      store.reset()
-    })
-
     afterEach(() => {
       store.reset()
     })
@@ -195,13 +237,7 @@ describe('Advanced Path Update Operations', () => {
         return [...current, 'date', 'elderberry']
       })
 
-      expect(store.getState().collections.simpleArray).toEqual([
-        'apple',
-        'banana',
-        'cherry',
-        'date',
-        'elderberry',
-      ])
+      expect(selectsimpleArray()).toEqual(['apple', 'banana', 'cherry', 'date', 'elderberry'])
     })
 
     it('should update specific array elements by index', () => {
@@ -210,7 +246,7 @@ describe('Advanced Path Update Operations', () => {
         return 'blueberry'
       })
 
-      expect(store.getState().collections.simpleArray).toEqual(['apple', 'blueberry', 'cherry'])
+      expect(selectsimpleArray()).toEqual(['apple', 'blueberry', 'cherry'])
     })
 
     it('should update array elements with complex objects', () => {
@@ -219,25 +255,25 @@ describe('Advanced Path Update Operations', () => {
         return true
       })
 
-      expect(store.getState().collections.objectArray[0].completed).toBe(true)
+      expect(selectObjectArray()[0].completed).toBe(true)
     })
 
     it('should update nested properties in array objects', () => {
-      updatePath(['collections', 'objectArray', 0, 'metadata', 'updatedAt'], () => Date.now())
+      const updateTime = Date.now()
+      updatePath(['collections', 'objectArray', 0, 'metadata', 'updatedAt'], updateTime)
 
-      const updatedTask = store.getState().collections.objectArray[0]
+      const updatedTask = selectObjectArray()[0]
       expect(updatedTask.metadata?.updatedAt).toBeTypeOf('number')
-      expect(updatedTask.metadata?.updatedAt).toBeGreaterThan(0)
+      expect(updatedTask.metadata?.updatedAt).toBe(updateTime)
     })
 
     it('should add new properties to array objects', () => {
-      updatePath(['collections', 'objectArray', 1, 'metadata'], current => ({
-        ...current,
-        updatedAt: Date.now(),
-        version: 1,
-      }))
+      const path = ['collections', 'objectArray', 1, 'metadata'] as const
 
-      const task = store.getState().collections.objectArray[1]
+      updatePath([...path, 'updatedAt'] as const, Date.now())
+      updatePath([...path, 'version'] as const, 1)
+
+      const task = selectObjectArray()[1]
       expect(task.metadata?.updatedAt).toBeTypeOf('number')
       expect((task.metadata as any)?.version).toBe(1)
     })
@@ -248,11 +284,7 @@ describe('Advanced Path Update Operations', () => {
         return [...current, 'group1-item3']
       })
 
-      expect(store.getState().collections.nestedArrays[0]).toEqual([
-        'group1-item1',
-        'group1-item2',
-        'group1-item3',
-      ])
+      expect(selectNestedArrays()[0]).toEqual(['group1-item1', 'group1-item2', 'group1-item3'])
     })
 
     it('should handle mixed type arrays', () => {
@@ -261,7 +293,7 @@ describe('Advanced Path Update Operations', () => {
         return {type: 'updated-config', value: {enabled: false, timeout: 3000}}
       })
 
-      const mixedArray = store.getState().collections.mixedArray
+      const mixedArray = selectmixedArray()
       expect(mixedArray[2]).toEqual({
         type: 'updated-config',
         value: {enabled: false, timeout: 3000},
@@ -270,10 +302,6 @@ describe('Advanced Path Update Operations', () => {
   })
 
   describe('Map and Set Operations', () => {
-    beforeEach(() => {
-      store.reset()
-    })
-
     afterEach(() => {
       store.reset()
     })
@@ -281,43 +309,73 @@ describe('Advanced Path Update Operations', () => {
     it('should update Map entries', () => {
       updatePath(['dataStructures', 'userMap'], currentMap => {
         expect(currentMap instanceof Map).toBe(true)
-        expect(currentMap.get('user-123')?.name).toBe('Alice Smith')
+        const originalUser = currentMap.get('user-123')
+        expect(originalUser?.name).toBe('Alice Smith')
 
-        const newMap = new Map(currentMap)
-        newMap.set('user-123', {...currentMap.get('user-123')!, name: 'Alice Johnson'})
-        return newMap
+        // // Create a new map and update the user's name
+        const updatedUser = {...originalUser!, name: 'Alice Johnson'}
+        // const newMap = new Map(currentMap)
+        // newMap.set('user-123', updatedUser)
+        // return newMap
+        currentMap.set('user-123', updatedUser)
+        return currentMap
       })
 
-      const userMap = store.getState().dataStructures.userMap
+      const userMap = selectDataStructures().userMap
       expect(userMap.get('user-123')?.name).toBe('Alice Johnson')
+
+      // Ensure other users are unchanged
+      const initialMap = createUpdatePathInitialState().dataStructures.userMap
+      // iterate over initial map to check
+      for (const [key, value] of initialMap) {
+        if (key !== 'user-123') {
+          expect(userMap.get(key)).toEqual(value)
+        }
+      }
     })
 
     it('should add new Map entries', () => {
       updatePath(['dataStructures', 'userMap'], currentMap => {
-        const newMap = new Map(currentMap)
-        newMap.set('user-999', {name: 'New User', age: 25, active: true})
-        return newMap
+        // const newMap = new Map(currentMap)
+        // newMap.set('user-999', {name: 'New User', age: 25, active: true})
+        // return newMap
+        expect(currentMap.get('user-999')).toBeUndefined()
+        currentMap.set('user-999', {name: 'New User', age: 25, active: true})
+        return currentMap
       })
 
-      const userMap = store.getState().dataStructures.userMap
+      const userMap = selectDataStructures().userMap
       expect(userMap.has('user-999')).toBe(true)
       expect(userMap.get('user-999')?.name).toBe('New User')
     })
 
     it('should update Set contents', () => {
+      const init = selectDataStructures().tagSet
       updatePath(['dataStructures', 'tagSet'], currentSet => {
         expect(currentSet instanceof Set).toBe(true)
         expect(currentSet.has('javascript')).toBe(true)
 
-        const newSet = new Set(currentSet)
-        newSet.add('python')
-        newSet.delete('javascript')
-        return newSet
+        // const newSet = new Set(currentSet)
+        // newSet.add('python')
+        // newSet.delete('javascript')
+        // return newSet
+        currentSet.add('python')
+        currentSet.delete('javascript')
+        return currentSet
       })
 
-      const tagSet = store.getState().dataStructures.tagSet
+      const tagSet = selectDataStructures().tagSet
       expect(tagSet.has('python')).toBe(true)
       expect(tagSet.has('javascript')).toBe(false)
+
+      expect(tagSet).not.toBe(init) // Ensure the set reference has changed
+
+      store.reset()
+      const initialSet = selectDataStructures().tagSet
+
+      updatePath(['dataStructures', 'tagSet'], current => current)
+      const tagSetAfterReset = selectDataStructures().tagSet
+      expect(tagSetAfterReset).toBe(initialSet)
     })
 
     it('should update Record/Object entries', () => {
@@ -326,16 +384,13 @@ describe('Advanced Path Update Operations', () => {
         return current + 100
       })
 
-      expect(store.getState().dataStructures.counters.pageViews).toBe(1350)
+      expect(selectPageViews()).toBe(1350)
     })
 
     it('should add new Record entries', () => {
-      updatePath(['dataStructures', 'counters'], current => ({
-        ...current,
-        newMetric: 42,
-      }))
+      updatePath(['dataStructures', 'counters', 'newMetric'], 42)
 
-      expect((store.getState().dataStructures.counters as any).newMetric).toBe(42)
+      expect((selectCounters() as any).newMetric).toBe(42)
     })
   })
 
@@ -349,14 +404,14 @@ describe('Advanced Path Update Operations', () => {
     })
 
     it('should auto-create missing intermediate objects', () => {
-      updatePath(['user', 'profile', 'newSection', 'newProperty'], () => 'created-value')
+      updatePath(['user', 'profile', 'newSection', 'newProperty'], 'created-value')
 
       const newSection = (store.getState().user.profile as any).newSection
       expect(newSection.newProperty).toBe('created-value')
     })
 
     it('should auto-create missing intermediate arrays', () => {
-      updatePath(['collections', 'newArray', 0], () => 'first-item')
+      updatePath(['collections', 'newArray', 0], 'first-item')
 
       const newArray = (store.getState().collections as any).newArray
       expect(Array.isArray(newArray)).toBe(true)
@@ -563,8 +618,8 @@ describe('Advanced Path Update Operations', () => {
       // Update optional property by replacing existing metadata
       updatePath(['collections', 'objectArray', 2, 'metadata'], current => {
         expect(current).toBeDefined() // It exists in our test data
-        expect(current.createdAt).toBeTypeOf('number')
-        return {createdAt: current.createdAt, version: 1}
+        expect(current?.createdAt).toBeTypeOf('number')
+        return {createdAt: current?.createdAt, version: 1}
       })
 
       const task2 = store.getState().collections.objectArray[2]
