@@ -690,12 +690,17 @@ describe('Advanced Path Update Operations', () => {
     it('should handle batch operations correctly', () => {
       const listener = vi.fn()
       const unsubscribe = store.subscribe(listener)
-
-      store.batch(() => {
+      function updaterFn() {
         updatePath(['primitives', 'stringValue'], () => 'batch-1')
         updatePath(['primitives', 'numberValue'], () => 999)
         updatePath(['primitives', 'booleanValue'], () => false)
-      })
+        let path = ['collections', 'objectArray', 0, 'metadata', 'updatedAt']
+        updatePath(path, 1234567)
+        path = ['collections', 'objectArray', 1, 'metadata', 'updatedAt']
+        updatePath(path, 7654321)
+      }
+
+      store.batch(updaterFn)
 
       // Should only trigger listener once for batched operations
       expect(listener).toHaveBeenCalledTimes(1)
@@ -704,6 +709,8 @@ describe('Advanced Path Update Operations', () => {
       expect(state.primitives.stringValue).toBe('batch-1')
       expect(state.primitives.numberValue).toBe(999)
       expect(state.primitives.booleanValue).toBe(false)
+      expect(state.collections.objectArray[0].metadata?.updatedAt).toBe(1234567)
+      expect(state.collections.objectArray[1].metadata?.updatedAt).toBe(7654321)
 
       unsubscribe()
     })

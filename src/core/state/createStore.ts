@@ -36,7 +36,7 @@ import type {
 } from './state-types/types'
 import {StorageType} from './state-types/types'
 import {assignState, cleanupStaleStates, DELETE_PROPERTY} from './utils'
-import {FlexiblePath, PathValue} from './state-types/path-types'
+import {PathValue, PathsOf} from './state-types/path-types'
 
 // Enable Immer features for better performance and functionality
 immer.enableMapSet()
@@ -579,7 +579,7 @@ export function createStore<S extends object>(
   }
 
   // Enhanced updatePath with multiple overloads for different type safety levels
-  storeInstance.updatePath = (<const P extends FlexiblePath>(
+  storeInstance.updatePath = (<const P extends PathsOf<S>>(
     path: P,
     updater: PathValue<S, P> extends infer V
       ? V extends never
@@ -589,16 +589,16 @@ export function createStore<S extends object>(
   ) => {
     if (isDestroyed) return
 
-    // Validate path is not empty
-    if (!Array.isArray(path) || path.length === 0) {
-      handleError(
-        new StoreError('updatePath requires a non-empty path array', {
-          operation: 'updatePath',
-          path,
-        })
-      )
-      return
-    }
+    // // Validate path is not empty
+    // if (!Array.isArray(path) || path.length === 0) {
+    //   handleError(
+    //     new StoreError('updatePath requires a non-empty path array', {
+    //       operation: 'updatePath',
+    //       path,
+    //     })
+    //   )
+    //   return
+    // }
 
     // Use Immer to safely update the path with automatic structural sharing
     // During batching, use the virtual state that includes batched changes
@@ -662,17 +662,18 @@ export function createStore<S extends object>(
             // For objects, delete the property using Immer's approach
             delete current[finalKey]
           }
-        } else {
-          // Only update if the value actually changed
-          current[finalKey] = newValue
-        }
-      } catch (error) {
+        } else current[finalKey] = newValue
+      } catch (error: any) {
         handleError(
           new StoreError('Updater function threw an error', {
             operation: 'updatePath',
             path,
-            error,
             currentValue,
+            error: {
+              message: error?.message || 'Unknown error',
+              stack: error?.stack || 'No stack trace available',
+              context: error?.context || {},
+            },
           })
         )
       }

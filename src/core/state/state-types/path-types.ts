@@ -46,7 +46,7 @@ export type PathValue<T, P extends readonly (string | number)[]> = P extends rea
  * Limited to a specific depth to prevent infinite recursion.
  *
  * @template T - The object type to generate paths for
- * @template D - Maximum depth to traverse (default: 4)
+ * @template D - Maximum depth to traverse (default: 10)
  *
  * @example
  * ```typescript
@@ -55,7 +55,7 @@ export type PathValue<T, P extends readonly (string | number)[]> = P extends rea
  * // ['profile'] | ['profile', 'name'] | ['profile', 'settings'] | ['profile', 'settings', 'theme']
  * ```
  */
-export type PathsOf<T, D extends number = 6> = D extends 0
+export type PathsOf<T, D extends number = 10> = D extends 0
   ? never
   : T extends readonly (infer U)[]
     ? [number] | [number, ...PathsOf<U, Prev[D]>]
