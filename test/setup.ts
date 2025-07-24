@@ -3,8 +3,12 @@ import {vi, beforeEach, afterEach} from 'vitest'
 import '@testing-library/jest-dom'
 
 // Mock localStorage for testing
+
 const localStorageMock = {
-  getItem: vi.fn(),
+  getItem: vi.fn((key: string) => {
+    if (key === 'APP_CLIENT_DEV_MODE') return 'true'
+    return undefined
+  }),
   setItem: vi.fn(),
   removeItem: vi.fn(),
   clear: vi.fn(),
