@@ -35,7 +35,7 @@ import type {
   Thunk,
 } from './state-types/types'
 import {StorageType} from './state-types/types'
-import {assignState, cleanupStaleStates, DELETE_PROPERTY} from './utils'
+import {assignState, cleanupStaleStates} from './utils'
 import {PathValue, PathsOf} from './state-types/path-types'
 
 // Enable Immer features for better performance and functionality
@@ -289,6 +289,15 @@ export function createStore<S extends object>(
     // only update if something actually changed
     // const nextState = {...state, ...newPartialState} as S
     const nextState = assignState(state, newPartialState)
+
+    // const nextState = immer.produce(state, draft => {
+    //   for (const key in newPartialState) {
+    //     if (Object.prototype.hasOwnProperty.call(newPartialState, key)) {
+    //       // Immer will handle structural sharing automatically
+    //       ;(draft as any)[key] = newPartialState[key]
+    //     }
+    //   }
+    // })
 
     if (Object.is(nextState, state)) return // No changes, exit early
     state = nextState
@@ -662,7 +671,13 @@ export function createStore<S extends object>(
             // For objects, delete the property using Immer's approach
             delete current[finalKey]
           }
-        } else current[finalKey] = newValue
+        } else if (newValue !== currentValue) {
+          // Only assign if the returned value is different from the current value
+          // This prevents overwriting in-place mutations
+          current[finalKey] = newValue
+        }
+        // If newValue === currentValue, the updater function likely mutated in place
+        // and we don't need to assign anything
       } catch (error: any) {
         handleError(
           new StoreError('Updater function threw an error', {
@@ -730,17 +745,13 @@ export function createStore<S extends object>(
       currentState = currentState[key]
     }
 
-    // For the final level, if the property exists in newState, set it; otherwise mark for deletion
+    // For the final level, get the entire value at the path from newState
     const finalKey = path[path.length - 1]
     const finalValue = getPath(newState, path)
 
-    if (finalKey in currentState) {
-      // Property exists in the new state (either updated or unchanged)
-      currentDiff[finalKey] = finalValue
-    } else {
-      // Property was deleted - mark it for deletion
-      currentDiff[finalKey] = DELETE_PROPERTY
-    }
+    // Always set the final value from newState, which includes any mutations
+    // made by the updater function (including deletions)
+    currentDiff[finalKey] = finalValue
 
     return diff
   }

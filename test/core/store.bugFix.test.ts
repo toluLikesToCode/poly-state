@@ -28,7 +28,7 @@ describe('ActiveMediaMap updatePath bug reproduction', () => {
     store = createStore(initialState)
   })
 
-  it('should reproduce the bug: updatePath only appends instead of replacing obsolete keys', () => {
+  it.skip('should reproduce the bug: updatePath only appends instead of replacing obsolete keys', () => {
     // Simulate the updater logic
     const visibleItems = ['media-2', 'media-4']
     const currentMode = 'multiview'
@@ -67,7 +67,7 @@ describe('ActiveMediaMap updatePath bug reproduction', () => {
     // expect(Object.keys(result).sort()).toEqual(visibleItems.sort());
   })
 
-  it.skip('should pass if updatePath truly modifies the object', () => {
+  it('should pass if updatePath truly modifies the object', () => {
     // The new value should modify the existing state
     const visibleItems = ['media-2', 'media-4']
     const currentMode = 'multiview'
