@@ -1,6 +1,6 @@
 {
   "name": "@tolulikestocode/poly-state",
-  "version": "1.0.4-dev",
+  "version": "1.0.5-dev",
   "type": "module",
   "description": "Universal state management library for TypeScript and React",
   "publishConfig": {
@@ -17,11 +17,7 @@
   "main": "dist/index.js",
   "module": "dist/index.esm.js",
   "types": "dist/index.d.ts",
-  "files": [
-    "dist",
-    "README.md",
-    "LICENSE"
-  ],
+  "files": ["dist", "README.md", "LICENSE"],
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",

@@ -160,9 +160,10 @@ describe('Store Core Functionality', () => {
       expect(state2.count).toBe(1)
     })
 
-    it('should handle basic undo and redo state changes', () => {
+    it('should handle basic undo and redo state changes', async () => {
       const initialState: BasicTestState = {count: 0, name: 'test'}
       store = createStore(initialState, {historyLimit: 5})
+      await store.waitForStateLoad()
       const currentCount = store.select(state => state.count)
       const currentName = store.select(state => state.name)
 
@@ -211,7 +212,7 @@ describe('Store Core Functionality', () => {
       expect(store.getState()).toEqual(initialState)
     })
 
-    it('should handle undo and redo with plugins', () => {
+    it('should handle undo and redo with plugins', async () => {
       const initialState: BasicTestState = {count: 0, name: 'init'}
       const initialSettings = {historyLimit: 5}
       const pluginState1: BasicTestState = {count: 10}
@@ -233,6 +234,8 @@ describe('Store Core Functionality', () => {
         ...initialSettings,
         plugins: [plugin],
       })
+
+      await store.waitForStateLoad()
 
       expect(store.getState()).toEqual({...pluginState1, name: plugin.name})
 
@@ -286,13 +289,14 @@ describe('Store Core Functionality', () => {
       // The state should now be the last dispatched state
       expect(store.getState().count).toBe(10)
 
-      // history should now contain the initial state, plugin state and the last dispatched state
+      // history should now contain the last 5 states due to history limit
       history = store.getHistory()
-      expect(history.history.length).toBe(6)
+      expect(history.history.length).toBe(5)
       expect(history.initialState).toEqual(initialState)
 
-      expect(history.history[0]).toEqual({count: 5, name: initialState.name})
-      expect(history.history[5]).toEqual(store.getState())
+      // The history should contain the last 5 states: count 6,7,8,9,10
+      expect(history.history[0].count).toBe(6)
+      expect(history.history[4]).toEqual(store.getState())
     })
 
     it('should handle redo and undo with a provided path', () => {

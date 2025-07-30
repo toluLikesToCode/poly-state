@@ -313,17 +313,14 @@ export class PersistenceManager<S extends object> {
     if (!storageKey || !this.isStorageAvailable()) return null
 
     try {
-      let wrappedState: PersistedState<any> | null = null
+      let wrappedState: PersistedState<S> | null = null
 
       switch (this.storageType) {
         case StorageType.Local:
-          wrappedState = getLocalStorage<PersistedState<any>>(storageKey, {} as PersistedState<any>)
+          wrappedState = getLocalStorage<S>(storageKey)
           break
         case StorageType.Session:
-          wrappedState = getSessionStorage<PersistedState<any>>(
-            storageKey,
-            {} as PersistedState<any>
-          )
+          wrappedState = getSessionStorage<S>(storageKey)
           break
         case StorageType.Cookie:
           const cookieValue = getCookie(storageKey)
@@ -388,22 +385,16 @@ export class PersistenceManager<S extends object> {
         if (!storageKey || !this.isStorageAvailable()) return null
 
         try {
-          let wrappedState: PersistedState<any> | null = null
+          let wrappedState: PersistedState<S> | null = null
           if (this.adapter) {
             wrappedState = (await this.adapter.get(storageKey)) as PersistedState<any> | null
           } else {
             switch (this.storageType) {
               case StorageType.Local:
-                wrappedState = getLocalStorage<PersistedState<any>>(
-                  storageKey,
-                  {} as PersistedState<any>
-                )
+                wrappedState = getLocalStorage<S>(storageKey)
                 break
               case StorageType.Session:
-                wrappedState = getSessionStorage<PersistedState<any>>(
-                  storageKey,
-                  {} as PersistedState<any>
-                )
+                wrappedState = getSessionStorage<S>(storageKey)
                 break
               case StorageType.Cookie:
                 const cookieValue = getCookie(storageKey)

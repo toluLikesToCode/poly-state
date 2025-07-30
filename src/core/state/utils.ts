@@ -132,7 +132,7 @@ function deepMerge(target: any, source: any, typeRegistry?: {findTypeFor: (value
 /**
  * Clean up stale persisted states across all storage types
  */
-export function cleanupStaleStates(
+export function cleanupStaleStates<S extends object>(
   maxAge: number = 30 * 24 * 60 * 60 * 1000,
   cookiePrefix: string = '__store_' // Default prefix
 ): {
@@ -154,7 +154,7 @@ export function cleanupStaleStates(
       const key = localStorage.key(i)
       if (key) {
         try {
-          const item = storage.getLocalStorage<PersistedState<any>>(key, {} as PersistedState<any>)
+          const item = storage.getLocalStorage<S>(key)
           if (item && item.meta && now - item.meta.lastUpdated > maxAge) {
             storage.removeLocalStorage(key)
             result.local++

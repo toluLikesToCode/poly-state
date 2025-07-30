@@ -301,12 +301,7 @@ export function createStoreContext<T extends Store<any>>(
   const useUpdatePath = () => {
     const store = useStore()
 
-    return useCallback(
-      <V = any>(path: (string | number)[], updater: (currentValue: V) => V) => {
-        store.updatePath(path, updater)
-      },
-      [store]
-    )
+    return useCallback(store.updatePath, [store])
   }
 
   const useStoreHistory = () => {
@@ -718,12 +713,7 @@ export function useStoreHooks<S extends object>(
       },
 
       useUpdatePath: () => {
-        return useCallback(
-          <V = any>(path: (string | number)[], updater: (currentValue: V) => V) => {
-            store.updatePath(path, updater)
-          },
-          [store]
-        )
+        return useCallback(store.updatePath, [store])
       },
 
       useStoreHistory: () => {

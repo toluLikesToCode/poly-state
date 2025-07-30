@@ -7,7 +7,7 @@ context-free approach, giving you flexibility to choose the best pattern for you
 ## Table of Contents
 
 - [Quick Start](#quick-start)
-- [Context-Free Integration](#context-free-integration)
+- [Context-Free Integration](#context-free-integration---deep-dive)
 - [Traditional Context Integration](#traditional-context-integration)
 - [Core Hooks and Usage](#core-hooks-and-usage)
 - [Advanced State Updates](#advanced-state-updates)
@@ -148,7 +148,7 @@ function AdvancedComponent() {
     useTransaction, // Atomic updates
     useAsyncThunk, // Async operations
     useBatch, // Batched updates
-    useUpdatePath, // Direct path updates
+    useUpdatePath, // Enhanced type-safe path updates
   } = useStoreHooks(appStore)
 
   const userName = useStoreValue<string>('user.name')
@@ -509,24 +509,83 @@ function BulkOperations() {
 }
 ```
 
-### Path Updates - Surgical Precision
+### Path Updates - Enhanced Type Safety and Flexibility
 
-For updating specific nested values, `useUpdatePath` provides efficient updates with automatic
-structural sharing:
+The `useUpdatePath` hook provides a powerful, type-safe way to update nested state values with
+multiple approaches for different use cases:
 
 ```tsx
 function NestedDataEditor() {
   const updatePath = useUpdatePath()
   const userProfile = useSelector(state => state.user.profile)
 
-  const updateAddress = (field: string, value: string) => {
-    updatePath(['user', 'profile', 'address', field], () => value)
+  // Type-safe path updates with compile-time validation
+  const updateUserName = (name: string) => {
+    updatePath(['user', 'profile', 'name'], (current: string) => name.toUpperCase())
   }
 
+  // Direct value assignment (no function needed)
+  const markAsVerified = () => {
+    updatePath(['user', 'profile', 'verified'], true)
+  }
+
+  // Delete properties by returning undefined
+  const clearTemporaryData = () => {
+    updatePath(['user', 'temporaryFlag'], () => undefined)
+  }
+
+  // Complex array operations with proper typing
+  const addNotification = (notification: Notification) => {
+    updatePath(['user', 'notifications'], (current: Notification[]) => [
+      ...current,
+      notification
+    ])
+  }
+
+  // Increment counters with explicit typing
+  const incrementLoginCount = () => {
+    updatePath<number>(['user', 'stats', 'loginCount'], (current) => current + 1)
+  }
+
+  // Toggle boolean values with type inference
+  const toggleNotificationSetting = (settingName: string) => {
+    updatePath(['user', 'settings', settingName], (current: boolean) => !current)
+  }
+
+  return (
+    <div>
+      <input
+        value={userProfile.name}
+        onChange={(e) => updateUserName(e.target.value)}
+      />
+      <button onClick={markAsVerified}>Mark as Verified</button>
+      <button onClick={clearTemporaryData}>Clear Temp Data</button>
+      <button onClick={incrementLoginCount}>Track Login</button>
+    </div>
+  )
+}
+
+  // Delete properties by returning undefined
+  const removeTemporaryFlag = () => {
+    updatePath(['user', 'temporaryData'], () => undefined)
+  }
+
+  // Flexible runtime paths with direct value assignment
+  const updateAddress = (field: string, value: string) => {
+    updatePath<string>(['user', 'profile', 'address', field], value)
+  }
+
+  // Complex updates with full type safety
   const incrementLoginCount = () => {
     updatePath(['user', 'stats', 'loginCount'], (current: number) => current + 1)
   }
 
+  // Array operations with proper typing
+  const addTodo = (newTodo: Todo) => {
+    updatePath(['todos'], (todos: Todo[]) => [...todos, newTodo])
+  }
+
+  // Toggle boolean values
   const toggleNotification = (notificationId: string) => {
     updatePath(['user', 'notifications', notificationId, 'read'], (current: boolean) => !current)
   }
@@ -538,6 +597,12 @@ function NestedDataEditor() {
         onChange={e => updateAddress('street', e.target.value)}
         placeholder="Street Address"
       />
+      <button onClick={() => markAsVerified()}>
+        Mark as Verified
+      </button>
+      <button onClick={() => removeTemporaryFlag()}>
+        Clear Temporary Data
+      </button>
       <input
         value={userProfile.address?.city || ''}
         onChange={e => updateAddress('city', e.target.value)}
@@ -546,6 +611,57 @@ function NestedDataEditor() {
       <button onClick={incrementLoginCount}>Simulate Login</button>
     </div>
   )
+}
+```
+
+#### updatePath Type Safety Levels
+
+The `useUpdatePath` hook provides three levels of type safety to accommodate different use cases:
+
+```tsx
+function UpdatePathExamples() {
+  const updatePath = useUpdatePath()
+
+  // 1. Compile-time type safety (recommended)
+  // TypeScript validates both path existence and value types
+  const updateUserName = () => {
+    updatePath(['user', 'profile', 'name'], (current: string) => current.trim())
+    //         ^^^^^^^^^^^^^^^^^^^^^^^^^^ - Path validated at compile time
+    //                                    ^^^^^^^^^^^^^^^^^^^^^^ - Value type inferred as string
+  }
+
+  // 2. Runtime flexibility with explicit typing
+  // Use when paths are dynamic but you know the value type
+  const updateDynamicField = (fieldName: string, value: any) => {
+    updatePath<string>(['user', 'profile', fieldName], () => value)
+    //        ^^^^^^^^ - Explicit type annotation for value
+  }
+
+  // 3. Maximum flexibility for complex scenarios
+  // Use when dealing with completely dynamic structures
+  const updateAnyPath = (path: (string | number)[], updater: any) => {
+    updatePath(path, updater)
+  }
+
+  // Value assignment patterns
+  const demonstrateValuePatterns = () => {
+    // Function updaters (most common)
+    updatePath(['count'], (current: number) => current + 1)
+
+    // Direct value assignment
+    updatePath(['user', 'isActive'], true)
+
+    // Deletion by returning undefined
+    updatePath(['user', 'temporaryToken'], () => undefined)
+
+    // Complex updates with side effects
+    updatePath(['user', 'lastLogin'], () => {
+      console.log('User logged in')
+      return new Date().toISOString()
+    })
+  }
+
+  return <div>Path update examples...</div>
 }
 ```
 

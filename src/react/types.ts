@@ -17,7 +17,16 @@
  */
 
 import type {ReactNode, ComponentType, DependencyList} from 'react'
-import type {Store, ReadOnlyStore, Thunk} from '../core/state/index'
+import type {
+  Store,
+  ReadOnlyStore,
+  Thunk,
+  PathsOf,
+  FlexiblePath,
+  TypedPathUpdater,
+  FlexiblePathUpdater,
+  EnhancedPathUpdater,
+} from '../core/state/index'
 import type {
   Selector,
   DependencyListener,
@@ -273,31 +282,42 @@ export type UseTransactionHook<S extends object> = () => (
 export type UseBatchHook = () => (fn: () => void) => void
 
 /**
- * Hook that provides a function for updating values at specific paths
- * @returns Function that updates a value at a given path using an updater function
+ * Hook that provides functions for updating values at specific paths with enhanced type safety
+ * @template S - The shape of the state object
+ * @returns Object containing updatePath methods with different type safety levels
  * @public
  *
  * @example
  * ```tsx
  * const updatePath = useUpdatePath();
  *
- * const incrementCount = () => {
- *   updatePath(['count'], (current: number) => current + 1);
- * };
+ * // Type-safe path updates (compile-time validated)
+ * updatePath(['user', 'profile', 'name'], (current: string) => current.toUpperCase());
+ * updatePath(['count'], (current: number) => current + 1);
  *
- * const updateUserName = (name: string) => {
- *   updatePath(['user', 'name'], () => name);
- * };
+ * // Flexible runtime path updates with explicit typing
+ * updatePath<string>(['user', 'email'], () => 'new@email.com');
  *
- * const toggleTodoComplete = (index: number) => {
- *   updatePath(['todos', index, 'completed'], (current: boolean) => !current);
- * };
+ * // Delete a property by returning undefined
+ * updatePath(['user', 'temporaryFlag'], () => undefined);
+ *
+ * // Direct value assignment
+ * updatePath(['todos', 0, 'completed'], true);
+ *
+ * // Array operations with proper typing
+ * updatePath(['todos'], (todos) => [...todos, newTodo]);
  * ```
  */
-export type UseUpdatePathHook = () => <V = any>(
-  path: (string | number)[],
-  updater: (currentValue: V) => V
-) => void
+export type UseUpdatePathHook<S extends object> = () => {
+  // Type-safe updatePath with compile-time path validation
+  <P extends PathsOf<S>>(path: P, updater: TypedPathUpdater<S, P>): void
+
+  // Flexible updatePath for runtime paths with value type inference
+  <V = any>(path: FlexiblePath, updater: FlexiblePathUpdater<V>): void
+
+  // Most flexible updatePath for complex runtime scenarios
+  (path: (string | number)[], updater: EnhancedPathUpdater<any>): void
+}
 
 /**
  * Store history state information
@@ -502,7 +522,7 @@ export interface StoreHooks<S extends object> {
   /** Hook to get a batch function for grouping multiple updates */
   useBatch: UseBatchHook
   /** Hook to get a function for updating values at specific paths */
-  useUpdatePath: UseUpdatePathHook
+  useUpdatePath: UseUpdatePathHook<S>
   /** Hook to access store history and undo/redo functionality */
   useStoreHistory: UseStoreHistoryHook<S>
   /** Hook to execute thunks (sync or async functions) */

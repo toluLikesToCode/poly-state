@@ -8,8 +8,9 @@ import type {
 import type {Middleware} from './middlewear-types'
 export type {Middleware}
 
-// Import path utility types
+// Import and re-export path utility types
 import type {PathsOf, FlexiblePath} from './path-types'
+export type {PathsOf, FlexiblePath}
 
 /**
  * Type definition for custom serialization/deserialization of complex objects

@@ -1045,8 +1045,24 @@ export function createStore<S extends object>(
 
   // --- Initialization ---
   if (shouldCleanupStaleStates) {
-    cleanupStaleStates(staleAge, cookiePrefix)
+    cleanupStaleStates<S>(staleAge, cookiePrefix)
   }
+
+  // Register store
+  if (sessionId) {
+    if (!storeRegistry.has(sessionId)) {
+      storeRegistry.set(sessionId, new Set())
+    }
+    storeRegistry.get(sessionId)!.add(storeInstance as Store<object>)
+  }
+
+  // Initialize history with the initial state BEFORE calling onStoreCreate
+  if (historyLimit > 0) {
+    historyManager.addToHistory(state)
+  }
+
+  // Call onStoreCreate for plugins BEFORE state loading so plugins can capture initial state
+  pluginManager.onStoreCreate(storeInstance)
 
   // Create a promise to track state loading completion
   let stateLoadingComplete: Promise<void> = Promise.resolve()
@@ -1075,11 +1091,6 @@ export function createStore<S extends object>(
           })
         )
       })
-  }
-
-  // Initialize history with the current state
-  if (historyLimit > 0) {
-    historyManager.addToHistory(state)
   }
 
   function storageEventHandler(event: StorageEvent) {
@@ -1169,9 +1180,6 @@ export function createStore<S extends object>(
     }
     storeRegistry.get(sessionId)!.add(storeInstance as Store<object>)
   }
-
-  // Call onStoreCreate for plugins
-  pluginManager.onStoreCreate(storeInstance)
 
   // Initial state persistence if key provided and no saved state (or saved state was stale and removed)
   if (persistKey && !savedStatePromise) {

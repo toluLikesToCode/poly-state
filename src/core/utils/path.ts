@@ -1,3 +1,5 @@
+import {deepClone} from './clone'
+
 export function getPath<T, V = any>(obj: T, path: (string | number)[]): V | undefined {
   let current: any = obj
   for (const key of path) {
@@ -97,4 +99,117 @@ export function setPath<T extends object, V = any>(obj: T, path: (string | numbe
 
   current[path[path.length - 1]] = value
   return newObj as T
+}
+
+/**
+ * Deep merges two objects while preserving specified paths from the initial state.
+ * This function ensures that omitted paths maintain their initial values during state restoration.
+ *
+ * @template S - The state type
+ * @param initialState - The initial state containing default values
+ * @param loadedState - The loaded state from persistence (may have missing paths)
+ * @param preservePaths - Array of paths that should preserve their initial values
+ * @returns Merged state with preserved paths from initial state
+ *
+ * @example
+ * ```typescript
+ * const initial = { user: { name: 'Default', token: 'default-token' }, settings: { theme: 'light' } }
+ * const loaded = { user: { name: 'John' }, settings: { theme: 'dark' } }
+ * const preserved = [['user', 'token']]
+ * const result = deepMergeWithPathPreservation(initial, loaded, preserved)
+ * // Result: { user: { name: 'John', token: 'default-token' }, settings: { theme: 'dark' } }
+ * ```
+ */
+export function deepMergeWithPathPreservation<S extends object>(
+  initialState: S,
+  loadedState: Partial<S>,
+  preservePaths: readonly (readonly (string | number)[])[]
+): Partial<S> {
+  // Use deepClone to create mutable copies and then merge them safely
+  const safeDeepMerge = (target: any, source: any): any => {
+    if (source === null || source === undefined) {
+      return target
+    }
+
+    // If source is not an object but target is, prefer target (initial state)
+    if (typeof source !== 'object') {
+      return target
+    }
+
+    // If target is not an object but source is, use source
+    if (typeof target !== 'object') {
+      return source
+    }
+
+    // Handle type mismatches - if types don't match, prefer the target (initial state)
+    if (typeof target !== typeof source) {
+      return target
+    }
+
+    if (Array.isArray(target) && Array.isArray(source)) {
+      return deepClone(source) // Use deepClone for arrays
+    }
+
+    if (Array.isArray(target) || Array.isArray(source)) {
+      // If one is array and other isn't, prefer the target (initial state)
+      return target
+    }
+
+    // Create deep clones to avoid any frozen object issues
+    const clonedTarget = deepClone(target)
+    const clonedSource = deepClone(source)
+
+    const result = {...clonedTarget}
+    for (const [key, value] of Object.entries(clonedSource)) {
+      if (
+        clonedTarget[key] !== undefined &&
+        typeof clonedTarget[key] === 'object' &&
+        value &&
+        typeof value === 'object'
+      ) {
+        result[key] = safeDeepMerge(clonedTarget[key], value)
+      } else if (clonedTarget[key] !== undefined && typeof clonedTarget[key] !== typeof value) {
+        // Type mismatch - prefer target (initial state) value
+        result[key] = clonedTarget[key]
+      } else {
+        result[key] = value
+      }
+    }
+    return result
+  }
+
+  // Start with initial state as base, then merge loaded state
+  const result = safeDeepMerge(initialState, loadedState) as Partial<S>
+
+  // For each preserve path, ensure the initial value is maintained
+  for (const path of preservePaths) {
+    const initialValue = getPath(initialState, [...path])
+    if (initialValue !== undefined) {
+      // Build the nested structure if it doesn't exist and set the initial value
+      const parentPath = path.slice(0, -1)
+      const key = path[path.length - 1]
+
+      if (parentPath.length === 0) {
+        // Top-level property
+        ;(result as any)[key] = initialValue
+      } else {
+        // Nested property - ensure parent exists
+        let current = result as any
+        for (let i = 0; i < parentPath.length; i++) {
+          const pathKey = parentPath[i]
+          if (
+            current[pathKey] === undefined ||
+            current[pathKey] === null ||
+            typeof current[pathKey] !== 'object'
+          ) {
+            current[pathKey] = {}
+          }
+          current = current[pathKey]
+        }
+        current[key] = initialValue
+      }
+    }
+  }
+
+  return result
 }

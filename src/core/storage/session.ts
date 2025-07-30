@@ -1,4 +1,5 @@
 import {StorageError} from '../../shared/errors'
+import {PersistedState} from '../state/state-types/types'
 
 /**
  * Safe error handler for storage operations
@@ -26,7 +27,10 @@ export function generateSessionId(): string {
 /**
  * Gets a value from sessionStorage and parses it from JSON.
  */
-export function getSessionStorage<T>(key: string, fallback: T): T {
+export function getSessionStorage<S extends object, T = PersistedState<S>>(
+  key: string,
+  fallback: T = {} as T
+): T {
   try {
     const saved = sessionStorage.getItem(key)
     if (saved !== null) {

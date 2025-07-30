@@ -1,6 +1,6 @@
 import {PluginManager} from '../../plugins/pluginManager'
 import {historyChangePluginOptions} from './state-types/types'
-import {assignState} from './utils'
+import {deepClone} from '../utils'
 
 /**
  * Manages undo/redo history for state changes.
@@ -12,11 +12,13 @@ export class HistoryManager<S extends object> {
   private isHistoryMutation = false
   private pluginManager: PluginManager<S>
   private historyLimit: number
+  private preHistoryState: S | null = null // State that would be at index -1
 
   constructor(historyLimit: number, pluginManager: PluginManager<S>, initialState: S) {
-    this.historyLimit = historyLimit + 1
+    this.historyLimit = historyLimit
     this.pluginManager = pluginManager
-    this._initialState = assignState({} as S, initialState)
+    // Use simple deep copy instead of assignState to avoid potential issues
+    this._initialState = deepClone(initialState)
   }
 
   /**
@@ -30,7 +32,7 @@ export class HistoryManager<S extends object> {
         this.historyIndex = -1
       }
 
-      // cut off any “future” states if we’re mid-undo
+      // cut off any "future" states if we're mid-undo
       if (this.historyIndex >= 0 && this.historyIndex < this.history.length - 1) {
         this.history = this.history.slice(0, this.historyIndex + 1)
       }
@@ -53,7 +55,18 @@ export class HistoryManager<S extends object> {
     this.isHistoryMutation = true
 
     this.historyIndex -= options.steps
-    const state = {...this.history[this.historyIndex]}
+
+    // Get the state based on the target index
+    let state: S
+    if (this.historyIndex === -1 && this.preHistoryState !== null) {
+      state = {...this.preHistoryState}
+    } else if (this.historyIndex >= 0) {
+      state = {...this.history[this.historyIndex]}
+    } else {
+      // This shouldn't happen due to canUndo check
+      throw new Error('Invalid history index after undo')
+    }
+
     this.applyTrimRule()
 
     if (persistFn) persistFn(state)
@@ -89,7 +102,12 @@ export class HistoryManager<S extends object> {
    * Check if undo is possible
    */
   canUndo(steps: number = 1): boolean {
-    return this.historyLimit > 0 && this.historyIndex - steps >= 0
+    const targetIndex = this.historyIndex - steps
+    // Allow undo if we can go to a valid history index OR to index -1 if we have a preHistoryState
+    return (
+      this.historyLimit > 0 &&
+      (targetIndex >= 0 || (targetIndex === -1 && this.preHistoryState !== null))
+    )
   }
 
   /**
@@ -105,6 +123,8 @@ export class HistoryManager<S extends object> {
   private applyTrimRule(): void {
     if (this.history.length > this.historyLimit) {
       const over = this.history.length - this.historyLimit
+      // Store the state that will be at index -1 after trimming
+      this.preHistoryState = {...this.history[over - 1]}
       this.history.splice(0, over)
       this.historyIndex -= over
       if (this.historyIndex < 0) this.historyIndex = 0
@@ -145,10 +165,12 @@ export class HistoryManager<S extends object> {
   } {
     // return a frozen shallow copy of the history
     const history = Object.freeze(this.history.map(state => ({...state})))
+    const frozenInitialState = Object.freeze(this._initialState)
+
     return {
       history,
       currentIndex: this.historyIndex,
-      initialState: Object.freeze(this._initialState),
+      initialState: frozenInitialState,
     }
   }
 
