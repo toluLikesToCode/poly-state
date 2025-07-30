@@ -288,6 +288,7 @@ export function createStore<S extends object>(
     // Use shallow merge to preserve references for unchanged root-level keys
     // only update if something actually changed
     // const nextState = {...state, ...newPartialState} as S
+
     const nextState = assignState(state, newPartialState)
 
     // const nextState = immer.produce(state, draft => {
@@ -700,6 +701,50 @@ export function createStore<S extends object>(
       const diff = buildMinimalDiff(nextState, path as unknown as (string | number)[])
       _internalDispatch(diff, false)
     }
+
+    // if (nextState !== baseState) {
+    //   // Manually create a diff that includes deletion markers.
+    //   const oldVal = getPath(baseState, path as string[])
+    //   const newVal = getPath(nextState, path as string[])
+
+    //   let updatePayload: any = {}
+
+    //   if (
+    //     newVal &&
+    //     typeof newVal === 'object' &&
+    //     !Array.isArray(newVal) &&
+    //     oldVal &&
+    //     typeof oldVal === 'object' &&
+    //     !Array.isArray(oldVal)
+    //   ) {
+    //     // Create a diff for object changes
+    //     Object.keys(newVal).forEach(key => {
+    //       if (oldVal[key] !== newVal[key]) {
+    //         updatePayload[key] = newVal[key]
+    //       }
+    //     })
+    //     Object.keys(oldVal).forEach(key => {
+    //       if (!(key in newVal)) {
+    //         updatePayload[key] = DELETE_PROPERTY // Explicitly mark keys for deletion
+    //       }
+    //     })
+    //   } else {
+    //     // For arrays, primitives, or type changes, just replace the value
+    //     updatePayload = newVal
+    //   }
+
+    //   // Wrap the payload in the path structure for dispatching
+    //   const diff: any = {} // ✅ Use 'any' type to allow numeric and string keys
+    //   let current: any = diff // ✅ Inferred 'any' type
+    //   for (let i = 0; i < path.length - 1; i++) {
+    //     const key = path[i]
+    //     current[key] = {}
+    //     current = current[key]
+    //   }
+    //   current[path[path.length - 1]] = updatePayload
+
+    //   _internalDispatch(diff as ActionPayload<S>, false)
+    // }
   }) as any
 
   storeInstance.getHistory = (): {

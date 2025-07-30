@@ -1,6 +1,5 @@
-import {describe, it, expect, beforeEach} from 'vitest'
+import {describe, it, expect, beforeEach, afterEach} from 'vitest'
 import {createStore, type Store} from '@tolulikestocode/poly-state'
-import {A} from 'vitest/dist/chunks/environment.d.cL3nLXbE.js'
 
 interface ActiveMediaData {
   mode: 'focus' | 'multiview'
@@ -28,7 +27,11 @@ describe('ActiveMediaMap updatePath bug reproduction', () => {
     store = createStore(initialState)
   })
 
-  it.skip('should reproduce the bug: updatePath only appends instead of replacing obsolete keys', () => {
+  afterEach(() => {
+    store.destroy({resetRegistry: true}) // Reset the store after each test
+  })
+
+  it('should not reproduce the bug: updatePath only appends instead of replacing obsolete keys', () => {
     // Simulate the updater logic
     const visibleItems = ['media-2', 'media-4']
     const currentMode = 'multiview'
@@ -55,8 +58,8 @@ describe('ActiveMediaMap updatePath bug reproduction', () => {
 
     // The bug: old keys ("media-1", "media-3") are still present
     const result = store.getState().activeMediaMap
-    expect(result).toHaveProperty('media-1') // Should NOT be present if replaced correctly
-    expect(result).toHaveProperty('media-3') // Should NOT be present if replaced correctly
+    expect(result).not.toHaveProperty('media-1') // Should NOT be present if replaced correctly
+    expect(result).not.toHaveProperty('media-3') // Should NOT be present if replaced correctly
     expect(result).toHaveProperty('media-2') // Should be present
     expect(result).toHaveProperty('media-4') // Should be present
 
@@ -99,6 +102,39 @@ describe('ActiveMediaMap updatePath bug reproduction', () => {
     expect(Object.keys(result).sort()).toEqual(visibleItems.sort())
     expect(result).not.toHaveProperty('media-1')
     expect(result).not.toHaveProperty('media-3')
+  })
+
+  it('should handled sinlgle item updates correctly', () => {
+    const changedMode = 'test-mode'
+    const changedLastActivated = 9999
+    const targetMediaId = 'media-2'
+
+    const initState = store.getState()
+
+    store.updatePath(['activeMediaMap', targetMediaId, 'mode'] as const, changedMode)
+
+    let currentState = store.getState()
+    expect(currentState.activeMediaMap[targetMediaId].mode).toBe(changedMode)
+    expect(currentState.activeMediaMap[targetMediaId].lastActivated).toBe(
+      initState.activeMediaMap[targetMediaId].lastActivated
+    )
+
+    // expect that the referecnce to the unchanged items to remain the same
+    expect(currentState.activeMediaMap['media-1']).toBe(initState.activeMediaMap['media-1'])
+    expect(currentState.activeMediaMap['media-3']).toBe(initState.activeMediaMap['media-3'])
+
+    // Now update lastActivated
+    store.updatePath(
+      ['activeMediaMap', targetMediaId, 'lastActivated'] as const,
+      changedLastActivated
+    )
+    currentState = store.getState()
+    expect(currentState.activeMediaMap[targetMediaId].mode).toBe(changedMode)
+    expect(currentState.activeMediaMap[targetMediaId].lastActivated).toBe(changedLastActivated)
+
+    // Check that the reference to the unchanged items remains the same
+    expect(currentState.activeMediaMap['media-1']).toBe(initState.activeMediaMap['media-1'])
+    expect(currentState.activeMediaMap['media-3']).toBe(initState.activeMediaMap['media-3'])
   })
 
   it('should work with a different data structure', () => {

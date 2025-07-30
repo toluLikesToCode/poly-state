@@ -7,9 +7,6 @@ import {TypeRegistry} from './typeRegistry'
 import {produce, Draft} from 'immer'
 import {deepClone} from '../utils'
 
-// Special marker for property deletion
-export const DELETE_PROPERTY = Symbol('DELETE_PROPERTY')
-
 /**
  * Deeply merges newState into state using Immer, handling arrays, objects, Maps, Sets, Dates, and custom classes.
  * Arrays are replaced, not merged. Maps/Sets are replaced by default, but can be extended for custom merge logic.
@@ -60,22 +57,16 @@ export function assignState<S extends object>(
 
 /**
  * Recursively merges source into target, handling arrays, Maps, Sets, Dates, and custom classes.
- * Arrays are replaced, Maps/Sets are shallow copied, Dates are cloned, and custom classes are replaced
- * unless a typeRegistry is provided to handle serialization/deserialization.
- * @param target - The target object to merge into
- * @param source - The source object to merge from
- * @param typeRegistry - Optional TypeRegistry for custom class handling
+ * Plain objects are shallow-merged (replaced), not recursively merged, to ensure deletions are respected.
+ *
+ * @param target - The target object to merge into.
+ * @param source - The source object to merge from.
+ * @param typeRegistry - Optional TypeRegistry for custom class handling.
  */
 function deepMerge(target: any, source: any, typeRegistry?: {findTypeFor: (value: any) => any}) {
   for (const key of Object.keys(source)) {
     const srcVal = source[key]
     const tgtVal = target[key]
-
-    // Handle deletion marker
-    if (srcVal === DELETE_PROPERTY) {
-      delete target[key]
-      continue
-    }
 
     // Handle null/undefined
     if (srcVal === null || srcVal === undefined) {
@@ -114,34 +105,22 @@ function deepMerge(target: any, source: any, typeRegistry?: {findTypeFor: (value
 
     // Handle custom class or registered type
     if (typeof srcVal === 'object' && srcVal.constructor && srcVal.constructor !== Object) {
-      // If a typeRegistry is provided, try to use it
       if (typeRegistry) {
         const typeDef = typeRegistry.findTypeFor(srcVal)
         if (typeDef) {
-          // Use serialize/deserialize to ensure correct type
           target[key] = typeDef.deserialize(typeDef.serialize(srcVal))
           continue
         }
       }
-      // Otherwise, just replace the value (shallow copy)
       target[key] = srcVal
       continue
     }
 
-    // Handle plain object
-    if (typeof srcVal === 'object' && srcVal !== null && srcVal.constructor === Object) {
-      // If the new object is empty, replace the old object
-      if (Object.keys(srcVal).length === 0) {
-        target[key] = {}
-        continue
-      }
-      // If the target is not an object, replace it
-      if (!tgtVal || typeof tgtVal !== 'object' || tgtVal.constructor !== Object) {
-        target[key] = {...srcVal}
-        continue
-      }
-      // Otherwise, merge recursively
-      deepMerge(target[key], srcVal)
+    // Handle plain object: **REPLACE** instead of recursive merge
+    if (typeof srcVal === 'object' && srcVal !== null) {
+      // By replacing the object, we ensure that keys present in the old state
+      // but absent in the new state are correctly removed.
+      target[key] = srcVal
       continue
     }
 

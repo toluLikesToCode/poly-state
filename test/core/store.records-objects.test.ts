@@ -1,4 +1,4 @@
-import {describe, it, expect, beforeEach, vi} from 'vitest'
+import {describe, it, expect, beforeEach, vi, afterEach} from 'vitest'
 import {createStore, type Store} from '../../src/core'
 
 // Define comprehensive test interfaces for Records and objects
@@ -213,6 +213,12 @@ describe('Records and Plain Objects Manipulation', () => {
 
   beforeEach(() => {
     store = createStore(createInitialState())
+  })
+
+  afterEach(() => {
+    if (store) {
+      store.destroy({clearHistory: true})
+    }
   })
 
   describe('Record Manipulation with updatePath', () => {
@@ -439,7 +445,7 @@ describe('Records and Plain Objects Manipulation', () => {
       expect(state.appSettings.features.analytics).toBe(true) // Preserved
     })
 
-    it('should demonstrate dispatch merge behavior (current store behavior)', () => {
+    it('should demonstrate fixed dispatch merge behavior (should replace over prev merge behavior)', () => {
       const newCategoryMap: Record<string, {count: number; lastUpdated: number}> = {
         technology: {count: 100, lastUpdated: Date.now()},
         lifestyle: {count: 50, lastUpdated: Date.now()},
@@ -451,8 +457,8 @@ describe('Records and Plain Objects Manipulation', () => {
       let state = store.getState()
       expect(state.categoryMap.technology).toBeDefined() // New entry added
       expect(state.categoryMap.lifestyle).toBeDefined() // New entry added
-      expect(state.categoryMap.tech).toBeDefined() // Old entries still exist (merged)
-      expect(state.categoryMap.business).toBeDefined() // Old entries still exist (merged)
+      expect(state.categoryMap.tech).not.toBeDefined() // Old entries do not exist (replaced)
+      expect(state.categoryMap.business).not.toBeDefined() // Old entries do not exist (replaced)
 
       // Reset for next test
       store.reset()
@@ -466,8 +472,9 @@ describe('Records and Plain Objects Manipulation', () => {
       expect(state.categoryMap.technology).toBeDefined() // New entry
       expect(state.categoryMap.lifestyle).toBeDefined() // New entry
       // Note: Due to merge semantics, old entries persist even in transactions
-      expect(state.categoryMap.tech).toBeDefined() // Old entries still exist (merged)
-      expect(state.categoryMap.business).toBeDefined() // Old entries still exist (merged)
+      // This should not be fixed, as it should replace
+      expect(state.categoryMap.tech).toBeUndefined() // Old entries do not exist (replaced)
+      expect(state.categoryMap.business).toBeUndefined() // Old entries do not exist (replaced)
     })
   })
 
@@ -680,16 +687,23 @@ describe('Records and Plain Objects Manipulation', () => {
   describe('Understanding Store Semantics: Merge vs Replacement', () => {
     it('should demonstrate consistent merge semantics across all methods', () => {
       // Test 1: dispatch with partial Record update (merge behavior)
+      // FIXED: This should now replace the existing entries
       store.dispatch({
         categoryMap: {
           newCategory1: {count: 100, lastUpdated: Date.now()},
         },
       })
 
+      // interface InitialStateforCategoryMap {
+      //   tech: {count: 45; lastUpdated: 1640995200000}
+      //   business: {count: 23; lastUpdated: 1640995100000}
+      //   design: {count: 12; lastUpdated: 1640995300000}
+      // }
+
       let state = store.getState()
       expect(state.categoryMap.newCategory1).toBeDefined() // New entry added
-      expect(state.categoryMap.tech).toBeDefined() // Original entries preserved
-      expect(state.categoryMap.business).toBeDefined() // Original entries preserved
+      expect(state.categoryMap.tech).toBeUndefined() // Original entries replaced
+      expect(state.categoryMap.business).toBeUndefined() // Original entries replaced
 
       // Test 2: updatePath with object merge
       store.updatePath(['categoryMap'], current => ({
@@ -697,18 +711,30 @@ describe('Records and Plain Objects Manipulation', () => {
         newCategory2: {count: 200, lastUpdated: Date.now()},
       }))
 
+      // interface InitialStateforCategoryMap {
+      //   tech: {count: 45; lastUpdated: 1640995200000}
+      //   business: {count: 23; lastUpdated: 1640995100000}
+      //   design: {count: 12; lastUpdated: 1640995300000}
+      // }
+
       state = store.getState()
       expect(state.categoryMap.newCategory2).toBeDefined() // New entry added
-      expect(state.categoryMap.tech).toBeDefined() // Original entries preserved
-      expect(state.categoryMap.business).toBeDefined() // Original entries preserved
+      expect(state.categoryMap.tech).toBeUndefined() // Previous replacements preserved
+      expect(state.categoryMap.business).toBeUndefined() // Previous replacements preserved
       expect(state.categoryMap.newCategory1).toBeDefined() // Previous additions preserved
     })
 
-    it('should demonstrate merge behavior even with transaction assignment', () => {
+    it('should demonstrate replacement behavior even with transaction assignment (NOW FIXED)', () => {
       // Even when we assign directly in a transaction, the store applies merge semantics
       const newCategoryMap = {
         onlyCategory: {count: 999, lastUpdated: Date.now()},
       }
+
+      // interface InitialStateforCategoryMap {
+      //   tech: {count: 45; lastUpdated: 1640995200000}
+      //   business: {count: 23; lastUpdated: 1640995100000}
+      //   design: {count: 12; lastUpdated: 1640995300000}
+      // }
 
       store.transaction(draft => {
         draft.categoryMap = newCategoryMap // Direct assignment in Immer draft
@@ -717,31 +743,10 @@ describe('Records and Plain Objects Manipulation', () => {
       const state = store.getState()
       expect(state.categoryMap.onlyCategory).toBeDefined() // New entry exists
       // Due to merge semantics in _applyStateChange, original entries persist
-      expect(state.categoryMap.tech).toBeDefined() // Original entries still there
-      expect(state.categoryMap.business).toBeDefined() // Original entries still there
-      expect(Object.keys(state.categoryMap).length).toBeGreaterThan(1) // More than just onlyCategory
-    })
-
-    it('should show workaround for achieving replacement behavior', () => {
-      // To achieve true replacement, you need to explicitly control the entire structure
-
-      const desiredCategories = {
-        keepOnly1: {count: 1, lastUpdated: Date.now()},
-        keepOnly2: {count: 2, lastUpdated: Date.now()},
-      }
-
-      // Method: Reset and then set (closest to replacement semantics)
-      store.reset()
-      store.dispatch({categoryMap: desiredCategories})
-
-      const state = store.getState()
-      expect(state.categoryMap.keepOnly1).toBeDefined()
-      expect(state.categoryMap.keepOnly2).toBeDefined()
-      // Even after reset + dispatch, merge semantics means original categories persist
-      expect(Object.keys(state.categoryMap).length).toBe(5) // 3 original + 2 new
-      expect(state.categoryMap.tech).toBeDefined() // Original entries still there
-      expect(state.categoryMap.business).toBeDefined() // Original entries still there
-      expect(state.categoryMap.design).toBeDefined() // Original entries still there
+      // FIXED: This should now replace the existing entries
+      expect(state.categoryMap.tech).toBeUndefined() // Original entries replaced
+      expect(state.categoryMap.business).toBeUndefined() // Original entries replaced
+      expect(Object.keys(state.categoryMap).length).toBe(1) // Only onlyCategory remains
     })
 
     it('should demonstrate deep merge behavior', () => {
