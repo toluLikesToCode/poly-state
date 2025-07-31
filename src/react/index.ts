@@ -32,12 +32,7 @@ export * from './types'
 import {Prettify} from '../shared'
 
 // Import types from the dedicated types file
-import type {
-  StoreContextValue,
-  StoreContextResult,
-  UseSubscribeToHook,
-  ExtractStateFromStore,
-} from './types'
+import type {StoreContextValue, StoreContextResult, UseSubscribeToHook} from './types'
 
 // Cache for store hooks to avoid recreating them
 const globalStoreHooks = new WeakMap<
@@ -89,11 +84,9 @@ const globalStoreHooks = new WeakMap<
  * @see {@link StoreContextResult} for all available hooks and their documentation
  * @see {@link Store} for the store interface
  */
-export function createStoreContext<T extends Store<any>>(
-  store: T
-): Prettify<StoreContextResult<ExtractStateFromStore<T>>> {
-  type S = ExtractStateFromStore<T>
-
+export function createStoreContext<S extends object = any>(
+  store: Store<S>
+): Prettify<StoreContextResult<S>> {
   const StoreContext = createContext<StoreContextValue<S> | null>(null)
   StoreContext.displayName = 'StoreContext'
 

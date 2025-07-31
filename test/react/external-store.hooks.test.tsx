@@ -3,19 +3,22 @@ import {describe, it, expect, beforeEach, vi, afterEach, Mock, TestContext} from
 import {render, screen, fireEvent, waitFor} from '@testing-library/react'
 import {createStore} from '../../src/core'
 import {createStoreContext, useStoreHooks} from '../../src/react/index'
+import z from 'zod'
 
-interface TestState {
-  count: number
-  user: {
-    name: string
-    email: string
-  }
-  nested: {
-    deep: {
-      value: string
-    }
-  }
-}
+const TestStateSchema = z.object({
+  count: z.number(),
+  user: z.object({
+    name: z.string(),
+    email: z.email(),
+  }),
+  nested: z.object({
+    deep: z.object({
+      value: z.string(),
+    }),
+  }),
+})
+
+type TestState = z.infer<typeof TestStateSchema>
 
 describe('useSyncExternalStore Integration Functionality', () => {
   let store: ReturnType<typeof createStore<TestState>>
