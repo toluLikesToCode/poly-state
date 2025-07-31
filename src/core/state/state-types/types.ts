@@ -355,12 +355,7 @@ export interface StoreOptions<S extends object> {
    * target, its options, and the state paths it manages.
    */
   persistence?: PersistenceConfig[]
-  /**
-   * Paths that should always be ephemeral and never persisted to any target.
-   * This serves as a global ignore list.
-   * @example [['runtime', 'volatileState']]
-   */
-  ephemeralPaths?: Path[]
+
   syncAcrossTabs?: boolean
   middleware?: Middleware<S>[]
   historyLimit?: number

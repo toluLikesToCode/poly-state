@@ -40,7 +40,7 @@ export class PersistenceManager<S extends object> {
   private readonly handleError: (error: StoreError) => void
   private readonly name: string
   private readonly sessionId: string
-  private readonly adapter?: StorageAdapter
+  private readonly adapter?: StorageAdapter<PersistedState<S>>
 
   constructor(
     storageType: StorageType,
@@ -387,7 +387,7 @@ export class PersistenceManager<S extends object> {
         try {
           let wrappedState: PersistedState<S> | null = null
           if (this.adapter) {
-            wrappedState = (await this.adapter.get(storageKey)) as PersistedState<any> | null
+            wrappedState = await this.adapter.get(storageKey)
           } else {
             switch (this.storageType) {
               case StorageType.Local:

@@ -121,14 +121,14 @@ export class SessionStorageAdapter implements StorageAdapter {
   }
 }
 
-export class CookieStorageAdapter implements StorageAdapter {
+export class CookieStorageAdapter<T = any> implements StorageAdapter<T> {
   private readonly options: CookieOptions
 
   constructor(options: CookieOptions = {}) {
     this.options = options
   }
 
-  async get(key: string): Promise<any> {
+  async get(key: string): Promise<T | null> {
     try {
       const value = this.getCookieValue(key)
       return value ? JSON.parse(value) : null
@@ -137,7 +137,7 @@ export class CookieStorageAdapter implements StorageAdapter {
     }
   }
 
-  async set(key: string, value: any): Promise<boolean> {
+  async set(key: string, value: T): Promise<boolean> {
     try {
       const serialized = JSON.stringify(value)
       this.setCookieValue(key, serialized, this.options)
