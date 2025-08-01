@@ -9,7 +9,7 @@ import type {Middleware} from './middlewear-types'
 export type {Middleware}
 
 // Import and re-export path utility types
-import type {PathsOf, FlexiblePath} from './path-types'
+import type {PathsOf, FlexiblePath, PathValue} from './path-types'
 export type {PathsOf, FlexiblePath}
 
 /**
@@ -570,11 +570,28 @@ export interface ReadOnlyStore<S extends object> {
    * @see {@link Store.subscribeTo} for selector-based subscriptions
    * @see {@link Store.subscribeToMultiple} for multiple value subscriptions
    */
-  subscribeToPath: <T = any>(
-    path: string | Path,
-    listener: DependencyListener<T>,
-    options?: DependencySubscriptionOptions
-  ) => () => void
+  subscribeToPath: {
+    /**
+     * Type-safe path subscription with compile-time validation.
+     * @template P - Path tuple type (must be valid for S)
+     * @template T - Value type at path
+     */
+    <P extends PathsOf<S>>(
+      path: P,
+      listener: DependencyListener<PathValue<S, P>>,
+      options?: DependencySubscriptionOptions
+    ): () => void
+
+    /**
+     * Flexible path subscription for runtime paths.
+     * @template T - Value type at path (defaults to any)
+     */
+    <T = any>(
+      path: FlexiblePath | string,
+      listener: DependencyListener<T>,
+      options?: DependencySubscriptionOptions
+    ): () => void
+  }
 
   /**
    * Creates a memoized selector function for deriving computed values from the store state.

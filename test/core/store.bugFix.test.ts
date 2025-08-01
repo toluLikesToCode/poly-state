@@ -194,4 +194,21 @@ describe('ActiveMediaMap updatePath bug reproduction', () => {
     expect(result2.some(([key]) => key === 'media-1')).toBe(false)
     expect(result2.some(([key]) => key === 'media-3')).toBe(false)
   })
+
+  it('should replace the entire object when updating a path', () => {
+    const newActiveMediaMap: ActiveMediaMap = {
+      'media-2': {mode: 'focus', lastActivated: 3000},
+      'media-4': {mode: 'multiview', lastActivated: 4000},
+    }
+
+    store.updatePath(['activeMediaMap'], newActiveMediaMap)
+
+    const result = store.getState().activeMediaMap
+    expect(result).toBe(newActiveMediaMap) // Should replace the entire object with the same reference that was passed
+    expect(Object.keys(result)).toHaveLength(2)
+    expect(result).toHaveProperty('media-2')
+    expect(result).toHaveProperty('media-4')
+    expect(result).not.toHaveProperty('media-1')
+    expect(result).not.toHaveProperty('media-3')
+  })
 })

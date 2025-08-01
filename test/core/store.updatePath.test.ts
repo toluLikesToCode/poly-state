@@ -789,7 +789,7 @@ describe('Advanced Path Update Operations', () => {
 
     it('should work with path subscriptions', () => {
       const pathListener = vi.fn()
-      const unsubscribe = store.subscribeToPath(['user', 'profile', 'email'], pathListener)
+      const unsubscribe = store.subscribeToPath(['user', 'profile', 'email'] as const, pathListener)
 
       updatePath(['user', 'profile', 'email'], () => 'new.email@example.com')
       expect(pathListener).toHaveBeenCalledWith('new.email@example.com', 'john.doe@example.com')

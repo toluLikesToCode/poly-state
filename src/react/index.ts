@@ -17,7 +17,7 @@ import React, {
   type ReactNode,
   type ComponentType,
 } from 'react'
-import type {Store, ReadOnlyStore, Thunk} from '../core/state/index'
+import type {Store, ReadOnlyStore, Thunk, FlexiblePath, PathsOf} from '../core/state/index'
 import type {
   Selector,
   DependencyListener,
@@ -32,7 +32,12 @@ export * from './types'
 import {Prettify} from '../shared'
 
 // Import types from the dedicated types file
-import type {StoreContextValue, StoreContextResult, UseSubscribeToHook} from './types'
+import type {
+  StoreContextValue,
+  StoreContextResult,
+  UseSubscribeToHook,
+  UseSubscribeToPathHook,
+} from './types'
 
 // Cache for store hooks to avoid recreating them
 const globalStoreHooks = new WeakMap<
@@ -230,8 +235,8 @@ export function createStoreContext<S extends object = any>(
     }, [store, selector, options?.immediate])
   }
 
-  const useSubscribeToPath = <T = any>(
-    path: string | (string | number)[],
+  const useSubscribeToPath: UseSubscribeToPathHook<S> = <T = any>(
+    path: string | FlexiblePath | PathsOf<S>,
     listener: DependencyListener<T>,
     options?: DependencySubscriptionOptions
   ) => {
@@ -246,6 +251,7 @@ export function createStoreContext<S extends object = any>(
         options
       )
     }, [store, path, options?.immediate])
+    return () => {}
   }
 
   const useStoreValue = <T = any>(path: string | (string | number)[]): T => {

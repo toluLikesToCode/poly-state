@@ -472,20 +472,20 @@ export function createStore<S extends object>(
     )
   }
 
-  storeInstance.subscribeToPath = <T = any>(
-    path: string | (string | number)[],
-    listener: DependencyListener<T>,
-    options?: DependencySubscriptionOptions
-  ): (() => void) => {
+  storeInstance.subscribeToPath = ((path: any, listener: any, options?: any) => {
     if (isDestroyed) {
       console.warn(
         `[Store: ${name || 'Unnamed'}] Cannot create path subscription on destroyed store`
       )
-      return () => {} // Return no-op cleanup function
+      return () => {}
     }
-
-    return selectorManager.createPathSubscription(path, listener, options)
-  }
+    // Accept FlexiblePath (readonly) or string, cast to mutable for internal use if needed
+    return selectorManager.createPathSubscription(
+      Array.isArray(path) ? [...path] : path,
+      listener,
+      options
+    )
+  }) as Store<S>['subscribeToPath']
 
   storeInstance.select = <R, P extends Selector<S, unknown>[]>(
     ...args:
@@ -1053,7 +1053,7 @@ export function createStore<S extends object>(
     if (!storeRegistry.has(sessionId)) {
       storeRegistry.set(sessionId, new Set())
     }
-    storeRegistry.get(sessionId)!.add(storeInstance as Store<object>)
+    storeRegistry.get(sessionId)!.add(storeInstance as unknown as Store<object>)
   }
 
   // Initialize history with the initial state BEFORE calling onStoreCreate
@@ -1159,7 +1159,7 @@ export function createStore<S extends object>(
     // Unregister from global registry
     if (sessionId && storeRegistry.has(sessionId)) {
       const storeSet = storeRegistry.get(sessionId)!
-      storeSet.delete(storeInstance as Store<object>)
+      storeSet.delete(storeInstance as unknown as Store<object>)
       if (storeSet.size === 0) {
         storeRegistry.delete(sessionId)
       }
@@ -1178,7 +1178,7 @@ export function createStore<S extends object>(
     if (!storeRegistry.has(sessionId)) {
       storeRegistry.set(sessionId, new Set())
     }
-    storeRegistry.get(sessionId)!.add(storeInstance as Store<object>)
+    storeRegistry.get(sessionId)!.add(storeInstance as unknown as Store<object>)
   }
 
   // Initial state persistence if key provided and no saved state (or saved state was stale and removed)
