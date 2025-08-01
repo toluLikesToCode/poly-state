@@ -1,410 +1,241 @@
 # Poly State React Integration Guide
 
-Poly State provides a powerful and intuitive React integration that makes state management feel
-natural and performant. This guide covers both traditional context-based integration and the new
-context-free approach, giving you flexibility to choose the best pattern for your use case.
+Poly State provides a powerful and intuitive React integration for scalable, maintainable state
+management in React apps. This guide focuses on optimal usage patterns: custom hooks for domain
+logic, thunks/selectors defined outside context, and modular architecture. Both context-based and
+context-free approaches are supported, but we recommend custom hooks and modular patterns for most
+real-world applications.
 
 ## Table of Contents
 
 - [Quick Start](#quick-start)
-- [Context-Free Integration](#context-free-integration---deep-dive)
-- [Traditional Context Integration](#traditional-context-integration)
-- [Core Hooks and Usage](#core-hooks-and-usage)
+- [Recommended Modular Patterns](#recommended-modular-patterns)
+- [Custom Hooks for Domain Logic](#custom-hooks-for-domain-logic)
+- [Selectors and Thunks Best Practices](#selectors-and-thunks-best-practices)
 - [Advanced State Updates](#advanced-state-updates)
 - [Subscriptions and Side Effects](#subscriptions-and-side-effects)
 - [Async Operations](#async-operations-and-loading-states)
 - [History and Time Travel](#history-and-time-travel)
-- [Advanced Patterns](#advanced-patterns-and-best-practices)
 - [TypeScript Integration](#typescript-integration)
 - [Testing Patterns](#testing-patterns)
 
 ## Quick Start
 
-Poly State offers two approaches for React integration. Choose the one that fits your needs:
+Poly State supports both context-based and context-free integration. For optimal scalability and
+maintainability, we recommend:
 
-### Context-Free Approach (Recommended for Simple Cases)
+- **Define selectors and thunks outside React context** (in shared modules)
+- **Create custom hooks for each domain/feature** that consume Poly State hooks and expose
+  specialized state/actions
+- **Use context-based integration for large apps, context-free for tests or isolated features**
 
-Perfect for simple components, testing, and gradual migration:
-
-```tsx
-import {createStore} from 'poly-state'
-import {useStoreHooks} from 'poly-state/react'
-
-// Create your store
-const appStore = createStore({
-  count: 0,
-  user: {name: '', email: ''},
-  todos: [],
-})
-
-// Use in components - no provider needed!
-function Counter() {
-  const {useSelector, useDispatch} = useStoreHooks(appStore)
-  const count = useSelector(state => state.count)
-  const dispatch = useDispatch()
-
-  return <button onClick={() => dispatch({count: count + 1})}>Count: {count}</button>
-}
-
-// No provider wrapper required
-function App() {
-  return <Counter />
-}
-```
-
-### Traditional Context Approach (Recommended for Large Apps)
-
-Ideal for applications with many components and centralized state management:
+### Example: Modular Custom Hook Pattern (Recommended)
 
 ```tsx
+// store/galleryStore.ts
 import {createStore} from 'poly-state'
 import {createStoreContext} from 'poly-state/react'
-
-// Define your state shape
-interface AppState {
-  count: number
-  user: {name: string; email: string}
-}
-
-// Create your store with initial state
-const store = createStore<AppState>({
-  count: 0,
-  user: {name: '', email: ''},
+export const galleryStore = createStore({
+  mode: 'grid',
+  activeItemIndex: 0,
+  items: [],
 })
 
-// Create React integration hooks and components
-const {StoreProvider, useSelector, useDispatch} = createStoreContext(store)
+// Export context utilities for use in app
+const {StoreProvider, StoreContext, ...StoreHooks} = createStoreContext(galleryStore)
+export {StoreContext, StoreHooks, StoreProvider}
 
-// Use in your components
-function Counter() {
-  const count = useSelector(state => state.count)
-  const dispatch = useDispatch()
+// selectors/gallerySelectors.ts
+import {galleryStore} from '../store/galleryStore'
+export const selectActiveItem = galleryStore.select(state => state.items[state.activeItemIndex])
+export const selectSeenItems = galleryStore.select(state => state.items.filter(item => item.seen))
 
-  return (
-    <div>
-      <p>Count: {count}</p>
-      <button onClick={() => dispatch({count: count + 1})}>Increment</button>
-    </div>
-  )
+// thunks/galleryThunks.ts
+export const markItemSeen = ({dispatch, getState}, itemId) => {
+  const items = getState().items.map(item => (item.id === itemId ? {...item, seen: true} : item))
+  dispatch({items})
 }
 
-// Wrap your app with the provider
-function App() {
+// hooks/useGallery.ts
+import {useSelector, useThunk} from 'poly-state/react'
+import {selectActiveItem, selectSeenItems} from '../selectors/gallerySelectors'
+import {markItemSeen} from '../thunks/galleryThunks'
+
+export function useGallery() {
+  const activeItem = useSelector(selectActiveItem)
+  const seenItems = useSelector(selectSeenItems)
+  const runThunk = useThunk()
+  const markSeen = id => runThunk(markItemSeen, id)
+  return {activeItem, seenItems, markSeen}
+}
+
+// components/GalleryView.tsx
+import {useGallery} from '../hooks/useGallery'
+function GalleryView() {
+  const {activeItem, seenItems, markSeen} = useGallery()
+  // ...render UI
+}
+
+// App.tsx
+import {createStoreContext} from 'poly-state/react'
+import {galleryStore} from './store/galleryStore'
+import {GalleryView} from './components/GalleryView'
+const {StoreProvider} = createStoreContext(galleryStore)
+export function App() {
   return (
     <StoreProvider>
-      <Counter />
+      <GalleryView />
     </StoreProvider>
   )
 }
 ```
 
-## Context-Free Integration - Deep Dive
+## Recommended Modular Patterns
 
-The `useStoreHooks` function provides a clean, optional way to use Poly State with React components
-without requiring any context setup. This approach is useful for:
+### Why Modular Custom Hooks?
 
-- **Simple components** that need direct store access
-- **Testing scenarios** where you want isolated store instances
-- **Gradual migration** from other state management libraries
-- **Library components** that shouldn't depend on providers
+- **Encapsulation:** Bundle selectors, thunks, and state logic for a specific domain (e.g., gallery,
+  user, todos)
+- **Reusability:** Components use hooks without knowing store internals
+- **Type Safety:** Strongly type returned values and actions
+- **Testability:** Hooks are easy to test in isolation
+- **Maintainability:** Centralizes business logic, making refactoring and scaling easier
 
-### Basic Context-Free Usage
+### Example: Custom Hook for Gallery Domain
 
 ```tsx
-import {createStore} from 'poly-state'
-import {useStoreHooks} from 'poly-state/react'
+// hooks/useGallery.ts
+import {useSelector, useThunk} from 'poly-state/react'
+import {selectActiveItem, selectSeenItems} from '../selectors/gallerySelectors'
+import {markItemSeen} from '../thunks/galleryThunks'
 
-// Create your store
-const appStore = createStore({
-  count: 0,
-  user: {name: '', email: ''},
-  todos: [],
-})
-
-// Use in components - no provider needed!
-function Counter() {
-  const {useSelector, useDispatch} = useStoreHooks(appStore)
-  const count = useSelector(state => state.count)
-  const dispatch = useDispatch()
-
-  return <button onClick={() => dispatch({count: count + 1})}>Count: {count}</button>
-}
-
-// No provider wrapper required
-function App() {
-  return <Counter />
+export function useGallery() {
+  const activeItem = useSelector(selectActiveItem)
+  const seenItems = useSelector(selectSeenItems)
+  const runThunk = useThunk()
+  const markSeen = id => runThunk(markItemSeen, id)
+  return {activeItem, seenItems, markSeen}
 }
 ```
 
-### Advanced Context-Free Features
-
-All store features work exactly the same as with context-based integration:
+### Usage in Components
 
 ```tsx
-function AdvancedComponent() {
-  const {
-    useSelector,
-    useStoreValue, // Path-based access
-    useTransaction, // Atomic updates
-    useAsyncThunk, // Async operations
-    useBatch, // Batched updates
-    useUpdatePath, // Enhanced type-safe path updates
-  } = useStoreHooks(appStore)
+import {useGallery} from '../hooks/useGallery'
+function GalleryView() {
+  const {activeItem, seenItems, markSeen} = useGallery()
+  // ...render UI
+}
+```
 
-  const userName = useStoreValue<string>('user.name')
-  const transaction = useTransaction()
-  const {execute, loading, error} = useAsyncThunk()
+### Context Setup for Large Apps
 
-  const updateUser = () => {
-    transaction(draft => {
-      draft.user.name = 'John Doe'
-      draft.user.email = 'john@example.com'
-    })
-  }
-
-  const loadData = async () => {
-    await execute(async ctx => {
-      const response = await fetch('/api/data')
-      const data = await response.json()
-      ctx.dispatch({user: data.user})
-    })
-  }
-
-  if (loading) return <div>Loading...</div>
-  if (error) return <div>Error: {error.message}</div>
-
+```tsx
+import {createStoreContext} from 'poly-state/react'
+import {galleryStore} from './store/galleryStore'
+import {GalleryView} from './components/GalleryView'
+const {StoreProvider} = createStoreContext(galleryStore)
+export function App() {
   return (
-    <div>
-      <h2>{userName || 'No user'}</h2>
-      <button onClick={updateUser}>Update User</button>
-      <button onClick={loadData}>Load Data</button>
-    </div>
+    <StoreProvider>
+      <GalleryView />
+    </StoreProvider>
   )
 }
 ```
 
-### Perfect for Testing
-
-Context-free hooks make testing much simpler:
-
-```tsx
-import {render, screen, fireEvent} from '@testing-library/react'
-import {createStore} from 'poly-state'
-import {useStoreHooks} from 'poly-state/react'
-
-function TestComponent() {
-  const testStore = createStore({count: 5})
-  const {useSelector, useDispatch} = useStoreHooks(testStore)
-  const count = useSelector(state => state.count)
-  const dispatch = useDispatch()
-
-  return (
-    <div>
-      <span data-testid="count">{count}</span>
-      <button onClick={() => dispatch({count: count + 1})}>Increment</button>
-    </div>
-  )
-}
-
-test('component works with isolated store', () => {
-  render(<TestComponent />)
-  expect(screen.getByTestId('count')).toHaveTextContent('5')
-
-  fireEvent.click(screen.getByText('Increment'))
-  expect(screen.getByTestId('count')).toHaveTextContent('6')
-})
-```
-
-### Multiple Stores with Context-Free
-
-You can easily work with multiple stores:
-
-```tsx
-const userStore = createStore({name: '', email: ''})
-const settingsStore = createStore({theme: 'light', language: 'en'})
-
-function MultiStoreComponent() {
-  const {useSelector: useUserSelector} = useStoreHooks(userStore)
-  const {useSelector: useSettingsSelector} = useStoreHooks(settingsStore)
-
-  const userName = useUserSelector(state => state.name)
-  const theme = useSettingsSelector(state => state.theme)
-
-  return <div className={`theme-${theme}`}>Hello, {userName}!</div>
-}
-```
-
-### Context-Free Performance
-
-- **Efficient caching**: Hooks are created once per store and reused across components
-- **Optimal re-renders**: Only components using changed state values re-render
-- **Memory friendly**: WeakMap ensures hooks are garbage collected with stores
-
-## Traditional Context Integration
-
-For larger applications, the traditional context-based approach provides centralized state
-management:
-
-### Understanding the Architecture
-
-Poly State's React integration is built around a few key concepts that work together to provide
-efficient state management:
-
-**Store Creation**: You start by creating a store instance that holds your application state. This
-store exists outside of React and can be used independently.
-
-**Context Generation**: The `createStoreContext` function generates a complete set of React hooks
-and components tailored to your specific store. This approach provides excellent TypeScript
-inference and prevents common mistakes.
-
-**Selective Subscriptions**: Unlike many state management solutions, Poly State allows components to
-subscribe only to the specific parts of state they need. This means components re-render only when
 their relevant data changes.
 
-**Immutable Updates**: All state updates preserve immutability while leveraging structural sharing
-for performance. The library uses Immer under the hood for complex updates.
+## Selectors and Thunks Best Practices
 
-### Installation and Setup
+- **Define selectors and thunks outside React context** for reusability and testability
+- **Use custom hooks to consume selectors/thunks and expose specialized logic**
+- **Dispatch thunks via hooks for async/multi-step actions**
 
-```bash
-# Note: This package is still in development thus its not yet available on npm.
-
-# To install first download the source code. Then install yalc:
-npm install -g yalc
-
-# Then publish the package locally
-cd path/to/poly-state
-yalc publish
-
-# Now you can add it to your project
-cd path/to/your/project
-yalc add poly-state
-
-
-# When available on npm, you can install it directly:
-npm install poly-state
-# or
-yarn add poly-state
-# or
-pnpm add poly-state
-```
-
-Poly State requires React 16.8 or later for hook support. TypeScript is strongly recommended for the
-best development experience, though not required.
-
-## Core Hooks and Usage
-
-### useSelector - Subscribing to State
-
-The `useSelector` hook is your primary way to access state in components. It takes a selector
-function that extracts the specific data you need:
+### Example: Async Thunk Pattern
 
 ```tsx
-function UserProfile() {
-  // Select just the user's name - component only re-renders when name changes
-  const userName = useSelector(state => state.user.name)
+// thunks/userThunks.ts
+export const fetchUser: Thunk<AppState, User> = async ({dispatch}) => {
+  const res = await fetch('/api/user')
+  const user = await res.json()
+  dispatch({user})
+  return user
+} // Thunk<AppState, User> annotation ensures type safety and infers the thunks methods like dispatch, transaction, etc.
 
-  // Select derived data - memoized automatically
-  const displayName = useSelector(state => state.user.name || 'Anonymous User')
-
-  // Select complex derived state
-  const userStats = useSelector(state => ({
-    hasEmail: !!state.user.email,
-    isComplete: state.user.name && state.user.email,
-    nameLength: state.user.name.length,
-  }))
-
-  return (
-    <div>
-      <h1>Welcome, {displayName}!</h1>
-      {userStats.isComplete ? (
-        <span>Profile complete</span>
-      ) : (
-        <span>Please complete your profile</span>
-      )}
-    </div>
-  )
-}
-```
-
-The selector function receives the entire state but should return only the data the component needs.
-Poly State automatically compares the returned values using deep equality, so your component won't
-re-render unless the selected data actually changes.
-
-### useDispatch - Updating State
-
-The `useDispatch` hook provides a function to update your state. You can dispatch partial state
-objects or thunk functions for more complex logic:
-
-```tsx
-function UserForm() {
+// hooks/useUser.ts
+import {useSelector, useAsyncThunk} from 'poly-state/react'
+import {fetchUser} from '../thunks/userThunks'
+export function useUser() {
   const user = useSelector(state => state.user)
-  const dispatch = useDispatch()
-
-  const updateUser = (field: keyof typeof user, value: string) => {
-    dispatch({
-      user: {...user, [field]: value},
-    })
-  }
-
-  const saveUser = async () => {
-    // Dispatch a thunk for async operations
-    await dispatch(async (dispatch, getState) => {
-      const currentUser = getState().user
-      try {
-        await saveToServer(currentUser)
-        dispatch({saved: true, lastSaved: Date.now()})
-      } catch (error) {
-        dispatch({error: error.message})
-      }
-    })
-  }
-
-  return (
-    <form>
-      <input
-        value={user.name}
-        onChange={e => updateUser('name', e.target.value)}
-        placeholder="Name"
-      />
-      <input
-        value={user.email}
-        onChange={e => updateUser('email', e.target.value)}
-        placeholder="Email"
-      />
-      <button type="button" onClick={saveUser}>
-        Save User
-      </button>
-    </form>
-  )
+  const {execute, loading, error} = useAsyncThunk()
+  const loadUser = () => execute(fetchUser)
+  return {user, loadUser, loading, error}
 }
 ```
 
-### useStoreValue - Path-Based Access
+## Custom Hooks for Domain Logic
 
-For deeply nested state, `useStoreValue` provides a convenient way to access values using dot
-notation:
+Custom hooks should encapsulate all state logic for a domain/feature. This keeps components clean
+and focused on UI.
+
+### Example: User Domain
 
 ```tsx
-function UserSettings() {
-  // Access nested values with string paths
-  const theme = useStoreValue<'light' | 'dark'>('user.preferences.theme')
-  const language = useStoreValue<string>('user.preferences.language')
-  const notificationCount = useStoreValue<number>('notifications.unread.length')
+// store/userStore.ts
+import {createStore} from 'poly-state'
+export const userStore = createStore({
+  profile: {name: '', email: ''},
+  preferences: {theme: 'light', language: 'en'},
+  authentication: {token: null, isLoggedIn: false},
+})
 
-  return (
-    <div className={`theme-${theme}`}>
-      <p>Language: {language}</p>
-      <p>Unread notifications: {notificationCount}</p>
-    </div>
-  )
+// selectors/userSelectors.ts
+export const selectUser = userStore.select(state => state.profile)
+
+// hooks/useUser.ts
+import {useSelector, useDispatch, useAsyncThunk} from 'poly-state/react'
+import {selectUser} from '../selectors/userSelectors'
+import {fetchUser} from '../thunks/userThunks'
+
+export function useUser() {
+  const user = useSelector(selectUser)
+  const dispatch = useDispatch()
+  const {execute, loading, error} = useAsyncThunk()
+  const updateUser = updates => dispatch({profile: {...user, ...updates}})
+  const loadUser = () => execute(fetchUser)
+  return {user, updateUser, loadUser, loading, error}
+}
+
+// Usage in component
+function UserProfile() {
+  const {user, updateUser, loadUser, loading, error} = useUser()
+  // ...render UI
 }
 ```
-
-This approach is particularly useful for accessing deep properties without needing to write complex
-selector functions. The component will automatically re-render when the specific path value changes.
 
 ## Advanced State Updates
+
+- Use transactions (`useTransaction`) for atomic multi-field updates
+- Use batching (`useBatch`) for performance when updating multiple slices
+- Use path-based access (`useStoreValue`, `useUpdatePath`) for deep/nested state
+
+### Example: Transaction Pattern
+
+```tsx
+import {useSelector, useTransaction} from 'poly-state/react'
+function TodoManager() {
+  const todos = useSelector(state => state.todos)
+  const transaction = useTransaction()
+  const addTodo = text => {
+    transaction(draft => {
+      draft.todos.push({id: Date.now(), text, completed: false})
+      draft.stats.totalTodos += 1
+    })
+  }
+  // ...render UI
+}
+```
 
 ### Transactions - Atomic Updates
 
@@ -468,44 +299,26 @@ Transactions use Immer's draft system, allowing you to write mutations that are 
 converted to immutable updates. This makes complex state updates much more readable and less
 error-prone.
 
-### Batching - Performance Optimization
+## Subscriptions and Side Effects
 
-When you need to make multiple dispatch calls, batching ensures they're grouped into a single
-re-render:
+- Use `useSubscribeTo` and `useSubscribeToPath` for reacting to state changes
+- Use `useStoreEffect` for complex effect scenarios
+
+### Example: Notification Side Effect
 
 ```tsx
-function BulkOperations() {
-  const batch = useBatch()
-  const dispatch = useDispatch()
-
-  const resetApplication = () => {
-    batch(() => {
-      dispatch({user: {name: '', email: ''}})
-      dispatch({todos: []})
-      dispatch({settings: {theme: 'light', language: 'en'}})
-      dispatch({stats: {totalTodos: 0, completedTodos: 0}})
-      dispatch({lastReset: Date.now()})
-    })
-    // All updates above trigger only one re-render
-  }
-
-  const loadUserData = async (userId: string) => {
-    const userData = await fetchUserData(userId)
-
-    batch(() => {
-      dispatch({user: userData.user})
-      dispatch({todos: userData.todos})
-      dispatch({settings: userData.settings})
-      dispatch({loaded: true, loading: false})
-    })
-  }
-
-  return (
-    <div>
-      <button onClick={resetApplication}>Reset App</button>
-      <button onClick={() => loadUserData('123')}>Load User Data</button>
-    </div>
+import {useSubscribeTo} from 'poly-state/react'
+function NotificationManager() {
+  useSubscribeTo(
+    state => state.notifications.unread.length,
+    (newCount, oldCount) => {
+      if (newCount > oldCount) {
+        new Notification(`You have ${newCount} unread notifications`)
+      }
+    },
+    {immediate: false}
   )
+  return null
 }
 ```
 
@@ -625,7 +438,7 @@ function UpdatePathExamples() {
   // 1. Compile-time type safety (recommended)
   // TypeScript validates both path existence and value types
   const updateUserName = () => {
-    updatePath(['user', 'profile', 'name'], (current: string) => current.trim())
+    updatePath(['user', 'profile', 'name'], current => current.trim())
     //         ^^^^^^^^^^^^^^^^^^^^^^^^^^ - Path validated at compile time
     //                                    ^^^^^^^^^^^^^^^^^^^^^^ - Value type inferred as string
   }
@@ -665,8 +478,6 @@ function UpdatePathExamples() {
 }
 ```
 
-## Subscriptions and Side Effects
-
 ### useSubscribeTo - React to State Changes
 
 Sometimes you need to perform side effects when specific state changes occur:
@@ -698,47 +509,25 @@ function NotificationManager() {
 }
 ```
 
-### useSubscribeToPath - Path-Based Side Effects
+- Use `useAsyncThunk` for async actions with loading/error state
 
-For deeply nested values, path-based subscriptions provide a more convenient syntax:
+### Example: Async Data Loading
 
 ```tsx
-function UserActivityTracker() {
-  // Track when user completes their profile
-  useSubscribeToPath(
-    'user.profile.completeness',
-    (completeness: number, previousCompleteness: number) => {
-      if (completeness === 100 && previousCompleteness < 100) {
-        // Profile just became complete
-        analytics.track('profile_completed')
-        showCelebrationAnimation()
-      }
-    }
-  )
-
-  // Path arrays are also supported
-  useSubscribeToPath(
-    ['user', 'profile', 'completeness'], // Same result as above
-    (completeness: number, previousCompleteness: number) => {
-      if (completeness === 100 && previousCompleteness < 100) {
-        // Profile just became complete
-        analytics.track('profile_completed')
-        showCelebrationAnimation()
-      }
-    }
-  )
-
-  // Auto-save user preferences
-  useSubscribeToPath(
-    'user.preferences',
-    preferences => {
-      // Debounced auto-save
-      debouncedSave(preferences)
-    },
-    {debounceMs: 1000} // Wait 1 second before saving
-  )
-
-  return null // This component only handles side effects
+import {useAsyncThunk, useSelector} from 'poly-state/react'
+function DataLoader() {
+  const {execute, loading, error} = useAsyncThunk()
+  const data = useSelector(state => state.apiData)
+  const loadUserData = async () => {
+    await execute(async dispatch => {
+      dispatch({loading: true, error: null})
+      const response = await fetch('/api/user/profile')
+      if (!response.ok) throw new Error('Failed to fetch')
+      const userData = await response.json()
+      dispatch({apiData: userData, lastFetch: Date.now()})
+    })
+  }
+  // ...render UI
 }
 ```
 
@@ -871,49 +660,22 @@ function DataLoader() {
 
 ## History and Time Travel
 
-Poly State includes built-in undo/redo functionality that integrates seamlessly with React:
+- Use `useStoreHistory` for undo/redo and time travel debugging
+
+### Example: Undo/Redo Controls
 
 ```tsx
+import {useStoreHistory} from 'poly-state/react'
 function HistoryControls() {
-  const {history, currentIndex, canUndo, canRedo, undo, redo} = useStoreHistory()
-
-  return (
-    <div className="history-controls">
-      <button disabled={!canUndo} onClick={() => undo()} title="Undo last action">
-        ← Undo
-      </button>
-
-      <button disabled={!canRedo} onClick={() => redo()} title="Redo next action">
-        Redo →
-      </button>
-
-      <span className="history-info">
-        Step {currentIndex + 1} of {history.length}
-      </span>
-
-      {/* Advanced controls */}
-      <button onClick={() => undo(5)}>Undo 5 steps</button>
-
-      <button onClick={() => redo(3)}>Redo 3 steps</button>
-    </div>
-  )
-}
-
-function DrawingApp() {
-  const drawing = useSelector(state => state.drawing)
-  const transaction = useTransaction()
-
-  const addStroke = (stroke: DrawingStroke) => {
-    transaction(draft => {
-      draft.drawing.strokes.push(stroke)
-      draft.drawing.lastModified = Date.now()
-    })
-  }
-
+  const {canUndo, canRedo, undo, redo} = useStoreHistory()
   return (
     <div>
-      <HistoryControls />
-      <Canvas strokes={drawing.strokes} onStroke={addStroke} />
+      <button disabled={!canUndo} onClick={undo}>
+        Undo
+      </button>
+      <button disabled={!canRedo} onClick={redo}>
+        Redo
+      </button>
     </div>
   )
 }
@@ -921,26 +683,27 @@ function DrawingApp() {
 
 ## Advanced Patterns and Best Practices
 
-### Multiple Store Pattern
+- **Split state into multiple stores for large apps**
+- **Create custom hooks for each domain**
+- **Use context-based integration for centralized state, context-free for isolated features/tests**
 
-For large applications, you might want to split state into multiple stores:
+### Example: Multiple Store Setup
 
 ```tsx
-// User store
-const userStore = createStore({
+// store/userStore.ts
+export const userStore = createStore({
   profile: {name: '', email: ''},
   preferences: {theme: 'light', language: 'en'},
   authentication: {token: null, isLoggedIn: false},
 })
 
-// Application store
-const appStore = createStore({
+// store/appStore.ts
+export const appStore = createStore({
   ui: {sidebarOpen: false, currentPage: 'home'},
   data: {todos: [], projects: []},
-  cache: new Map(),
 })
 
-// Option 1: Create separate contexts (traditional approach)
+// context setup
 const UserContext = createStoreContext(userStore)
 const AppContext = createStoreContext(appStore)
 
@@ -953,119 +716,58 @@ function App() {
     </UserContext.StoreProvider>
   )
 }
-
-// Option 2: Use context-free hooks (simpler approach)
-function UserProfile() {
-  const {useSelector, useDispatch} = useStoreHooks(userStore)
-  const profile = useSelector(state => state.profile)
-  const dispatch = useDispatch()
-
-  return (
-    <div>
-      <h1>{profile.name}</h1>
-      <button onClick={() => dispatch({profile: {...profile, name: 'Updated'}})}>
-        Update Name
-      </button>
-    </div>
-  )
-}
 ```
 
 ### Custom Hook Patterns
 
-Create reusable custom hooks for common state operations:
+- **Create a custom hook for each domain/feature**
+- **Expose only the state/actions needed by components**
+
+### Example: useTodos Hook
 
 ```tsx
-// Custom hook for user operations
-function useUser() {
-  const user = useSelector(state => state.user)
-  const dispatch = useDispatch()
+// store/appStore.ts
+import {createStore} from 'poly-state'
+export const appStore = createStore({
+  ui: {sidebarOpen: false, currentPage: 'home'},
+  data: {todos: [], projects: []},
+})
+
+// selectors/todoSelectors.ts
+export const selectTodos = appStore.select(state => state.data.todos)
+
+// hooks/useTodos.ts
+import {useSelector, useTransaction} from 'poly-state/react'
+import {selectTodos} from '../selectors/todoSelectors'
+
+export function useTodos() {
+  const todos = useSelector(selectTodos)
   const transaction = useTransaction()
-
-  const login = useCallback(
-    async (credentials: LoginCredentials) => {
-      try {
-        const response = await authService.login(credentials)
-        transaction(draft => {
-          draft.user.profile = response.user
-          draft.user.lastLogin = Date.now()
-        })
-        return response
-      } catch (error) {
-        dispatch({user: {...user, loginError: error.message}})
-        throw error
-      }
-    },
-    [dispatch, transaction, user]
-  )
-
-  const logout = useCallback(() => {
+  const addTodo = text => {
     transaction(draft => {
-      draft.user = {
-        profile: {name: '', email: ''},
-        token: null,
-        isLoggedIn: false,
-        loginError: null,
-      }
+      draft.data.todos.push({id: Date.now(), text, completed: false})
     })
-    authService.logout()
-  }, [transaction])
-
-  const updateProfile = useCallback(
-    (updates: Partial<UserProfile>) => {
-      dispatch({
-        user: {
-          ...user,
-          profile: {...user.profile, ...updates},
-        },
-      })
-    },
-    [dispatch, user]
-  )
-
-  return {
-    user,
-    isLoggedIn: user.isLoggedIn,
-    login,
-    logout,
-    updateProfile,
   }
-}
-
-// Using custom hooks in components
-function TodoApp() {
-  const {user, isLoggedIn} = useUser()
-
-  if (!isLoggedIn) {
-    return <LoginForm />
-  }
-
-  return (
-    <div>
-      <h1>Welcome, {user.profile.name}!</h1>
-      <TodoList />
-    </div>
-  )
+  return {todos, addTodo}
 }
 ```
 
 ### Performance Optimization Patterns
 
-Poly State includes several patterns for optimizing performance in React applications:
+- **Use memoized selectors and path-based subscriptions for optimal re-renders**
+- **Memoize components with React.memo when possible**
+
+### Example: Optimized Todo List
 
 ```tsx
-// Selector optimization - avoid creating new objects in selectors
+// selectors/todoSelectors.ts
+export const selectIncompleteTodos = appStore.select(selectTodos, todos =>
+  todos.filter(todo => !todo.completed)
+)
+
 function TodoList() {
-  // ❌ Poor - creates new array on every render
-  const incompleteTodos = useSelector(state => state.todos.filter(todo => !todo.completed))
-
-  // ✅ Better - use memoized selector
-  const incompleteTodos = useSelector(state => state.todos).filter(todo => !todo.completed)
-
-  // ✅ Best - use store's built-in selector memoization
-  const incompleteTodos = useSelector(state => state.todos.filter(todo => !todo.completed))
-  // Poly State automatically memoizes this selector
-
+  // Use memoized selector
+  const incompleteTodos = useSelector(selectIncompleteTodos)
   return (
     <div>
       {incompleteTodos.map(todo => (
@@ -1075,16 +777,11 @@ function TodoList() {
   )
 }
 
-// Component-level memoization
-const TodoItem = React.memo(function TodoItem({todo}: {todo: Todo}) {
+const TodoItem = React.memo(function TodoItem({todo}) {
   const dispatch = useDispatch()
-
-  const toggleComplete = useCallback(() => {
-    dispatch({
-      todos: todos.map(t => (t.id === todo.id ? {...t, completed: !t.completed} : t)),
-    })
-  }, [todo.id, dispatch])
-
+  const toggleComplete = () => {
+    dispatch({completed: !todo.completed})
+  }
   return (
     <div>
       <span>{todo.text}</span>
@@ -1092,26 +789,6 @@ const TodoItem = React.memo(function TodoItem({todo}: {todo: Todo}) {
     </div>
   )
 })
-
-// Subscription optimization
-function UserProfileDisplay() {
-  // ❌ Poor - subscribes to entire user object
-  const user = useSelector(state => state.user)
-
-  // ✅ Better - subscribe only to needed fields
-  const displayName = useSelector(state => state.user.profile.name || 'Anonymous')
-  const avatarUrl = useSelector(state => state.user.profile.avatar)
-
-  // ✅ Best - use path-based subscription for deep values
-  const theme = useStoreValue<'light' | 'dark'>('user.preferences.theme')
-
-  return (
-    <div className={`profile theme-${theme}`}>
-      <img src={avatarUrl} alt="Avatar" />
-      <h2>{displayName}</h2>
-    </div>
-  )
-}
 ```
 
 ## TypeScript Integration
@@ -1313,23 +990,9 @@ describe('Async Data Loading', () => {
 
 ## When to Use Each Approach
 
-### Use Context-Free (`useStoreHooks`) When
+- **Use context-based integration and custom hooks for large, modular apps**
+- **Use context-free hooks for tests, isolated features, or library components**
+- **Mix both approaches as needed—Poly State supports both seamlessly**
 
-- Building simple components or demos
-- Writing tests with isolated store instances
-- Migrating from other state libraries gradually
-- Creating library components that shouldn't depend on providers
-- Working with multiple independent stores
-- Prototyping or building small applications
-
-### Use Context-Based (`createStoreContext`) When
-
-- Building larger applications with many components
-- You want centralized provider setup
-- Components are deeply nested and need store access
-- You prefer the explicit provider pattern
-- You need centralized error boundaries or middleware setup
-- Working with a single primary application store
-
-Both approaches provide the exact same functionality and performance characteristics - choose what
-works best for your use case! You can even mix both approaches in the same application as needed.
+Both approaches provide the same performance and features. For most real-world apps, prefer modular
+custom hooks and context-based integration for maintainability and scalability.

@@ -37,6 +37,7 @@ import type {
   StoreContextResult,
   UseSubscribeToHook,
   UseSubscribeToPathHook,
+  UseStoreHook,
 } from './types'
 
 // Cache for store hooks to avoid recreating them
@@ -107,7 +108,7 @@ export function createStoreContext<S extends object = any>(
   }
   StoreProvider.displayName = 'StoreProvider'
 
-  const useStore = (): Store<S> => {
+  const useStore: UseStoreHook<S> = (): Store<S> => {
     const context = useContext(StoreContext)
     if (!context) {
       throw new Error('useStore must be used within a StoreProvider')
