@@ -592,7 +592,7 @@ function DataLoader() {
 
   const loadUserData = async () => {
     try {
-      await execute(async dispatch => {
+      await execute(async {dispatch} => {
         // Set loading state
         dispatch({loading: true, error: null})
 

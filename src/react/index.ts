@@ -369,7 +369,14 @@ export function createStoreContext<S extends object = any>(
       [dispatch]
     )
 
-    return {execute, loading, error}
+    return useMemo(
+      () => ({
+        execute,
+        loading,
+        error,
+      }),
+      [execute, loading, error]
+    )
   }
 
   const useStoreEffect = <R>(
@@ -776,7 +783,14 @@ export function useStoreHooks<S extends object>(
           [store]
         )
 
-        return {execute, loading, error}
+        return useMemo(
+          () => ({
+            execute,
+            loading,
+            error,
+          }),
+          [execute, loading, error]
+        )
       },
 
       useStoreEffect: <R>(

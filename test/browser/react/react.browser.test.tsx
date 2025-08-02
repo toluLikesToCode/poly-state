@@ -1,7 +1,7 @@
 /// <reference types="@vitest/browser/matchers" />
 /// <reference types="@testing-library/jest-dom" />
 import {afterEach, beforeEach, describe, expect, it, vi, beforeAll, afterAll} from 'vitest'
-import {cleanup, waitFor} from '@testing-library/react'
+import {cleanup, waitFor, screen} from '@testing-library/react'
 import {userEvent} from '@vitest/browser/context'
 
 import {render} from 'vitest-browser-react'
@@ -2239,5 +2239,242 @@ describe('Browser: OmitPathsPlugin Integration Tests', () => {
     expect(stored.data.settings).not.toHaveProperty('theme')
     expect(stored.data.user).not.toHaveProperty('name')
     expect(stored.data.user).not.toHaveProperty('email')
+  })
+})
+
+describe('Browser: useAsyncThunk Stability Tests', () => {
+  beforeEach(() => {
+    cleanup()
+    vi.clearAllMocks()
+  })
+
+  it('should return stable references and prevent double execution', async () => {
+    interface TestState {
+      data: string[]
+      loading: boolean
+    }
+
+    const initialState: TestState = {
+      data: [],
+      loading: false,
+    }
+
+    const store = createStore(initialState)
+    const {StoreProvider, useAsyncThunk, useSelector} = createStoreContext(store)
+
+    // Mock thunk that we'll track calls to
+    const mockThunk = vi.fn(async (ctx: {getState: () => TestState; dispatch: any}) => {
+      await new Promise(resolve => setTimeout(resolve, 50)) // Simulate async work
+      const newData = ['item1', 'item2', 'item3']
+      ctx.dispatch({data: newData})
+      return newData
+    }) as Thunk<TestState, Promise<string[]>>
+
+    let executeCallCount = 0
+    let renderCount = 0
+
+    function TestComponent() {
+      renderCount++
+      const {execute, loading, error} = useAsyncThunk()
+      const data = useSelector(state => state.data)
+
+      // Track how many times execute function reference changes
+      React.useEffect(() => {
+        executeCallCount++
+      }, [execute])
+
+      // Execute thunk on mount
+      React.useEffect(() => {
+        execute(mockThunk)
+      }, [execute])
+
+      return (
+        <div>
+          <div data-testid="render-count">{renderCount}</div>
+          <div data-testid="execute-count">{executeCallCount}</div>
+          <div data-testid="loading">{loading.toString()}</div>
+          <div data-testid="error">{error?.message || 'null'}</div>
+          <div data-testid="data">{data.join(',')}</div>
+        </div>
+      )
+    }
+
+    function App() {
+      return (
+        <StoreProvider>
+          <TestComponent />
+        </StoreProvider>
+      )
+    }
+
+    render(<App />)
+
+    // Wait for async thunk to complete
+    await waitFor(async () => {
+      await expect.element(screen.getByTestId('data')).toHaveTextContent('item1,item2,item3')
+    })
+
+    // Verify the mock thunk was only called once
+    expect(mockThunk).toHaveBeenCalledTimes(1)
+
+    // Verify execute function reference was stable (should only change once on mount)
+    await expect.element(screen.getByTestId('execute-count')).toHaveTextContent('1')
+
+    // Component should render a reasonable number of times
+    // (Not verifying exact count as React may batch updates differently)
+  })
+
+  it('should work correctly with useStoreHooks (no context)', async () => {
+    interface TestState {
+      value: number
+    }
+
+    const store = createStore<TestState>({value: 0})
+
+    const mockThunk = vi.fn(async (ctx: {getState: () => TestState; dispatch: any}) => {
+      await new Promise(resolve => setTimeout(resolve, 30))
+      const state = ctx.getState()
+      const newValue = state.value + 10
+      ctx.dispatch({value: newValue})
+      return newValue
+    }) as Thunk<TestState, Promise<number>>
+
+    let executeReferenceChanges = 0
+
+    function TestComponent() {
+      const {useAsyncThunk, useSelector} = useStoreHooks(store)
+      const {execute, loading, error} = useAsyncThunk()
+      const value = useSelector(state => state.value)
+
+      // Track execute reference stability
+      React.useEffect(() => {
+        executeReferenceChanges++
+      }, [execute])
+
+      const handleClick = () => {
+        execute(mockThunk)
+      }
+
+      return (
+        <div>
+          <div data-testid="value">{value}</div>
+          <div data-testid="loading">{loading.toString()}</div>
+          <div data-testid="execute-changes">{executeReferenceChanges}</div>
+          <button data-testid="execute-btn" onClick={handleClick}>
+            Execute
+          </button>
+        </div>
+      )
+    }
+
+    render(<TestComponent />)
+
+    // Initial state
+    await expect.element(screen.getByTestId('value')).toHaveTextContent('0')
+    await expect.element(screen.getByTestId('loading')).toHaveTextContent('false')
+
+    // Click to execute thunk
+    await userEvent.click(screen.getByTestId('execute-btn'))
+
+    // Wait for completion
+    await waitFor(async () => {
+      await expect.element(screen.getByTestId('value')).toHaveTextContent('10')
+      await expect.element(screen.getByTestId('loading')).toHaveTextContent('false')
+    })
+
+    // Verify stable references (should only change once on mount)
+    await expect.element(screen.getByTestId('execute-changes')).toHaveTextContent('1')
+    expect(mockThunk).toHaveBeenCalledTimes(1)
+  })
+
+  it('should provide stable references in React.StrictMode (but allow intentional double execution)', async () => {
+    interface TestState {
+      callCount: number
+      data: string[]
+    }
+
+    const initialState: TestState = {
+      callCount: 0,
+      data: [],
+    }
+
+    const store = createStore(initialState)
+    const {StoreProvider, useAsyncThunk, useSelector} = createStoreContext(store)
+
+    // Track mock calls separately
+    let mockCallCount = 0
+
+    // Mock thunk that increments a counter to track actual calls
+    const mockThunk = vi.fn(async (ctx: {getState: () => TestState; dispatch: any}) => {
+      mockCallCount++
+      const state = ctx.getState()
+      const newCallCount = state.callCount + 1
+      const newData = [`call-${newCallCount}`]
+
+      ctx.dispatch({
+        callCount: newCallCount,
+        data: [...state.data, ...newData],
+      })
+
+      return newData
+    }) as Thunk<TestState, Promise<string[]>>
+
+    let executeCallCount = 0
+
+    function TestComponent() {
+      const {execute, loading, error} = useAsyncThunk()
+      const {callCount, data} = useSelector(state => state)
+
+      // Track how many times execute function reference changes
+      React.useEffect(() => {
+        executeCallCount++
+      }, [execute])
+
+      // Execute thunk on mount (StrictMode will intentionally call this twice)
+      React.useEffect(() => {
+        execute(mockThunk)
+      }, [execute])
+
+      return (
+        <div>
+          <div data-testid="execute-ref-changes">{executeCallCount}</div>
+          <div data-testid="store-call-count">{callCount}</div>
+          <div data-testid="mock-call-count">{mockCallCount}</div>
+          <div data-testid="data-length">{data.length}</div>
+          <div data-testid="loading">{loading.toString()}</div>
+          <div data-testid="error">{error?.message || 'null'}</div>
+        </div>
+      )
+    }
+
+    function App() {
+      return (
+        <React.StrictMode>
+          <StoreProvider>
+            <TestComponent />
+          </StoreProvider>
+        </React.StrictMode>
+      )
+    }
+
+    render(<App />)
+
+    // Wait for async thunk to complete (expecting 2 calls due to StrictMode)
+    await waitFor(async () => {
+      await expect.element(screen.getByTestId('store-call-count')).toHaveTextContent('2')
+    })
+
+    // StrictMode intentionally causes double execution - this is expected behavior
+    await expect.element(screen.getByTestId('mock-call-count')).toHaveTextContent('2')
+    await expect.element(screen.getByTestId('store-call-count')).toHaveTextContent('2')
+    await expect.element(screen.getByTestId('data-length')).toHaveTextContent('2')
+
+    // Our fix ensures execute function reference changes are minimized
+    // In StrictMode, effects run twice, but our useAsyncThunk should still provide
+    // stable references within each render cycle
+    await expect.element(screen.getByTestId('execute-ref-changes')).toHaveTextContent('2')
+
+    // The mock should be called exactly twice (once per StrictMode effect run)
+    expect(mockThunk).toHaveBeenCalledTimes(2)
   })
 })
