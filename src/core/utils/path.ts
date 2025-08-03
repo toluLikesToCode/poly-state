@@ -125,25 +125,63 @@ export function deepMergeWithPathPreservation<S extends object>(
   loadedState: Partial<S>,
   preservePaths: readonly (readonly (string | number)[])[]
 ): Partial<S> {
+  // Helper function to check if two values are compatible types
+  const areTypesCompatible = (target: any, source: any): boolean => {
+    // Both null/undefined are compatible
+    if ((target === null || target === undefined) && (source === null || source === undefined)) {
+      return true
+    }
+
+    // Null can be overwritten by any value
+    if (target === null || target === undefined) {
+      return true
+    }
+
+    // Don't allow overwriting valid data with null/undefined
+    if (source === null || source === undefined) {
+      return false
+    }
+
+    // Arrays are only compatible with arrays
+    if (Array.isArray(target) !== Array.isArray(source)) {
+      return false
+    }
+
+    // Objects are only compatible with objects (excluding arrays and null)
+    const targetIsObject = typeof target === 'object' && !Array.isArray(target) && target !== null
+    const sourceIsObject = typeof source === 'object' && !Array.isArray(source) && source !== null
+
+    if (targetIsObject !== sourceIsObject) {
+      return false
+    }
+
+    // Primitives are compatible with same type primitives
+    if (typeof target !== 'object' && typeof source !== 'object') {
+      return typeof target === typeof source
+    }
+
+    return true
+  }
+
   // Use deepClone to create mutable copies and then merge them safely
   const safeDeepMerge = (target: any, source: any): any => {
     if (source === null || source === undefined) {
       return target
     }
 
-    // If source is not an object but target is, prefer target (initial state)
-    if (typeof source !== 'object') {
+    // Check type compatibility - if incompatible, prefer target (initial state)
+    if (!areTypesCompatible(target, source)) {
       return target
     }
 
-    // If target is not an object but source is, use source
-    if (typeof target !== 'object') {
+    // Handle non-object source values
+    if (typeof source !== 'object' || source === null) {
       return source
     }
 
-    // Handle type mismatches - if types don't match, prefer the target (initial state)
-    if (typeof target !== typeof source) {
-      return target
+    // Handle non-object target values - if source is object, use source
+    if (typeof target !== 'object' || target === null) {
+      return source
     }
 
     if (Array.isArray(target) && Array.isArray(source)) {
@@ -151,8 +189,8 @@ export function deepMergeWithPathPreservation<S extends object>(
     }
 
     if (Array.isArray(target) || Array.isArray(source)) {
-      // If one is array and other isn't, prefer the target (initial state)
-      return target
+      // This should be handled by type compatibility check above
+      return Array.isArray(source) ? deepClone(source) : target
     }
 
     // Create deep clones to avoid any frozen object issues
@@ -163,22 +201,28 @@ export function deepMergeWithPathPreservation<S extends object>(
     for (const [key, value] of Object.entries(clonedSource)) {
       if (
         clonedTarget[key] !== undefined &&
+        clonedTarget[key] !== null &&
         typeof clonedTarget[key] === 'object' &&
+        !Array.isArray(clonedTarget[key]) &&
         value &&
-        typeof value === 'object'
+        typeof value === 'object' &&
+        !Array.isArray(value)
       ) {
         result[key] = safeDeepMerge(clonedTarget[key], value)
-      } else if (clonedTarget[key] !== undefined && typeof clonedTarget[key] !== typeof value) {
-        // Type mismatch - prefer target (initial state) value
-        result[key] = clonedTarget[key]
       } else {
-        result[key] = value
+        // Check compatibility before merging
+        if (areTypesCompatible(clonedTarget[key], value)) {
+          result[key] = value
+        } else {
+          // Keep the target value if types are incompatible
+          result[key] = clonedTarget[key]
+        }
       }
     }
     return result
   }
 
-  // Start with initial state as base, then merge loaded state
+  // Start with loaded state as base (prefer loaded values), then apply initial state for non-existent keys
   const result = safeDeepMerge(initialState, loadedState) as Partial<S>
 
   // For each preserve path, ensure the initial value is maintained

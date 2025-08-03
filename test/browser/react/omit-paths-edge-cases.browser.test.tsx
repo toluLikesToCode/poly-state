@@ -7,9 +7,20 @@ import {userEvent} from '@vitest/browser/context'
 import {render} from 'vitest-browser-react'
 import React from 'react'
 
-import {createStore, getLocalStorage, StorageType} from '../../../src/core'
+import {
+  createStore,
+  getLocalStorage,
+  PersistedState,
+  setLocalStorage,
+  StateMetadata,
+  StorageType,
+  TypeRegistry,
+} from '../../../src/core'
 import {createStoreContext} from '../../../src/react'
 import {createOmitPathsPlugin} from '../../../src/plugins/omitPathsPlugin'
+import {StoreError} from '../../../src/shared'
+import z from 'zod'
+import {T} from 'vitest/dist/chunks/reporters.d.BFLkQcL6.js'
 
 const cardStyle: React.CSSProperties = {
   padding: '16px',
@@ -606,7 +617,7 @@ describe('OmitPathsPlugin - Advanced Edge Cases', () => {
       sensitive: 'secret',
     }
 
-    const errorHandler = vi.fn()
+    const errorHandler = vi.fn((error: StoreError) => {})
     const omitPathsPlugin = createOmitPathsPlugin<TestState>([['sensitive']])
 
     const store = createStore(initialState, {
@@ -626,7 +637,9 @@ describe('OmitPathsPlugin - Advanced Edge Cases', () => {
         // Mock localStorage to fail after component mounts
         const originalSetItem = localStorage.setItem
         localStorage.setItem = vi.fn(() => {
-          throw new Error('Storage quota exceeded')
+          // Simulate a real DOMException like the browser would throw
+          const error = new DOMException('QuotaExceededError', 'QuotaExceededError')
+          throw error
         })
 
         // Attempt update that should trigger persistence
@@ -674,5 +687,112 @@ describe('OmitPathsPlugin - Advanced Edge Cases', () => {
     // App should continue working despite storage errors
     expect(screen.getByTestId('data')).toBeInTheDocument()
     expect(screen.getByTestId('sensitive')).toBeInTheDocument()
+  })
+
+  it('should correctly merge state with omitted paths on store creation', async () => {
+    const SeenTrackingSessionStateSchema = z
+      .object({
+        queuedItems: z.array(z.string()),
+        lastAttemptTs: z.record(z.string(), z.number()),
+        galleryVersion: z.number().int().positive('Version must be a positive integer').nullable(),
+      })
+      .strict()
+    interface TestState {
+      session: z.infer<typeof SeenTrackingSessionStateSchema>
+      sensitive: {
+        token: string
+        secret: string
+      }
+    }
+    const initialState: TestState = {
+      session: {
+        queuedItems: [],
+        lastAttemptTs: {},
+        galleryVersion: null,
+      },
+      sensitive: {
+        token: 'init-token-value',
+        secret: 'init-secret-value',
+      },
+    }
+
+    const omitPathsPlugin = createOmitPathsPlugin<TestState>(
+      [
+        ['session', 'queuedItems'],
+        ['sensitive', 'secret'],
+      ],
+      'merge-test',
+      initialState
+    )
+
+    // inject state into localStorage to simulate pre-existing state
+    const typeRegistry = new TypeRegistry()
+    const stateToPersist: TestState = {
+      session: {
+        queuedItems: ['item1', 'item2'],
+        lastAttemptTs: {
+          item1: 1,
+          item2: 2,
+        },
+        galleryVersion: 1,
+      },
+      sensitive: {
+        token: 'stored-token-value',
+        secret: 'stored-secret-value',
+      },
+    }
+    const serializedData = typeRegistry.serialize(stateToPersist)
+    const meta: StateMetadata = {
+      lastUpdated: Date.now(),
+      sessionId: 'merge-omit-paths-test',
+      storeName: 'merge-omit-paths-test',
+    }
+    const persistedState: PersistedState<TestState> = {
+      data: serializedData,
+      meta: meta,
+    }
+    setLocalStorage('merge-omit-paths-test', persistedState)
+
+    const store = createStore(initialState, {
+      persistKey: 'merge-omit-paths-test',
+      storageType: StorageType.Local,
+      plugins: [omitPathsPlugin],
+    })
+
+    const {StoreProvider, useStoreState} = createStoreContext(store)
+    function TestComponent() {
+      const state = useStoreState()
+
+      return (
+        <div style={cardStyle}>
+          <h3>Merge Omit Paths Test</h3>
+          <p>
+            Session Items:{' '}
+            <span data-testid="session-items">{state.session.queuedItems.length}</span>
+          </p>
+          <p>
+            Gallery Version:{' '}
+            <span data-testid="gallery-version">{state.session.galleryVersion}</span>
+          </p>
+          <p>
+            Sensitive Token: <span data-testid="sensitive-token">{state.sensitive.token}</span>
+          </p>
+          <p>
+            Sensitive Secret: <span data-testid="sensitive-secret">{state.sensitive.secret}</span>
+          </p>
+        </div>
+      )
+    }
+    const screen = render(
+      <StoreProvider>
+        <TestComponent />
+      </StoreProvider>
+    )
+    await waitFor(() => {
+      expect(screen.getByTestId('session-items')).toHaveTextContent('0') // Omitted path should not be present
+      expect(screen.getByTestId('sensitive-token')).toHaveTextContent('stored-token-value')
+      expect(screen.getByTestId('sensitive-secret')).toHaveTextContent('init-secret-value') // Omitted path should not be present
+      expect(screen.getByTestId('gallery-version')).toHaveTextContent('1')
+    })
   })
 })
