@@ -17,7 +17,7 @@ import React, {
   type ReactNode,
   type ComponentType,
 } from 'react'
-import type {Store, ReadOnlyStore, Thunk} from '../core/state/index'
+import type {Store, ReadOnlyStore, Thunk, FlexiblePath, PathsOf} from '../core/state/index'
 import type {
   Selector,
   DependencyListener,
@@ -36,7 +36,8 @@ import type {
   StoreContextValue,
   StoreContextResult,
   UseSubscribeToHook,
-  ExtractStateFromStore,
+  UseSubscribeToPathHook,
+  UseStoreHook,
 } from './types'
 
 // Cache for store hooks to avoid recreating them
@@ -89,11 +90,9 @@ const globalStoreHooks = new WeakMap<
  * @see {@link StoreContextResult} for all available hooks and their documentation
  * @see {@link Store} for the store interface
  */
-export function createStoreContext<T extends Store<any>>(
-  store: T
-): Prettify<StoreContextResult<ExtractStateFromStore<T>>> {
-  type S = ExtractStateFromStore<T>
-
+export function createStoreContext<S extends object = any>(
+  store: Store<S>
+): Prettify<StoreContextResult<S>> {
   const StoreContext = createContext<StoreContextValue<S> | null>(null)
   StoreContext.displayName = 'StoreContext'
 
@@ -109,7 +108,7 @@ export function createStoreContext<T extends Store<any>>(
   }
   StoreProvider.displayName = 'StoreProvider'
 
-  const useStore = (): Store<S> => {
+  const useStore: UseStoreHook<S> = (): Store<S> => {
     const context = useContext(StoreContext)
     if (!context) {
       throw new Error('useStore must be used within a StoreProvider')
@@ -237,8 +236,8 @@ export function createStoreContext<T extends Store<any>>(
     }, [store, selector, options?.immediate])
   }
 
-  const useSubscribeToPath = <T = any>(
-    path: string | (string | number)[],
+  const useSubscribeToPath: UseSubscribeToPathHook<S> = <T = any>(
+    path: string | FlexiblePath | PathsOf<S>,
     listener: DependencyListener<T>,
     options?: DependencySubscriptionOptions
   ) => {
@@ -253,6 +252,7 @@ export function createStoreContext<T extends Store<any>>(
         options
       )
     }, [store, path, options?.immediate])
+    return () => {}
   }
 
   const useStoreValue = <T = any>(path: string | (string | number)[]): T => {
@@ -301,12 +301,7 @@ export function createStoreContext<T extends Store<any>>(
   const useUpdatePath = () => {
     const store = useStore()
 
-    return useCallback(
-      <V = any>(path: (string | number)[], updater: (currentValue: V) => V) => {
-        store.updatePath(path, updater)
-      },
-      [store]
-    )
+    return useCallback(store.updatePath, [store])
   }
 
   const useStoreHistory = () => {
@@ -374,7 +369,14 @@ export function createStoreContext<T extends Store<any>>(
       [dispatch]
     )
 
-    return {execute, loading, error}
+    return useMemo(
+      () => ({
+        execute,
+        loading,
+        error,
+      }),
+      [execute, loading, error]
+    )
   }
 
   const useStoreEffect = <R>(
@@ -718,12 +720,7 @@ export function useStoreHooks<S extends object>(
       },
 
       useUpdatePath: () => {
-        return useCallback(
-          <V = any>(path: (string | number)[], updater: (currentValue: V) => V) => {
-            store.updatePath(path, updater)
-          },
-          [store]
-        )
+        return useCallback(store.updatePath, [store])
       },
 
       useStoreHistory: () => {
@@ -786,7 +783,14 @@ export function useStoreHooks<S extends object>(
           [store]
         )
 
-        return {execute, loading, error}
+        return useMemo(
+          () => ({
+            execute,
+            loading,
+            error,
+          }),
+          [execute, loading, error]
+        )
       },
 
       useStoreEffect: <R>(

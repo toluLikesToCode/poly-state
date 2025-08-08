@@ -27,5 +27,5 @@
       }
     }
   ],
-  "ignorePatterns": ["dist/", "node_modules/", "coverage/", "*.d.ts"]
+  "ignorePatterns": ["dist/", "node_modules/", "coverage/", "*.d.ts", "*.config.js"]
 }

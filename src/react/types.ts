@@ -17,13 +17,23 @@
  */
 
 import type {ReactNode, ComponentType, DependencyList} from 'react'
-import type {Store, ReadOnlyStore, Thunk} from '../core/state/index'
+import type {
+  Store,
+  ReadOnlyStore,
+  Thunk,
+  PathsOf,
+  FlexiblePath,
+  TypedPathUpdater,
+  FlexiblePathUpdater,
+  EnhancedPathUpdater,
+} from '../core/state/index'
 import type {
   Selector,
   DependencyListener,
   DependencySubscriptionOptions,
 } from '../core/selectors/index'
 import type {Draft} from 'immer'
+import {PathValue} from '../core/state/state-types/path-types'
 
 /**
  * Context value containing the store instance
@@ -163,36 +173,67 @@ export type UseSubscribeToHook<S extends object> = <R>(
 ) => void
 
 /**
- * Hook that subscribes to changes at a specific state path
- * @template T - The type of value at the path
- * @param path - Dot-separated path to the state value (e.g., 'user.profile.name')
- * @param listener - Callback invoked when the path value changes
- * @param options - Optional subscription configuration
- * @public
+ * Hook to subscribe to changes at a specific state path.
+ *
+ * This hook allows you to listen for changes to a specific value within the store state,
+ * identified by a dot-separated string path (e.g., 'user.profile.name') or an array path (e.g., ['todos', 0, 'completed']).
+ * The provided listener function is called whenever the value at the specified path changes.
+ *
+ * @template T - The type of the value at the specified path
+ * @param path - The path to the value in the state to observe. Accepts a dot-separated string (e.g., 'user.name') or an array of keys/indices (e.g., ['todos', 0, 'completed']).
+ * @param listener - Callback invoked with the new and previous value whenever the value at the path changes. Receives (newValue, oldValue).
+ * @param options - Optional configuration object. If `{ immediate: true }` is provided, the listener is called immediately on mount with the current value.
+ * @returns void
+ *
+ * @remarks
+ * - The listener is automatically unsubscribed when the component unmounts.
+ * - Supports both primitive and deeply nested values.
+ * - Useful for triggering side effects in response to specific state changes.
  *
  * @example
- * ```tsx
+ * // Listen for theme changes and update the document body class
  * useSubscribeToPath(
  *   'user.preferences.theme',
  *   (newTheme, oldTheme) => {
- *     updateThemeClass(newTheme);
- *     saveThemePreference(newTheme);
- *   }
+ *     document.body.className = `theme-${newTheme}`;
+ *     console.log(`Theme changed from ${oldTheme} to ${newTheme}`);
+ *   },
+ *   { immediate: true }
  * );
  *
+ * @example
+ * // Listen for changes to a specific todo's completion status
  * useSubscribeToPath(
  *   ['todos', 0, 'completed'],
  *   (isCompleted) => {
  *     if (isCompleted) showCelebration();
  *   }
  * );
- * ```
+ *
+ * @see UseSubscribeToPathHook
  */
-export type UseSubscribeToPathHook = <T = any>(
-  path: string | (string | number)[],
-  listener: DependencyListener<T>,
-  options?: DependencySubscriptionOptions
-) => void
+export type UseSubscribeToPathHook<S extends object> = {
+  /**
+   * Type-safe path subscription with compile-time validation.
+   * @template P - Path tuple type (must be valid for S)
+   * @template T - Value type at path
+   */
+  <P extends PathsOf<S>>(
+    path: P,
+    listener: DependencyListener<PathValue<S, P>>,
+    options?: DependencySubscriptionOptions
+  ): () => void
+
+  /**
+   * Flexible path subscription for runtime paths.
+   * @template T - Value type at path (defaults to any)
+   */
+  <T = any>(
+    path: FlexiblePath | string,
+    listener: DependencyListener<T>,
+    options?: DependencySubscriptionOptions
+  ): () => void
+}
 
 /**
  * Hook that accesses a specific value by path and subscribes to its changes
@@ -273,31 +314,42 @@ export type UseTransactionHook<S extends object> = () => (
 export type UseBatchHook = () => (fn: () => void) => void
 
 /**
- * Hook that provides a function for updating values at specific paths
- * @returns Function that updates a value at a given path using an updater function
+ * Hook that provides functions for updating values at specific paths with enhanced type safety
+ * @template S - The shape of the state object
+ * @returns Object containing updatePath methods with different type safety levels
  * @public
  *
  * @example
  * ```tsx
  * const updatePath = useUpdatePath();
  *
- * const incrementCount = () => {
- *   updatePath(['count'], (current: number) => current + 1);
- * };
+ * // Type-safe path updates (compile-time validated)
+ * updatePath(['user', 'profile', 'name'], (current: string) => current.toUpperCase());
+ * updatePath(['count'], (current: number) => current + 1);
  *
- * const updateUserName = (name: string) => {
- *   updatePath(['user', 'name'], () => name);
- * };
+ * // Flexible runtime path updates with explicit typing
+ * updatePath<string>(['user', 'email'], () => 'new@email.com');
  *
- * const toggleTodoComplete = (index: number) => {
- *   updatePath(['todos', index, 'completed'], (current: boolean) => !current);
- * };
+ * // Delete a property by returning undefined
+ * updatePath(['user', 'temporaryFlag'], () => undefined);
+ *
+ * // Direct value assignment
+ * updatePath(['todos', 0, 'completed'], true);
+ *
+ * // Array operations with proper typing
+ * updatePath(['todos'], (todos) => [...todos, newTodo]);
  * ```
  */
-export type UseUpdatePathHook = () => <V = any>(
-  path: (string | number)[],
-  updater: (currentValue: V) => V
-) => void
+export type UseUpdatePathHook<S extends object> = () => {
+  // Type-safe updatePath with compile-time path validation
+  <P extends PathsOf<S>>(path: P, updater: TypedPathUpdater<S, P>): void
+
+  // Flexible updatePath for runtime paths with value type inference
+  <V = any>(path: FlexiblePath, updater: FlexiblePathUpdater<V>): void
+
+  // Most flexible updatePath for complex runtime scenarios
+  (path: (string | number)[], updater: EnhancedPathUpdater<any>): void
+}
 
 /**
  * Store history state information
@@ -493,8 +545,47 @@ export interface StoreHooks<S extends object> {
   useStoreState: UseStoreStateHook<S>
   /** Hook to subscribe to changes in a specific selected value */
   useSubscribeTo: UseSubscribeToHook<S>
-  /** Hook to subscribe to changes at a specific state path */
-  useSubscribeToPath: UseSubscribeToPathHook
+  /**
+   * Hook to subscribe to changes at a specific state path.
+   *
+   * This hook allows you to listen for changes to a specific value within the store state,
+   * identified by a dot-separated string path (e.g., 'user.profile.name') or an array path (e.g., ['todos', 0, 'completed']).
+   * The provided listener function is called whenever the value at the specified path changes.
+   *
+   * @template T - The type of the value at the specified path
+   * @param path - The path to the value in the state to observe. Accepts a dot-separated string (e.g., 'user.name') or an array of keys/indices (e.g., ['todos', 0, 'completed']).
+   * @param listener - Callback invoked with the new and previous value whenever the value at the path changes. Receives (newValue, oldValue).
+   * @param options - Optional configuration object. If `{ immediate: true }` is provided, the listener is called immediately on mount with the current value.
+   * @returns void
+   *
+   * @remarks
+   * - The listener is automatically unsubscribed when the component unmounts.
+   * - Supports both primitive and deeply nested values.
+   * - Useful for triggering side effects in response to specific state changes.
+   *
+   * @example
+   * // Listen for theme changes and update the document body class
+   * useSubscribeToPath(
+   *   'user.preferences.theme',
+   *   (newTheme, oldTheme) => {
+   *     document.body.className = `theme-${newTheme}`;
+   *     console.log(`Theme changed from ${oldTheme} to ${newTheme}`);
+   *   },
+   *   { immediate: true }
+   * );
+   *
+   * @example
+   * // Listen for changes to a specific todo's completion status
+   * useSubscribeToPath(
+   *   ['todos', 0, 'completed'],
+   *   (isCompleted) => {
+   *     if (isCompleted) showCelebration();
+   *   }
+   * );
+   *
+   * @see UseSubscribeToPathHook
+   */
+  useSubscribeToPath: UseSubscribeToPathHook<S>
   /** Hook to access a specific value by path and subscribe to its changes */
   useStoreValue: UseStoreValueHook
   /** Hook to get a transaction function for atomic state updates */
@@ -502,7 +593,7 @@ export interface StoreHooks<S extends object> {
   /** Hook to get a batch function for grouping multiple updates */
   useBatch: UseBatchHook
   /** Hook to get a function for updating values at specific paths */
-  useUpdatePath: UseUpdatePathHook
+  useUpdatePath: UseUpdatePathHook<S>
   /** Hook to access store history and undo/redo functionality */
   useStoreHistory: UseStoreHistoryHook<S>
   /** Hook to execute thunks (sync or async functions) */

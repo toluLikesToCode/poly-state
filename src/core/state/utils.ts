@@ -57,11 +57,11 @@ export function assignState<S extends object>(
 
 /**
  * Recursively merges source into target, handling arrays, Maps, Sets, Dates, and custom classes.
- * Arrays are replaced, Maps/Sets are shallow copied, Dates are cloned, and custom classes are replaced
- * unless a typeRegistry is provided to handle serialization/deserialization.
- * @param target - The target object to merge into
- * @param source - The source object to merge from
- * @param typeRegistry - Optional TypeRegistry for custom class handling
+ * Plain objects are shallow-merged (replaced), not recursively merged, to ensure deletions are respected.
+ *
+ * @param target - The target object to merge into.
+ * @param source - The source object to merge from.
+ * @param typeRegistry - Optional TypeRegistry for custom class handling.
  */
 function deepMerge(target: any, source: any, typeRegistry?: {findTypeFor: (value: any) => any}) {
   for (const key of Object.keys(source)) {
@@ -105,34 +105,22 @@ function deepMerge(target: any, source: any, typeRegistry?: {findTypeFor: (value
 
     // Handle custom class or registered type
     if (typeof srcVal === 'object' && srcVal.constructor && srcVal.constructor !== Object) {
-      // If a typeRegistry is provided, try to use it
       if (typeRegistry) {
         const typeDef = typeRegistry.findTypeFor(srcVal)
         if (typeDef) {
-          // Use serialize/deserialize to ensure correct type
           target[key] = typeDef.deserialize(typeDef.serialize(srcVal))
           continue
         }
       }
-      // Otherwise, just replace the value (shallow copy)
       target[key] = srcVal
       continue
     }
 
-    // Handle plain object
-    if (typeof srcVal === 'object' && srcVal !== null && srcVal.constructor === Object) {
-      // If the new object is empty, replace the old object
-      if (Object.keys(srcVal).length === 0) {
-        target[key] = {}
-        continue
-      }
-      // If the target is not an object, replace it
-      if (!tgtVal || typeof tgtVal !== 'object' || tgtVal.constructor !== Object) {
-        target[key] = {...srcVal}
-        continue
-      }
-      // Otherwise, merge recursively
-      deepMerge(target[key], srcVal)
+    // Handle plain object: **REPLACE** instead of recursive merge
+    if (typeof srcVal === 'object' && srcVal !== null) {
+      // By replacing the object, we ensure that keys present in the old state
+      // but absent in the new state are correctly removed.
+      target[key] = srcVal
       continue
     }
 
@@ -144,7 +132,7 @@ function deepMerge(target: any, source: any, typeRegistry?: {findTypeFor: (value
 /**
  * Clean up stale persisted states across all storage types
  */
-export function cleanupStaleStates(
+export function cleanupStaleStates<S extends object>(
   maxAge: number = 30 * 24 * 60 * 60 * 1000,
   cookiePrefix: string = '__store_' // Default prefix
 ): {
@@ -166,7 +154,7 @@ export function cleanupStaleStates(
       const key = localStorage.key(i)
       if (key) {
         try {
-          const item = storage.getLocalStorage<PersistedState<any>>(key, {} as PersistedState<any>)
+          const item = storage.getLocalStorage<S>(key)
           if (item && item.meta && now - item.meta.lastUpdated > maxAge) {
             storage.removeLocalStorage(key)
             result.local++

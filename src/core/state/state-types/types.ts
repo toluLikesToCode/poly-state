@@ -8,6 +8,10 @@ import type {
 import type {Middleware} from './middlewear-types'
 export type {Middleware}
 
+// Import and re-export path utility types
+import type {PathsOf, FlexiblePath, PathValue} from './path-types'
+export type {PathsOf, FlexiblePath}
+
 /**
  * Type definition for custom serialization/deserialization of complex objects
  * @template T - The type of the object being handled
@@ -43,6 +47,13 @@ export interface TypeDefinition<T> {
 /**
  * Function that receives state updates
  * @typeParam S - The type of the state
+ *
+ * @remarks
+ * The store invokes listeners synchronously and does not await their return value.
+ * If you provide an async function, it will be treated as fire-and-forget:
+ * - It will not block other listeners or subsequent state updates.
+ * - Errors thrown after an `await` won't be caught by the store. Wrap your logic in try/catch.
+ * - Multiple async runs may overlap across rapid state changes; serialize if ordering matters.
  */
 export type Listener<S extends object> = (newState: S, prevState?: S) => void
 
@@ -57,10 +68,18 @@ export type Dispatch<S extends object> = {
 
 export type Path = (string | number)[]
 
+type updatePathMethodType<S extends object> = {
+  <P extends PathsOf<S>>(path: P, updater: TypedPathUpdater<S, P>): void
+
+  <V = any>(path: FlexiblePath, updater: FlexiblePathUpdater<V>): void
+
+  (path: (string | number)[], updater: EnhancedPathUpdater<any>): void
+}
+
 export type ThunkContext<S extends object> = {
   dispatch: Dispatch<S>
   getState: () => S
-  updatePath: <V = any>(path: Path, updater: (currentValue: V) => V) => void
+  updatePath: updatePathMethodType<S>
   transaction: (recipe: (draft: Draft<S>) => void) => boolean
   batch: (fn: () => void) => void
 }
@@ -99,6 +118,37 @@ export interface CookieStorageOptions {
   domain?: string
   secure?: boolean
   sameSite?: 'Strict' | 'Lax' | 'None'
+}
+
+/**
+ * Defines the configuration for a single persistence strategy.
+ * @template S - The type of the store's state.
+ */
+export interface PersistenceConfig {
+  /** The key to use for this specific storage instance. */
+  persistKey: string
+
+  /** The type of storage to use (e.g., local, session, cookie). */
+  storageType: StorageType
+
+  /**
+   * Specific options for the storage type. Currently used for cookies.
+   */
+  cookieOptions?: CookieStorageOptions
+
+  /**
+   * An array of paths to explicitly include in persistence for this target.
+   * If provided, only these paths will be saved. Takes precedence over global ephemeralPaths.
+   * @example [['user', 'profile'], ['settings']]
+   */
+  includePaths?: Path[]
+
+  /**
+   * An array of paths to explicitly exclude from persistence for this target.
+   * This takes precedence over includePaths.
+   * @example [['user', 'tokens'], ['tempData']]
+   */
+  excludePaths?: Path[]
 }
 
 export interface historyChangePluginOptions<S extends object> {
@@ -307,6 +357,12 @@ export interface StoreOptions<S extends object> {
   storageType?: StorageType
   cookieOptions?: CookieStorageOptions
   cookiePrefix?: string // For improved cookie cleanup
+  /**
+   * An array of persistence configurations. Each object defines a storage
+   * target, its options, and the state paths it manages.
+   */
+  persistence?: PersistenceConfig[]
+
   syncAcrossTabs?: boolean
   middleware?: Middleware<S>[]
   historyLimit?: number
@@ -521,11 +577,28 @@ export interface ReadOnlyStore<S extends object> {
    * @see {@link Store.subscribeTo} for selector-based subscriptions
    * @see {@link Store.subscribeToMultiple} for multiple value subscriptions
    */
-  subscribeToPath: <T = any>(
-    path: string | Path,
-    listener: DependencyListener<T>,
-    options?: DependencySubscriptionOptions
-  ) => () => void
+  subscribeToPath: {
+    /**
+     * Type-safe path subscription with compile-time validation.
+     * @template P - Path tuple type (must be valid for S)
+     * @template T - Value type at path
+     */
+    <P extends PathsOf<S>>(
+      path: P,
+      listener: DependencyListener<PathValue<S, P>>,
+      options?: DependencySubscriptionOptions
+    ): () => void
+
+    /**
+     * Flexible path subscription for runtime paths.
+     * @template T - Value type at path (defaults to any)
+     */
+    <T = any>(
+      path: FlexiblePath | string,
+      listener: DependencyListener<T>,
+      options?: DependencySubscriptionOptions
+    ): () => void
+  }
 
   /**
    * Creates a memoized selector function for deriving computed values from the store state.
@@ -639,6 +712,103 @@ export interface ReadOnlyStore<S extends object> {
     currentIndex: number
     initialState: Readonly<S> | null
   }
+}
+
+/**
+ * Enhanced path updater that provides better type safety and supports deletion.
+ *
+ * @template V - The type of the value at the specified path
+ */
+export type EnhancedPathUpdater<V = any> =
+  | ((currentValue: V) => V)
+  | ((currentValue: V) => V | undefined) // Allow returning undefined to delete
+  | V
+  | undefined // Allow undefined to delete the property
+
+// /**
+//  * Type-safe path updater that ensures the updater function matches the expected value type.
+//  * This version provides compile-time guarantees about the path-value relationship.
+//  *
+//  * @template S - The state type
+//  * @template P - The path tuple type
+//  */
+// export type TypedPathUpdater<S extends object, P extends FlexiblePath> =
+//   PathValue<S, P> extends infer V
+//     ? V extends never
+//       ? never // Invalid path
+//       : EnhancedPathUpdater<V>
+//     : never
+
+/**
+ * Type-safe path updater that ensures the updater function matches the expected value type.
+ * This version provides compile-time guarantees about the path-value relationship.
+ *
+ * @template S - The state type
+ * @template P - The path tuple type
+ */
+export type TypedPathUpdater<S extends object, P extends FlexiblePath> = P extends readonly [
+  infer K,
+  ...infer Rest,
+]
+  ? K extends keyof S
+    ? Rest extends readonly (string | number)[]
+      ? Rest extends readonly []
+        ? EnhancedPathUpdater<S[K]>
+        : Rest extends FlexiblePath
+          ? TypedPathUpdater<S[K] extends object ? S[K] : never, Rest>
+          : never
+      : never
+    : K extends number
+      ? S extends readonly (infer Item)[]
+        ? Rest extends readonly (string | number)[]
+          ? Rest extends readonly []
+            ? EnhancedPathUpdater<Item>
+            : Rest extends FlexiblePath
+              ? TypedPathUpdater<Item extends object ? Item : never, Rest>
+              : never
+          : never
+        : never
+      : never
+  : never
+
+/**
+ * Flexible path updater that works with runtime path validation
+ * while still providing good type inference when possible.
+ */
+export type FlexiblePathUpdater<V = any> = EnhancedPathUpdater<V>
+
+/**
+ * Overloaded updatePath method signatures for maximum type safety and flexibility
+ */
+export interface PathUpdateMethods<S extends object> {
+  /**
+   * Type-safe updatePath with compile-time path validation.
+   * Provides the best type safety when paths are known at compile time.
+   *
+   * @template P - The path tuple type (must be a valid path in S)
+   * @param path - Strongly typed path that must exist in the state structure
+   * @param updater - Type-safe updater function that receives the correct value type
+   */
+  <P extends PathsOf<S>>(path: P, updater: TypedPathUpdater<S, P>): void
+
+  /**
+   * Flexible updatePath for runtime paths with value type inference.
+   * Provides type safety for the updater function when the value type can be inferred.
+   *
+   * @template V - The expected value type at the path
+   * @param path - Array of keys/indices representing the path
+   * @param updater - Updater function that receives and returns values of type V
+   */
+  <V = any>(path: FlexiblePath, updater: FlexiblePathUpdater<V>): void
+
+  /**
+   * Most flexible updatePath for complex runtime scenarios.
+   * Falls back to any typing when type inference isn't possible.
+   *
+   * @param path - Array of keys/indices representing the path
+   * @param updater - Updater function with minimal type constraints
+   */
+  (path: (string | number)[], updater: EnhancedPathUpdater<any>): void
 }
 
 /**
@@ -844,10 +1014,7 @@ export interface Store<S extends object> extends ReadOnlyStore<S> {
 
   /**
    * Updates a value at a specific path in the state using an updater function.
-   *
-   * @template V - The type of the value at the specified path
-   * @param path - Array of keys/indices representing the path to the value
-   * @param updater - Function that receives the current value and returns the new value
+   * This method provides multiple overloads for different levels of type safety.
    *
    * @remarks
    * This method uses Immer's {@link https://immerjs.github.io/immer/produce | produce} function
@@ -879,7 +1046,7 @@ export interface Store<S extends object> extends ReadOnlyStore<S> {
    * @see {@link https://immerjs.github.io/immer/produce | Immer produce documentation}
    * @see {@link transaction} for multiple related updates
    */
-  updatePath: <V = any>(path: Path, updater: (currentValue: V) => V) => void
+  updatePath: updatePathMethodType<S>
 
   /**
    * Batches multiple state updates into a single notification to subscribers.
@@ -979,7 +1146,6 @@ export interface Store<S extends object> extends ReadOnlyStore<S> {
    * @see {@link https://immerjs.github.io/immer/typescript | Immer TypeScript documentation}
    * @see {@link batch} for batching multiple state updates
    */
-
   transaction: (recipe: (draft: Draft<S>) => void) => boolean
 
   /**
@@ -1084,6 +1250,35 @@ export interface Store<S extends object> extends ReadOnlyStore<S> {
       }
     ) => R
   ) => (params: Props) => (() => R) & {lastValue?: R}
+
+  /**
+   * Waits for any persisted state to finish loading.
+   *
+   * @remarks
+   * This method returns a promise that resolves when the store has completed loading
+   * any persisted state from storage. This is useful when you need to ensure that
+   * the store has its persisted state before performing operations that depend on it.
+   *
+   * The store creation itself remains synchronous, but this method allows consumers
+   * to wait for the async state loading to complete when needed.
+   *
+   * @returns Promise that resolves when state loading is complete
+   *
+   * @example
+   * ```typescript
+   * const store = createStore(initialState, { persistKey: 'myStore' });
+   *
+   * // Wait for persisted state to load before using the store
+   * await store.waitForStateLoad();
+   * console.log('Store now has persisted state loaded');
+   *
+   * // Now safe to use store with confidence that persisted state is loaded
+   * const currentState = store.getState();
+   * ```
+   *
+   * @see {@link StoreOptions.persistKey} for state persistence configuration
+   */
+  waitForStateLoad: () => Promise<void>
 
   /**
    * Internal method for Redux DevTools to set state directly without going through dispatch.

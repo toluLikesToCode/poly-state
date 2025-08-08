@@ -1,4 +1,5 @@
 import {StorageError} from '../../shared/errors'
+import {PersistedState} from '../state/state-types/types'
 
 /**
  * The key used to store the client session ID in localStorage.
@@ -67,9 +68,9 @@ function handleStorageError(operation: string, key: string, error: unknown): voi
 /**
  * Gets a value from localStorage and parses it from JSON.
  */
-export function getLocalStorage<T>(
+export function getLocalStorage<S extends object, T = PersistedState<S>>(
   key: string,
-  fallback: T,
+  fallback: T = {} as T,
   reviver?: (this: any, key: string, value: any) => any
 ): T {
   try {

@@ -40,7 +40,7 @@ export class PersistenceManager<S extends object> {
   private readonly handleError: (error: StoreError) => void
   private readonly name: string
   private readonly sessionId: string
-  private readonly adapter?: StorageAdapter
+  private readonly adapter?: StorageAdapter<PersistedState<S>>
 
   constructor(
     storageType: StorageType,
@@ -210,17 +210,91 @@ export class PersistenceManager<S extends object> {
   ): Promise<boolean> {
     return withErrorRecovery(
       async () => {
-        return this.persistState(persistKey, state, plugins, store)
+        const storageKey = this.getStorageKey(persistKey)
+        if (!storageKey || !this.isStorageAvailable()) return false
+
+        try {
+          const serializedData = this.typeRegistry.serialize(state)
+          const meta: StateMetadata = {
+            lastUpdated: Date.now(),
+            sessionId: this.sessionId,
+            storeName: this.name,
+          }
+          const persistedState: PersistedState<S> = {
+            data: serializedData,
+            meta: meta,
+          }
+          try {
+            // Apply any plugin transformations
+            const beforePersistedState = plugins.beforePersist(
+              persistedState.data,
+              this.storageType,
+              store
+            )
+            if (beforePersistedState) {
+              persistedState.data = beforePersistedState
+            }
+          } catch (e: any) {
+            this.handleError(
+              new MiddlewareError('Plugin error during beforePersist', {
+                operation: 'beforePersist',
+                error: e,
+                key: storageKey,
+                sessionId: this.sessionId,
+              })
+            )
+          }
+          if (this.adapter) {
+            const success = await this.adapter.set(storageKey, persistedState)
+            if (!success) {
+              throw new StoreError('Failed to persist state using adapter', {
+                adapter: this.adapter?.constructor?.name ?? 'UnknownAdapter',
+              })
+            }
+          } else {
+            switch (this.storageType) {
+              case StorageType.Local:
+                setLocalStorage(storageKey, persistedState)
+                break
+              case StorageType.Session:
+                setSessionStorage(storageKey, persistedState)
+                break
+              case StorageType.Cookie:
+                setCookie(storageKey, JSON.stringify(persistedState), this.cookieOptions)
+                break
+            }
+          }
+          // Notify plugins after successful persistence
+          try {
+            plugins.onPersisted(persistedState.data, this.storageType, store)
+          } catch (error) {
+            this.handleError(
+              new MiddlewareError('Plugin error during onPersisted', {
+                operation: 'onPersisted',
+                error: error,
+                key: storageKey,
+                sessionId: this.sessionId,
+              })
+            )
+          }
+
+          return true
+        } catch (e: any) {
+          throw new PersistenceError('Failed to persist state', {
+            operation: 'persistState',
+            error: e,
+            key: storageKey,
+            sessionId: this.sessionId,
+          })
+        }
       },
       {
-        maxRetries: 3,
-        retryDelay: 100,
+        maxRetries: 2,
+        retryDelay: 50,
         fallbackValue: false,
         onRetry: (attempt, error) => {
-          console.warn(
-            `[PersistenceManager] Retry ${attempt} for persist operation:`,
-            error.message
-          )
+          console.warn(`[PersistenceManager] Retry ${attempt} for persist operation:`)
+          this.handleError(error)
         },
       }
     )
@@ -239,17 +313,14 @@ export class PersistenceManager<S extends object> {
     if (!storageKey || !this.isStorageAvailable()) return null
 
     try {
-      let wrappedState: PersistedState<any> | null = null
+      let wrappedState: PersistedState<S> | null = null
 
       switch (this.storageType) {
         case StorageType.Local:
-          wrappedState = getLocalStorage<PersistedState<any>>(storageKey, {} as PersistedState<any>)
+          wrappedState = getLocalStorage<S>(storageKey)
           break
         case StorageType.Session:
-          wrappedState = getSessionStorage<PersistedState<any>>(
-            storageKey,
-            {} as PersistedState<any>
-          )
+          wrappedState = getSessionStorage<S>(storageKey)
           break
         case StorageType.Cookie:
           const cookieValue = getCookie(storageKey)
@@ -302,7 +373,7 @@ export class PersistenceManager<S extends object> {
   /**
    * Load state with error recovery
    */
-  public async loadStateWithRecovery(
+  public async loadStateAsync(
     persistKey: string | undefined,
     staleAge: number,
     plugins: PluginManager<S>,
@@ -310,14 +381,73 @@ export class PersistenceManager<S extends object> {
   ): Promise<Partial<S> | null> {
     return withErrorRecovery(
       async () => {
-        return this.loadState(persistKey, staleAge, plugins, store)
+        const storageKey = this.getStorageKey(persistKey)
+        if (!storageKey || !this.isStorageAvailable()) return null
+
+        try {
+          let wrappedState: PersistedState<S> | null = null
+          if (this.adapter) {
+            wrappedState = await this.adapter.get(storageKey)
+          } else {
+            switch (this.storageType) {
+              case StorageType.Local:
+                wrappedState = getLocalStorage<S>(storageKey)
+                break
+              case StorageType.Session:
+                wrappedState = getSessionStorage<S>(storageKey)
+                break
+              case StorageType.Cookie:
+                const cookieValue = getCookie(storageKey)
+                if (cookieValue) wrappedState = JSON.parse(cookieValue)
+                break
+            }
+          }
+
+          if (wrappedState && wrappedState.meta) {
+            if (Date.now() - wrappedState.meta.lastUpdated > staleAge) {
+              console.warn(`Discarding stale state for ${storageKey}`)
+              this.removeState(persistKey)
+              return null
+            } else {
+              const data = this.typeRegistry.deserialize(wrappedState.data) as Partial<S>
+              // Notify plugins after loading state
+              try {
+                const loadedState = plugins.onStateLoaded(data, this.storageType, store)
+                if (loadedState) {
+                  return loadedState
+                } else {
+                  return data
+                }
+              } catch (e: any) {
+                this.handleError(
+                  new MiddlewareError('Plugin error during onStateLoaded', {
+                    operation: 'onStateLoaded',
+                    error: e,
+                    key: storageKey,
+                    sessionId: this.sessionId,
+                  })
+                )
+              }
+              return data
+            }
+          }
+
+          return null
+        } catch (e: any) {
+          throw new PersistenceError('Failed to load persisted state', {
+            operation: 'loadState',
+            error: {message: e.message || 'Unknown error', errObj: JSON.stringify(e)},
+            key: storageKey,
+          })
+        }
       },
       {
         maxRetries: 2,
         retryDelay: 50,
         fallbackValue: null,
         onRetry: (attempt, error) => {
-          console.warn(`[PersistenceManager] Retry ${attempt} for load operation:`, error.message)
+          console.warn(`[PersistenceManager] Retry ${attempt} for load operation:`)
+          this.handleError(error)
         },
       }
     )

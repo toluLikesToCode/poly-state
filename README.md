@@ -243,6 +243,16 @@ store.updatePath(['user', 'preferences', 'theme'], currentTheme =>
 - **subscribeToPath(path, listener)**: Subscribes to changes at a specific nested path (e.g.,
   'user.name').
 
+Async listeners and cautions
+
+- Listeners (subscribe, subscribeTo, subscribeToPath) are invoked synchronously by the store. If a
+  listener is async and returns a Promise, the store won’t await it (fire-and-forget).
+- Errors after an await won’t be caught by the store unless you handle them. Wrap async work in
+  try/catch or attach your own .catch.
+- Multiple async executions can overlap on rapid updates; queue or guard if ordering matters.
+- Prefer thunks or middleware for async flows that need ordering, cancellation, or centralized error
+  handling.
+
 #### Selectors
 
 **select(selector)**: Creates a memoized selector to compute derived data. The selector only
@@ -381,6 +391,11 @@ useStoreEffect(
 **useSubscribeTo(selector, listener)**: A lower-level hook to subscribe a listener function to state
 changes.
 
+Note on async listeners
+
+- These hooks follow the same listener semantics as the core store: async listeners are not awaited
+  and may run concurrently. Handle errors inside the listener and guard ordering if needed.
+
 **useSubscribeToPath(path, listener)**: Subscribes a listener to a specific nested path.
 
 ### React History
@@ -400,6 +415,97 @@ function HistoryControls() {
   );
 }
 ```
+
+## Plugins
+
+### Omit Paths Plugin (redact fields before persistence)
+
+Redacts configured paths from persisted snapshots while keeping in-memory state intact. Useful for
+tokens, secrets, ephemeral queues, or any data that should not be written to storage or synced
+across tabs.
+
+- Works with objects and arrays
+- Supports wildcards '\*' at any level
+  - Intermediate '\*' applies to all keys/indices at that level
+  - Trailing '\*' clears the entire collection (array -> [], object -> {})
+- Missing keys and out-of-bounds indices are ignored with dev-time warnings
+- Sanitizes undefined values to avoid serialization issues
+
+Basic usage
+
+```ts
+import {createStore, StorageType, createOmitPathsPlugin} from 'poly-state'
+
+interface AppState {
+  user: {name: string; token?: string}
+  logs: string[]
+}
+
+const initialState: AppState = {user: {name: 'John', token: 'secret'}, logs: ['a', 'b']}
+
+const omitPlugin = createOmitPathsPlugin<AppState>([
+  ['user', 'token'], // remove user.token from persistence
+])
+
+const store = createStore(initialState, {
+  persistKey: 'app-state',
+  storageType: StorageType.Local,
+  plugins: [omitPlugin],
+})
+```
+
+Wildcards and deep paths
+
+```ts
+// Redact password for every account entry
+const redactPasswords = createOmitPathsPlugin<{
+  accounts: Array<{id: string; profile: {password?: string; email: string}}>
+}>([['accounts', '*', 'profile', 'password']])
+
+// Clear entire logs array in persisted snapshot (kept in memory)
+const clearLogs = createOmitPathsPlugin<{logs: string[]}>([['logs', '*']])
+
+// Target nested private field of the first item only
+const redactFirstOnly = createOmitPathsPlugin<{
+  nested: {items: Array<{meta: {public: string; private?: string}}>}
+}>([['nested', 'items', 0, 'meta', 'private']])
+```
+
+Restoring omitted fields on load
+
+```ts
+// Provide an initial baseline used to restore omitted paths after loading from storage
+const withBaseline = createOmitPathsPlugin(initialState /* paths: */ [
+  ['user', 'token'],
+], /* name */ 'omitSecrets', /* initialStateParam */ initialState)
+```
+
+Edge cases and behavior
+
+- Missing keys / out-of-bounds indices: safely ignored, dev warnings in non-production
+- Trailing '\*' at final segment clears arrays/objects ([], {}) in the persisted snapshot
+- Null/undefined values are sanitized; undefined keys are dropped during persistence
+- Cross-tab sync merges remote state with current state while preserving omitted paths from memory
+- If the plugin cannot capture initial state at store creation and no baseline is provided, the
+  loaded state is returned (sanitized) and a dev warning is emitted
+
+Gotchas (read this before using)
+
+- Persistence vs runtime: redaction only affects what is written to storage/sync. In-memory state
+  still contains those fields. Do not assume they are removed at runtime.
+- Array indices are positional: using 0 targets only the first item at persistence time. If order
+  changes, you may affect a different item. Prefer '\*' when you mean "all items".
+- Restoration baseline: if onStoreCreate cannot capture the initial state and you do not pass
+  initialStateParam, omitted paths cannot be restored on load. The sanitized loaded snapshot will be
+  used as-is with a dev warning.
+- Not a security boundary: secrets remain in memory and can be logged or exposed by your app. This
+  plugin prevents writing them to storage/sync only.
+- Parent branches are not created: the plugin only removes existing values. Define default branches
+  in your initial state if consumers expect them.
+- Clearing vs removing key: a trailing '_' clears the collection to [] or {} but keeps the parent
+  key. If you need to remove the parent property, target that property directly (without '_').
+- Schemas/validators: if your validation requires a field that you omit, make it optional or provide
+  defaults in the initial state to avoid load-time validation failures.
 
 ## Development & Contributing
 

@@ -94,7 +94,7 @@ const UserProfile: React.FC = () => {
   }
 
   const handleUpdateName = () => {
-    updatePath(['user', 'name'], () => 'Jane Smith')
+    updatePath(['user', 'name'], 'Jane Smith')
   }
 
   return (
@@ -112,7 +112,7 @@ const UserProfile: React.FC = () => {
 const TodoList: React.FC = () => {
   const todos = useSelector(state => state.todos)
   const dispatch = useDispatch()
-  const {execute: addTodoAsync, loading} = useAsyncThunk()
+  const {execute: addTodoAsync, loading, error} = useAsyncThunk()
   const [newTodoText, setNewTodoText] = useState('')
 
   const addTodo = () => {
@@ -133,7 +133,7 @@ const TodoList: React.FC = () => {
 
   const addTodoWithDelay = () => {
     if (newTodoText.trim()) {
-      addTodoAsync(async (dispatch, getState) => {
+      addTodoAsync(async ({dispatch, getState}) => {
         // Simulate API call
         await new Promise(resolve => setTimeout(resolve, 1000))
         const currentState = getState()

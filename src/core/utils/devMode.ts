@@ -129,8 +129,8 @@ export async function getDevModeConfig(): Promise<DevModeConfig> {
       return validatedConfig
     },
     {
-      maxRetries: 2,
-      retryDelay: 100,
+      maxRetries: 1,
+      retryDelay: 30,
       fallbackValue: DEFAULT_DEV_CONFIG,
       onRetry: (attempt, error) => {
         console.warn(`[DevMode] Config load retry ${attempt}:`, error.message)
@@ -173,8 +173,8 @@ export async function setDevModeConfig(config: Partial<DevModeConfig>): Promise<
       }
     },
     {
-      maxRetries: 3,
-      retryDelay: 150,
+      maxRetries: 1,
+      retryDelay: 15,
       fallbackValue: false,
       onRetry: (attempt, error) => {
         console.warn(`[DevMode] Config save retry ${attempt}:`, error.message)

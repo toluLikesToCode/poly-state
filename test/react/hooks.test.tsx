@@ -137,7 +137,7 @@ describe('React Integration – Complete Basic Usage', () => {
   let useSelector: UseSelectorHook<AppState>
   let useThunk: UseThunkHook<AppState>
   let useTransaction: UseTransactionHook<AppState>
-  let useUpdatePath: UseUpdatePathHook
+  let useUpdatePath: UseUpdatePathHook<AppState>
 
   let selectorSpy = vi.fn()
   let selectors: {
@@ -714,7 +714,7 @@ describe('React Integration – Advanced Features', () => {
   let useStoreState: UseStoreStateHook<TestState>
   let useTransaction: UseTransactionHook<TestState>
   let useBatch: UseBatchHook
-  let useUpdatePath: UseUpdatePathHook
+  let useUpdatePath: UseUpdatePathHook<TestState>
   let useStoreValue: UseStoreValueHook
   let useSubscribeToPath: UseSubscribeToPathHook
   let useThunk: UseThunkHook<TestState>

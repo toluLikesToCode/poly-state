@@ -9,14 +9,15 @@
  * @packageDocumentation
  */
 
-import {Plugin} from '../core'
+// import {Plugin} from '../core'
 
 // TODO: Add built in plugins here
 
 export * from './devTools'
+export * from './omitPathsPlugin'
 
-// Example plugin structure for now
-export interface BasePlugin<S extends object> {
-  name: string
-  plugin: Plugin<S>
-}
+// // Example plugin structure for now
+// export interface BasePlugin<S extends object> {
+//   name: string
+//   plugin: Plugin<S>
+// }

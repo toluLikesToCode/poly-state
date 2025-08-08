@@ -1,4 +1,4 @@
-import {beforeEach, describe, expect, it, vi} from 'vitest'
+import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest'
 import {
   createStore,
   getCookie,
@@ -15,9 +15,10 @@ import {
   LocalStorageAdapter,
   SessionStorageAdapter,
   CookieStorageAdapter,
+  Store,
 } from '../../../src/core'
 
-import {withErrorRecovery, StorageError} from '../../../src/shared'
+import {withErrorRecovery} from '../../../src/shared'
 
 describe('Real Browser Storage Tests', () => {
   beforeEach(() => {
@@ -27,12 +28,21 @@ describe('Real Browser Storage Tests', () => {
   })
 
   describe('localStorage Integration', () => {
+    let store: Store<{count: number; name: string}>
+
+    afterEach(() => {
+      // Clean up after each test
+      if (store) {
+        store.destroy({removePersistedState: true})
+      }
+    })
     it('should persist state to real localStorage', () => {
-      const store = createStore(
+      store = createStore(
         {count: 0, name: 'test'},
         {
           persistKey: 'browser-test-store',
           storageType: StorageType.Local,
+          name: 'TEST =>should persist state to real localStorage<=',
         }
       )
 
@@ -47,7 +57,7 @@ describe('Real Browser Storage Tests', () => {
       expect(parsedData.data).toMatchObject({count: 42, name: 'updated'})
     })
 
-    it('should restore state from real localStorage', () => {
+    it('should restore state from real localStorage', async () => {
       // Pre-populate localStorage with test data
       const testData = {
         data: {count: 99, name: 'restored'},
@@ -60,13 +70,14 @@ describe('Real Browser Storage Tests', () => {
       localStorage.setItem('restore-test', JSON.stringify(testData))
 
       // Create new store that should load from localStorage
-      const store = createStore(
+      store = createStore(
         {count: 0, name: 'initial'},
         {
           persistKey: 'restore-test',
           storageType: StorageType.Local,
         }
       )
+      await store.waitForStateLoad()
 
       // Verify state was restored
       expect(store.getState()).toMatchObject({count: 99, name: 'restored'})
@@ -227,12 +238,15 @@ describe('Real Browser Storage Tests', () => {
         }
       )
 
-      // Listen for state changes
-      const stateChanges: any[] = []
-      const listener: Listener<{shared: number}> = (newState, prevState) => {
-        stateChanges.push(newState)
-      }
-      store.subscribe(listener)
+      // Create a promise that resolves when the state changes to the expected value
+      const waitForStateChange = new Promise<void>(resolve => {
+        const listener: Listener<{shared: number}> = newState => {
+          if (newState.shared === 999) {
+            resolve()
+          }
+        }
+        store.subscribe(listener)
+      })
 
       // Simulate another tab changing localStorage
       const newData = {
@@ -255,13 +269,11 @@ describe('Real Browser Storage Tests', () => {
         })
       )
 
-      // Wait for event processing and state update
-      await new Promise(resolve => setTimeout(resolve, 100))
+      // Wait for the specific state change we expect
+      await waitForStateChange
 
       // Assert that the store's state was updated from the storage event
       expect(store.getState().shared).toBe(999)
-      // Optionally, check that the stateChanges array captured the update
-      expect(stateChanges.some(s => s.shared === 999)).toBe(true)
     })
   })
 
@@ -442,7 +454,7 @@ describe('Real Browser Storage Tests', () => {
         },
         {
           maxRetries: 3,
-          retryDelay: 10,
+          retryDelay: 1,
           onRetry: attempt => {
             expect(attempt).toBeGreaterThan(0)
           },
@@ -571,10 +583,10 @@ describe('Real Browser Storage Tests', () => {
         expect(monitor.getLastReport()).toBeNull()
 
         // Start monitoring with short interval for testing
-        monitor.startMonitoring(100)
+        monitor.startMonitoring(10)
 
         // Wait for a couple of cycles
-        await new Promise(resolve => setTimeout(resolve, 250))
+        await new Promise(resolve => setTimeout(resolve, 20))
 
         // Should have run at least one check
         const report = monitor.getLastReport()
@@ -588,9 +600,9 @@ describe('Real Browser Storage Tests', () => {
         expect(monitor.getLastReport()).not.toBeNull()
 
         // Test multiple start/stop cycles
-        monitor.startMonitoring(50)
+        monitor.startMonitoring(10)
         monitor.stopMonitoring()
-        monitor.startMonitoring(50)
+        monitor.startMonitoring(10)
         monitor.stopMonitoring()
 
         // Should still have the report
@@ -1027,8 +1039,8 @@ describe('Real Browser Storage Tests', () => {
         // Mock setItem to fail on first few attempts
         localStorage.setItem = vi.fn((key, value) => {
           attempts++
-          if (attempts <= 2) {
-            // Fail first 2 attempts
+          if (attempts <= 1) {
+            // Fail first attempt
             throw new Error('Transient storage error')
           }
           return originalSetItem.call(localStorage, key, value)
@@ -1037,7 +1049,7 @@ describe('Real Browser Storage Tests', () => {
         // Should succeed after retries
         const result = await setDevModeConfig({verboseLogging: true})
         expect(result).toBe(true)
-        expect(attempts).toBeGreaterThan(2) // Should have made multiple attempts
+        expect(attempts).toBeGreaterThan(1) // Should have made multiple attempts
 
         // Restore original method
         localStorage.setItem = originalSetItem

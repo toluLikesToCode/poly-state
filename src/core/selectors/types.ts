@@ -85,10 +85,34 @@ export interface MemoizedSelector<R> {
  * @param newValue - The new value after the change
  * @param oldValue - The previous value before the change
  *
+ * @remarks
+ * Listeners are treated as synchronous by the store. If you provide an async function,
+ * its returned Promise is not awaited (fire-and-forget). This means:
+ * - State updates and other listeners will not be delayed or sequenced behind your async work.
+ * - Errors thrown after an `await` will not be caught by the store unless you handle them inside
+ *   the listener. The runtime will attach a `.catch(...)` to avoid unhandled rejections, but you
+ *   should still wrap your async code in try/catch for app-specific handling.
+ * - Multiple async invocations can overlap; add your own guards/queues if ordering matters.
+ *
+ * Prefer thunks or middleware for async flows that need ordering, cancellation, or centralized
+ * error handling coordinated with state changes.
+ *
  * @example
  * ```typescript
  * const listener: DependencyListener<string> = (newName, oldName) => {
  *   console.log(`Name changed from ${oldName} to ${newName}`);
+ * };
+ * ```
+ *
+ * @example
+ * ```typescript
+ * // If you use async, handle errors in the listener
+ * const listener: DependencyListener<User> = async (next, prev) => {
+ *   try {
+ *     await analytics.track('user_changed', { id: next.id });
+ *   } catch (e) {
+ *     console.error('analytics failed', e);
+ *   }
  * };
  * ```
  */

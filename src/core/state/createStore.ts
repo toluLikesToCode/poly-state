@@ -26,6 +26,7 @@ import {MiddlewareExecutor} from './middlewear'
 import type {
   ActionPayload,
   CleanupOptions,
+  EnhancedPathUpdater,
   Listener,
   PersistedState,
   ReadOnlyStore,
@@ -35,6 +36,7 @@ import type {
 } from './state-types/types'
 import {StorageType} from './state-types/types'
 import {assignState, cleanupStaleStates} from './utils'
+import {PathValue, PathsOf} from './state-types/path-types'
 
 // Enable Immer features for better performance and functionality
 immer.enableMapSet()
@@ -248,7 +250,17 @@ export function createStore<S extends object>(
 
     listeners.forEach(listener => {
       try {
-        listener(safeCurrentState, safePrevState)
+        const res: any = listener(safeCurrentState, safePrevState)
+        if (res && typeof res.then === 'function') {
+          res.catch((e: any) => {
+            handleError(
+              new StoreError('Async listener rejected', {
+                operation: 'notifyListeners(async)',
+                error: e,
+              })
+            )
+          })
+        }
       } catch (e: any) {
         handleError(
           new StoreError('Listener invocation failed', {
@@ -286,7 +298,17 @@ export function createStore<S extends object>(
     // Use shallow merge to preserve references for unchanged root-level keys
     // only update if something actually changed
     // const nextState = {...state, ...newPartialState} as S
+
     const nextState = assignState(state, newPartialState)
+
+    // const nextState = immer.produce(state, draft => {
+    //   for (const key in newPartialState) {
+    //     if (Object.prototype.hasOwnProperty.call(newPartialState, key)) {
+    //       // Immer will handle structural sharing automatically
+    //       ;(draft as any)[key] = newPartialState[key]
+    //     }
+    //   }
+    // })
 
     if (Object.is(nextState, state)) return // No changes, exit early
     state = nextState
@@ -460,20 +482,20 @@ export function createStore<S extends object>(
     )
   }
 
-  storeInstance.subscribeToPath = <T = any>(
-    path: string | (string | number)[],
-    listener: DependencyListener<T>,
-    options?: DependencySubscriptionOptions
-  ): (() => void) => {
+  storeInstance.subscribeToPath = ((path: any, listener: any, options?: any) => {
     if (isDestroyed) {
       console.warn(
         `[Store: ${name || 'Unnamed'}] Cannot create path subscription on destroyed store`
       )
-      return () => {} // Return no-op cleanup function
+      return () => {}
     }
-
-    return selectorManager.createPathSubscription(path, listener, options)
-  }
+    // Accept FlexiblePath (readonly) or string, cast to mutable for internal use if needed
+    return selectorManager.createPathSubscription(
+      Array.isArray(path) ? [...path] : path,
+      listener,
+      options
+    )
+  }) as Store<S>['subscribeToPath']
 
   storeInstance.select = <R, P extends Selector<S, unknown>[]>(
     ...args:
@@ -576,48 +598,194 @@ export function createStore<S extends object>(
     return true
   }
 
-  storeInstance.updatePath = <V = any>(
-    path: (string | number)[],
-    updater: (currentValue: V) => V
+  // Enhanced updatePath with multiple overloads for different type safety levels
+  storeInstance.updatePath = (<const P extends PathsOf<S>>(
+    path: P,
+    updater: PathValue<S, P> extends infer V
+      ? V extends never
+        ? never
+        : EnhancedPathUpdater<V>
+      : never
   ) => {
     if (isDestroyed) return
 
+    // // Validate path is not empty
+    // if (!Array.isArray(path) || path.length === 0) {
+    //   handleError(
+    //     new StoreError('updatePath requires a non-empty path array', {
+    //       operation: 'updatePath',
+    //       path,
+    //     })
+    //   )
+    //   return
+    // }
+
     // Use Immer to safely update the path with automatic structural sharing
-    const nextState = immer.produce(state, draft => {
+    // During batching, use the virtual state that includes batched changes
+    const baseState =
+      batching && batchedActions.length > 0
+        ? batchedActions.reduce((acc, curr) => assignState(acc as S, curr), state)
+        : state
+
+    const nextState = immer.produce(baseState, draft => {
       // Navigate to the parent of the target path
       let current: any = draft
 
-      // Navigate to the parent object/array
+      // Navigate to the parent object/array with better error handling
       for (let i = 0; i < path.length - 1; i++) {
         const key = path[i]
-        if (current[key] === undefined || current[key] === null) {
-          // Auto-create missing intermediate objects/arrays
+        // Prevent prototype pollution
+        if (
+          typeof key === 'string' &&
+          (key === '__proto__' || key === 'constructor' || key === 'prototype')
+        ) {
+          handleError(
+            new StoreError('Prototype-polluting key detected in path', {
+              operation: 'updatePath',
+              path,
+              pathIndex: i,
+              key,
+            })
+          )
+          return // Exit the produce function early
+        }
+
+        if (current[key] === undefined) {
+          // Auto-create missing intermediate objects/arrays based on next key type
           const nextKey = path[i + 1]
           current[key] = typeof nextKey === 'number' ? [] : {}
+        } else if (
+          current[key] === null ||
+          (typeof current[key] !== 'object' && typeof current[key] !== 'function')
+        ) {
+          // Cannot navigate through null or non-object values
+          handleError(
+            new StoreError('Cannot navigate through non-object value in path', {
+              operation: 'updatePath',
+              path,
+              pathIndex: i + 1,
+              currentValue: current[key],
+            })
+          )
+          return // Exit the produce function early
         }
+
         current = current[key]
       }
 
       // Get the final key and current value
       const finalKey = path[path.length - 1]
-      const currentValue = current[finalKey] as V
+      // Prevent prototype pollution for the final key
+      if (
+        typeof finalKey === 'string' &&
+        (finalKey === '__proto__' || finalKey === 'constructor' || finalKey === 'prototype')
+      ) {
+        handleError(
+          new StoreError('Prototype-polluting key detected in path', {
+            operation: 'updatePath',
+            path,
+            pathIndex: path.length - 1,
+            key: finalKey,
+          })
+        )
+        return // Exit the produce function early
+      }
+      const currentValue = current[finalKey]
 
-      // Apply the updater function
-      const newValue = updater(currentValue)
+      try {
+        // Apply the updater function with proper type handling
+        let newValue: any
+        if (typeof updater === 'function') {
+          newValue = (updater as Function)(currentValue)
+        } else {
+          newValue = updater
+        }
 
-      // Only update if the value actually changed
-      if (!Object.is(currentValue, newValue)) {
-        current[finalKey] = newValue
+        // Handle deletion (undefined means delete)
+        if (newValue === undefined) {
+          if (Array.isArray(current)) {
+            // For arrays, remove the element at the index
+            if (typeof finalKey === 'number' && finalKey >= 0 && finalKey < current.length) {
+              current.splice(finalKey, 1)
+            }
+          } else {
+            // For objects, delete the property using Immer's approach
+            delete current[finalKey]
+          }
+        } else if (newValue !== currentValue) {
+          // Only assign if the returned value is different from the current value
+          // This prevents overwriting in-place mutations
+          current[finalKey] = newValue
+        }
+        // If newValue === currentValue, the updater function likely mutated in place
+        // and we don't need to assign anything
+      } catch (error: any) {
+        handleError(
+          new StoreError('Updater function threw an error', {
+            operation: 'updatePath',
+            path,
+            currentValue,
+            error: {
+              message: error?.message || 'Unknown error',
+              stack: error?.stack || 'No stack trace available',
+              context: error?.context || {},
+            },
+          })
+        )
       }
     })
 
     // Only dispatch if state actually changed (Immer provides reference equality)
-    if (nextState !== state) {
-      // Always build and dispatch the minimal diff, even when not batching
-      const diff = buildMinimalDiff(nextState, path)
+    if (nextState !== baseState) {
+      // Always build and dispatch the minimal diff, respecting batching
+      const diff = buildMinimalDiff(nextState, path as unknown as (string | number)[])
       _internalDispatch(diff, false)
     }
-  }
+
+    // if (nextState !== baseState) {
+    //   // Manually create a diff that includes deletion markers.
+    //   const oldVal = getPath(baseState, path as string[])
+    //   const newVal = getPath(nextState, path as string[])
+
+    //   let updatePayload: any = {}
+
+    //   if (
+    //     newVal &&
+    //     typeof newVal === 'object' &&
+    //     !Array.isArray(newVal) &&
+    //     oldVal &&
+    //     typeof oldVal === 'object' &&
+    //     !Array.isArray(oldVal)
+    //   ) {
+    //     // Create a diff for object changes
+    //     Object.keys(newVal).forEach(key => {
+    //       if (oldVal[key] !== newVal[key]) {
+    //         updatePayload[key] = newVal[key]
+    //       }
+    //     })
+    //     Object.keys(oldVal).forEach(key => {
+    //       if (!(key in newVal)) {
+    //         updatePayload[key] = DELETE_PROPERTY // Explicitly mark keys for deletion
+    //       }
+    //     })
+    //   } else {
+    //     // For arrays, primitives, or type changes, just replace the value
+    //     updatePayload = newVal
+    //   }
+
+    //   // Wrap the payload in the path structure for dispatching
+    //   const diff: any = {} // ✅ Use 'any' type to allow numeric and string keys
+    //   let current: any = diff // ✅ Inferred 'any' type
+    //   for (let i = 0; i < path.length - 1; i++) {
+    //     const key = path[i]
+    //     current[key] = {}
+    //     current = current[key]
+    //   }
+    //   current[path[path.length - 1]] = updatePayload
+
+    //   _internalDispatch(diff as ActionPayload<S>, false)
+    // }
+  }) as any
 
   storeInstance.getHistory = (): {
     history: readonly S[]
@@ -647,6 +815,19 @@ export function createStore<S extends object>(
     for (let i = 0; i < path.length - 1; i++) {
       const key = path[i]
 
+      // Prevent prototype pollution
+      if (
+        typeof key === 'string' &&
+        (key === '__proto__' || key === 'constructor' || key === 'prototype')
+      ) {
+        throw new StoreError('Prototype-polluting key detected in path', {
+          operation: 'buildMinimalDiff',
+          path,
+          pathIndex: i,
+          key,
+        })
+      }
+
       // Get the full object/array at this level from newState to preserve siblings
       const fullObjectAtLevel = currentState[key]
 
@@ -662,8 +843,14 @@ export function createStore<S extends object>(
       currentState = currentState[key]
     }
 
-    // Set the final changed value
-    currentDiff[path[path.length - 1]] = getPath(newState, path)
+    // For the final level, get the entire value at the path from newState
+    const finalKey = path[path.length - 1]
+    const finalValue = getPath(newState, path)
+
+    // Always set the final value from newState, which includes any mutations
+    // made by the updater function (including deletions)
+    currentDiff[finalKey] = finalValue
+
     return diff
   }
 
@@ -911,23 +1098,52 @@ export function createStore<S extends object>(
 
   // --- Initialization ---
   if (shouldCleanupStaleStates) {
-    cleanupStaleStates(staleAge, cookiePrefix)
+    cleanupStaleStates<S>(staleAge, cookiePrefix)
   }
 
-  const savedState = persistenceManager.loadState(
+  // Register store
+  if (sessionId) {
+    if (!storeRegistry.has(sessionId)) {
+      storeRegistry.set(sessionId, new Set())
+    }
+    storeRegistry.get(sessionId)!.add(storeInstance as unknown as Store<object>)
+  }
+
+  // Initialize history with the initial state BEFORE calling onStoreCreate
+  if (historyLimit > 0) {
+    historyManager.addToHistory(state)
+  }
+
+  // Call onStoreCreate for plugins BEFORE state loading so plugins can capture initial state
+  pluginManager.onStoreCreate(storeInstance)
+
+  // Create a promise to track state loading completion
+  let stateLoadingComplete: Promise<void> = Promise.resolve()
+
+  const savedStatePromise = persistenceManager.loadStateAsync(
     persistKey,
     staleAge,
     pluginManager,
     storeInstance
   )
-  if (savedState) {
-    //state = { ...state, ...savedState };
-    _internalDispatch(savedState as ActionPayload<S>, false) // allow plugins/middleware to process the loaded state
-  }
 
-  // Initialize history with the current state
-  if (historyLimit > 0) {
-    historyManager.addToHistory(state)
+  // Handle Promise savedState
+  if (typeof (savedStatePromise as any)?.then === 'function') {
+    stateLoadingComplete = (savedStatePromise as Promise<Partial<S> | null>)
+      .then(resolvedState => {
+        if (resolvedState) {
+          _internalDispatch(resolvedState as ActionPayload<S>, false)
+        }
+      })
+      .catch(error => {
+        handleError(
+          new StoreError('Failed to load persisted state', {
+            operation: 'loadStateAsync',
+            error,
+            persistKey,
+          })
+        )
+      })
   }
 
   function storageEventHandler(event: StorageEvent) {
@@ -996,7 +1212,7 @@ export function createStore<S extends object>(
     // Unregister from global registry
     if (sessionId && storeRegistry.has(sessionId)) {
       const storeSet = storeRegistry.get(sessionId)!
-      storeSet.delete(storeInstance as Store<object>)
+      storeSet.delete(storeInstance as unknown as Store<object>)
       if (storeSet.size === 0) {
         storeRegistry.delete(sessionId)
       }
@@ -1015,16 +1231,30 @@ export function createStore<S extends object>(
     if (!storeRegistry.has(sessionId)) {
       storeRegistry.set(sessionId, new Set())
     }
-    storeRegistry.get(sessionId)!.add(storeInstance as Store<object>)
+    storeRegistry.get(sessionId)!.add(storeInstance as unknown as Store<object>)
   }
-
-  // Call onStoreCreate for plugins
-  pluginManager.onStoreCreate(storeInstance)
 
   // Initial state persistence if key provided and no saved state (or saved state was stale and removed)
-  if (persistKey && !savedState) {
+  if (persistKey && !savedStatePromise) {
     persistState(state)
   }
+
+  // Add utility methods to check and wait for state loading completion
+  ;(storeInstance as any)._waitForStateLoad = () => stateLoadingComplete
+  ;(storeInstance as any)._isStateLoading = () => {
+    let isLoading = true
+    stateLoadingComplete
+      .then(() => {
+        isLoading = false
+      })
+      .catch(() => {
+        isLoading = false
+      })
+    return isLoading
+  }
+
+  // Add public method to wait for state loading completion
+  storeInstance.waitForStateLoad = () => stateLoadingComplete
 
   return storeInstance
 }

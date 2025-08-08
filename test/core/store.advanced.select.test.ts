@@ -153,7 +153,7 @@ describe('Non-Negotiable Selector Tests', () => {
       updatedSpy.mockClear()
 
       // Simulate a state change
-      dispatch({tracking: {updated: 2}})
+      updatePath(['tracking', 'updated'], 2)
 
       // Should return the new value and trigger recomputation
       let updatedValue = selectUpdated()
@@ -173,7 +173,7 @@ describe('Non-Negotiable Selector Tests', () => {
       expect(trackingSpy).toHaveBeenCalledTimes(1) // global state change will trigger base selector
       expect(updatedSpy).toHaveBeenCalledTimes(0) // Should not recompute derived selector
 
-      updatePath<number>(['data', 2], value => value + 10)
+      updatePath(['data', 2], value => value + 10)
       expect(store.getState().data[2]).toBe(18)
       const selectData = select(state => state.data)
       expect(selectData()).toEqual([6, 7, 18, 9, 10])
@@ -183,9 +183,7 @@ describe('Non-Negotiable Selector Tests', () => {
       expect(updatedSpy).toHaveBeenCalledTimes(0) // Should not recompute derived selector
 
       // add new value field to tracking
-      updatePath<Set<string>>(['tracking', 'newField'], newField => {
-        return new Set(['newValue1', 'newValue2', 'newValue3'])
-      })
+      updatePath(['tracking', 'newField'], new Set(['newValue1', 'newValue2', 'newValue3']))
 
       expect(store.getState().tracking).toEqual({
         updated: 2,
@@ -202,6 +200,7 @@ describe('Non-Negotiable Selector Tests', () => {
         newField.delete('newValue2')
         return newField
       })
+
       expect(store.getState().tracking).toEqual({
         updated: 2,
         newField: new Set(['newValue1', 'newValue3']),
@@ -406,7 +405,7 @@ describe('Advanced Selector Operations', () => {
       expect(initialUserId).toBe(1)
 
       // Change the state
-      updatePath(['users', 'activeUserId'], () => 2)
+      updatePath(['users', 'activeUserId'], 2)
 
       const newUserId = selectActiveUserId()
       expect(newUserId).toBe(2)
@@ -592,7 +591,7 @@ describe('Advanced Selector Operations', () => {
       expect(nextValue).toEqual(firstValue)
 
       // Change unrelated state shouldn't trigger recomputation
-      updatePath(['ui', 'loading'], () => true)
+      updatePath(['ui', 'loading'], true)
 
       nextValue = selectFilteredProducts()
 
@@ -604,7 +603,7 @@ describe('Advanced Selector Operations', () => {
 
       // Change relevant state should trigger recomputation
 
-      updatePath<string | null>(['products', 'filters', 'category'], () => 'electronics')
+      updatePath(['products', 'filters', 'category'], 'electronics')
       nextValue = selectFilteredProducts()
       expect(computationSpy).toHaveBeenCalledTimes(2)
       expect(productSpy).toHaveBeenCalledTimes(3) // base selector should recompute
@@ -617,7 +616,7 @@ describe('Advanced Selector Operations', () => {
       const itemValues1 = selectItems()
 
       // update products pagination but not items or filters
-      updatePath<number>(['products', 'pagination', 'page'], () => 2)
+      updatePath(['products', 'pagination', 'page'], 2)
       selectFilteredProducts()
       expect(computationSpy).toHaveBeenCalledTimes(2) // Should not recompute
       expect(productSpy).toHaveBeenCalledTimes(4) // base selector should recompute
@@ -675,10 +674,7 @@ describe('Advanced Selector Operations', () => {
       getAccessories()
       expect(computationSpy).toHaveBeenCalledTimes(3)
 
-      updatePath<AppState['products']['items'][number]['category']>(
-        ['products', 'items', 2, 'category'],
-        () => 'mommy'
-      )
+      updatePath(['products', 'items', 2, 'category'], 'mommy')
       getElectronics()
       expect(computationSpy).toHaveBeenCalledTimes(4)
       const getMommy = selectProductsByCategory('mommy')
@@ -688,7 +684,7 @@ describe('Advanced Selector Operations', () => {
 
       expect(getState().users.byId.get(1)?.metadata.isVerified).toBe(true)
 
-      updatePath<AppState['users']['byId']>(['users', 'byId'], users => {
+      updatePath(['users', 'byId'], users => {
         const user = users.get(1)
         if (user) {
           user.metadata.isVerified = false
@@ -803,21 +799,21 @@ describe('Advanced Selector Operations', () => {
       expect(activeUserSelectorSpy).toHaveBeenCalledTimes(1)
 
       // Change the active user
-      updatePath(['users', 'activeUserId'], () => 2)
+      updatePath(['users', 'activeUserId'], 2)
 
       expect(listener).toHaveBeenCalledWith(2, 1)
       expect(baseSelectorSpy).toHaveBeenCalledTimes(2)
       expect(activeUserSelectorSpy).toHaveBeenCalledTimes(2)
 
       // update unrelated state
-      updatePath(['ui', 'loading'], () => true)
+      updatePath(['ui', 'loading'], true)
 
       expect(listener).toHaveBeenCalledTimes(1) // Should not trigger listener
       expect(baseSelectorSpy).toHaveBeenCalledTimes(3) // base selector should recompute
       expect(activeUserSelectorSpy).toHaveBeenCalledTimes(2) // Should not recompute derived selector
 
       // Change the active user again
-      updatePath(['users', 'activeUserId'], () => 5000)
+      updatePath(['users', 'activeUserId'], 5000)
 
       expect(listener).toHaveBeenCalledWith(5000, 2)
       expect(baseSelectorSpy).toHaveBeenCalledTimes(4)
@@ -964,12 +960,9 @@ describe('Advanced Selector Operations', () => {
       // Rapid changes
       for (let i = 0; i < 5; i++) {
         batch(() => {
-          updatePath<AppState['users']['activeUserId']>(['users', 'activeUserId'], () => i)
-          updatePath<AppState['products']['filters']['category']>(
-            ['products', 'filters', 'category'],
-            () => `category-${i}`
-          )
-          updatePath<AppState['ui']['loading']>(['ui', 'loading'], () => i % 2 === 0)
+          updatePath(['users', 'activeUserId'], i)
+          updatePath(['products', 'filters', 'category'], `category-${i}`)
+          updatePath(['ui', 'loading'], i % 2 === 0)
         })
       }
 
@@ -1044,21 +1037,18 @@ describe('Advanced Selector Operations', () => {
       )
 
       // Add a new product
-      const updater = (items: AppState['products']['items']) => {
-        return [
-          ...items,
-          {
-            id: 4,
-            name: 'USB Mouse',
-            price: 29.99,
-            category: 'accessories',
-            inStock: true,
-            tags: ['mouse', 'usb'],
-            ratings: {average: 4.0, count: 15, reviews: []},
-          },
-        ]
-      }
-      updatePath<AppState['products']['items']>(['products', 'items'], updater)
+      updatePath(['products', 'items'], items => [
+        ...items,
+        {
+          id: 4,
+          name: 'USB Mouse',
+          price: 29.99,
+          category: 'accessories',
+          inStock: true,
+          tags: ['mouse', 'usb'],
+          ratings: {average: 4.0, count: 15, reviews: []},
+        },
+      ])
 
       expect(listener).toHaveBeenCalledWith(
         [2, 4, 3], // 2 users, 4 products, 3 in stock
@@ -1074,7 +1064,7 @@ describe('Advanced Selector Operations', () => {
 
       const unsubscribe = subscribeToPath('users.activeUserId', listener)
 
-      updatePath(['users', 'activeUserId'], () => 2)
+      updatePath(['users', 'activeUserId'], 2)
 
       expect(listener).toHaveBeenCalledWith(2, 1)
       unsubscribe()
@@ -1177,7 +1167,7 @@ describe('Advanced Selector Operations', () => {
       expect(itemsSelectorSpy).toHaveBeenCalledTimes(1) // Should not recompute derived selector
 
       // Change related state
-      updatePath(['products', 'items', 0, 'inStock'], () => false)
+      updatePath(['products', 'items', 0, 'inStock'], false)
       lastResult = selectExpensiveComputation()
       expect(lastResult).not.toEqual(firstResult) // Should recompute due to inStock change
       expect(computationSpy).toHaveBeenCalledTimes(2)
@@ -1204,7 +1194,7 @@ describe('Advanced Selector Operations', () => {
         })
       }
 
-      updatePath(['users', 'byId'], () => largeUserSet)
+      updatePath(['users', 'byId'], largeUserSet)
 
       const selectActiveUsers = select(state =>
         Array.from(state.users.byId.values())
@@ -1405,8 +1395,8 @@ describe('Advanced Selector Operations', () => {
       expect(result1.total).toBe(3)
 
       // Apply filters
-      updatePath(categoryPath, () => 'electronics')
-      updatePath(inStockPath, () => true)
+      updatePath(categoryPath, 'electronics')
+      updatePath(inStockPath, true)
 
       const result2 = selectFilteredProductsWithPagination()
       expect(result2.products).toHaveLength(1) // Only gaming laptop
