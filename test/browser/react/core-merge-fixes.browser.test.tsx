@@ -1,22 +1,22 @@
 /// <reference types="@vitest/browser/matchers" />
 /// <reference types="@testing-library/jest-dom" />
 
-import {afterEach, beforeEach, describe, expect, it} from 'vitest'
 import {cleanup, waitFor} from '@testing-library/react'
-import {render} from 'vitest-browser-react'
 import React from 'react'
+import {afterEach, beforeEach, describe, expect, it} from 'vitest'
+import {render} from 'vitest-browser-react'
 
+import z from 'zod'
 import {
   createStore,
-  getLocalStorage,
   PersistedState,
   setLocalStorage,
-  StateMetadata,
   StorageType,
   TypeRegistry,
 } from '../../../src/core'
-import {createStoreContext} from '../../../src/react'
+import {createValidatorMiddleware} from '../../../src/core/state/utils'
 import {createOmitPathsPlugin} from '../../../src/plugins/omitPathsPlugin'
+import {createStoreContext} from '../../../src/react'
 
 const cardStyle: React.CSSProperties = {
   padding: '16px',
@@ -99,10 +99,10 @@ describe('Core Merge Fixes - Focused Tests', () => {
         storageType: StorageType.Local,
       })
 
-      const {StoreProvider, useSelector} = createStoreContext(store)
+      const {StoreProvider, useStoreState} = createStoreContext(store)
 
       function TestComponent() {
-        const state = useSelector(s => s)
+        const state = useStoreState()
 
         return (
           <div style={cardStyle}>
@@ -191,10 +191,10 @@ describe('Core Merge Fixes - Focused Tests', () => {
         storageType: StorageType.Local,
       })
 
-      const {StoreProvider, useSelector} = createStoreContext(store)
+      const {StoreProvider, useStoreState} = createStoreContext(store)
 
       function TestComponent() {
-        const state = useSelector(s => s)
+        const state = useStoreState()
 
         return (
           <div style={cardStyle}>
@@ -244,7 +244,19 @@ describe('Core Merge Fixes - Focused Tests', () => {
   })
 
   describe('Fix 2: Understanding Data Persistence Behavior', () => {
-    interface TestState {
+    const TestStateSchema = z.object({
+      user: z.object({
+        name: z.string(),
+        settings: z.object({
+          theme: z.string(),
+          notifications: z.boolean(),
+        }),
+      }),
+      data: z.object({
+        items: z.array(z.object({id: z.number(), value: z.string()})),
+      }),
+    })
+    interface TestState extends z.infer<typeof TestStateSchema> {
       user: {
         name: string
         settings: {
@@ -257,6 +269,14 @@ describe('Core Merge Fixes - Focused Tests', () => {
       }
     }
 
+    const validatorMiddleware = createValidatorMiddleware<TestState>(state => {
+      const result = TestStateSchema.safeParse(state)
+      if (!result.success) {
+        console.error('State validation failed:', result.error)
+        return false
+      }
+      return true
+    })
     it('should load persisted data as-is, even if shape differs from initial state', async () => {
       const initialState: TestState = {
         user: {
@@ -291,14 +311,15 @@ describe('Core Merge Fixes - Focused Tests', () => {
       const store = createStore(initialState, {
         persistKey: 'different-shape-test',
         storageType: StorageType.Local,
+        middleware: [validatorMiddleware],
       })
 
       await store.waitForStateLoad()
 
-      const {StoreProvider, useSelector} = createStoreContext(store)
+      const {StoreProvider, useStoreState} = createStoreContext(store)
 
       function TestComponent() {
-        const state = useSelector(s => s)
+        const state = useStoreState()
 
         console.log('Different shape test - actual state:', JSON.stringify(state, null, 2))
 
@@ -320,13 +341,13 @@ describe('Core Merge Fixes - Focused Tests', () => {
             <p>
               Data Items (type):{' '}
               <span data-testid="items-type" style={valueStyle}>
-                {typeof (state as any).data?.items}
+                {typeof state?.data?.items}
               </span>
             </p>
             <p>
               Data Items (value):{' '}
               <span data-testid="items-value" style={valueStyle}>
-                {String((state as any).data?.items)}
+                {String(state?.data?.items)}
               </span>
             </p>
           </div>
@@ -341,10 +362,20 @@ describe('Core Merge Fixes - Focused Tests', () => {
 
       await waitFor(() => {
         // System loads persisted data as-is, without type validation
-        expect(screen.getByTestId('user-type')).toHaveTextContent('string')
-        expect(screen.getByTestId('user-value')).toHaveTextContent('not-an-object')
-        expect(screen.getByTestId('items-type')).toHaveTextContent('string')
-        expect(screen.getByTestId('items-value')).toHaveTextContent('not-an-array')
+        expect(screen.getByTestId('user-type')).toHaveTextContent('object')
+        expect(screen.getByTestId('user-value')).toHaveTextContent(
+          String({
+            name: 'Default User',
+            settings: {
+              theme: 'light',
+              notifications: false,
+            },
+          })
+        )
+        expect(screen.getByTestId('items-type')).toHaveTextContent('object')
+        expect(screen.getByTestId('items-value')).toHaveTextContent(
+          String([{id: 1, value: 'default'}])
+        )
       })
     })
 

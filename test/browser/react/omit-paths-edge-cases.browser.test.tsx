@@ -20,7 +20,6 @@ import {createStoreContext} from '../../../src/react'
 import {createOmitPathsPlugin} from '../../../src/plugins/omitPathsPlugin'
 import {StoreError} from '../../../src/shared'
 import z from 'zod'
-import {T} from 'vitest/dist/chunks/reporters.d.BFLkQcL6.js'
 
 const cardStyle: React.CSSProperties = {
   padding: '16px',
@@ -86,23 +85,11 @@ describe('OmitPathsPlugin - Advanced Edge Cases', () => {
       onError: errorHandler,
     })
 
-    const {StoreProvider, useSelector, useDispatch} = createStoreContext(store)
+    const {StoreProvider, useStoreState, useDispatch} = createStoreContext(store)
 
     function TestComponent() {
-      const state = useSelector(s => s)
+      const state = useStoreState()
       const dispatch = useDispatch()
-
-      const handleComplexUpdate = () => {
-        dispatch({
-          user: {
-            name: 'Updated John',
-            secret: 'new-secret',
-          },
-          metadata: {
-            sensitive: 'new-sensitive',
-          },
-        })
-      }
 
       return (
         <div style={cardStyle}>
@@ -113,7 +100,20 @@ describe('OmitPathsPlugin - Advanced Edge Cases', () => {
           <p>
             Secret: <span data-testid="secret">{state.user.secret}</span>
           </p>
-          <button style={buttonStyle} data-testid="update-complex" onClick={handleComplexUpdate}>
+          <button
+            style={buttonStyle}
+            data-testid="update-complex"
+            onClick={() => {
+              dispatch({
+                user: {
+                  name: 'Updated John',
+                  secret: 'new-secret',
+                },
+                metadata: {
+                  sensitive: 'new-sensitive',
+                },
+              })
+            }}>
             Update Complex Data
           </button>
         </div>
@@ -170,11 +170,15 @@ describe('OmitPathsPlugin - Advanced Edge Cases', () => {
       },
     }
 
-    const omitPathsPlugin = createOmitPathsPlugin<TestState>([
-      ['user', 'optional'],
-      ['user', 'settings'],
-      ['data', 'nullable'],
-    ])
+    const omitPathsPlugin = createOmitPathsPlugin<TestState>(
+      [
+        ['user', 'optional'],
+        ['user', 'settings'],
+        ['data', 'nullable'],
+      ],
+      undefined,
+      initialState
+    )
 
     const store = createStore(initialState, {
       persistKey: 'undefined-null-test',
@@ -182,10 +186,10 @@ describe('OmitPathsPlugin - Advanced Edge Cases', () => {
       plugins: [omitPathsPlugin],
     })
 
-    const {StoreProvider, useSelector, useDispatch} = createStoreContext(store)
+    const {StoreProvider, useStoreState, useDispatch} = createStoreContext(store)
 
     function TestComponent() {
-      const state = useSelector(s => s)
+      const state = useStoreState()
       const dispatch = useDispatch()
 
       const handleNullUpdate = () => {
@@ -319,46 +323,34 @@ describe('OmitPathsPlugin - Advanced Edge Cases', () => {
       plugins: [omitPathsPlugin],
     })
 
-    const {StoreProvider, useSelector, useDispatch} = createStoreContext(store)
+    const {StoreProvider, useSelector, useTransaction} = createStoreContext(store)
 
     function TestComponent() {
-      const state = useSelector(s => s)
-      const dispatch = useDispatch()
-
-      const deepData = state.level1.level2.level3.level4.level5
+      const deepData = useSelector(s => s.level1.level2.level3.level4.level5)
+      const transaction = useTransaction()
 
       const handleDeepUpdate = () => {
-        dispatch({
-          level1: {
-            level2: {
-              level3: {
-                level4: {
-                  level5: {
-                    data: 'updated-data',
-                    secret: 'new-deep-secret',
-                    nested: {
-                      items: [
-                        {
-                          id: 1,
-                          metadata: {
-                            public: 'updated-public',
-                            private: 'updated-private',
-                          },
-                        },
-                        {
-                          id: 2,
-                          metadata: {
-                            public: 'new-public',
-                            private: 'new-private',
-                          },
-                        },
-                      ],
-                    },
-                  },
-                },
+        transaction(draft => {
+          const level5 = draft.level1.level2.level3.level4.level5
+          level5.data = 'updated-data'
+          level5.secret = 'new-deep-secret'
+          const newItems = [
+            {
+              id: 1,
+              metadata: {
+                public: 'updated-public',
+                private: 'updated-private',
               },
             },
-          },
+            {
+              id: 2,
+              metadata: {
+                public: 'new-public',
+                private: 'new-private',
+              },
+            },
+          ]
+          level5.nested.items = newItems
         })
       }
 
@@ -450,30 +442,28 @@ describe('OmitPathsPlugin - Advanced Edge Cases', () => {
       plugins: [omitPathsPlugin],
     })
 
-    const {StoreProvider, useSelector, useDispatch, useBatch} = createStoreContext(store)
+    const {StoreProvider, useStoreState, useDispatch} = createStoreContext(store)
 
     function TestComponent() {
-      const state = useSelector(s => s)
+      const state = useStoreState()
       const dispatch = useDispatch()
-      const batch = useBatch()
 
       const handleRapidChanges = () => {
         // Simulate rapid but manageable state changes
-        batch(() => {
-          for (let i = 1; i <= 10; i++) {
-            dispatch({
-              counter: i,
-              batch: i,
-              sensitive: {
-                tokens: [`token-${i}`, ...state.sensitive.tokens],
-                secrets: {...state.sensitive.secrets, [`key-${i}`]: `secret-${i}`},
-              },
-              public: {
-                messages: [`msg-${i}`, ...state.public.messages],
-              },
-            })
-          }
-        })
+
+        for (let i = 1; i <= 10; i++) {
+          dispatch({
+            counter: i,
+            batch: i,
+            sensitive: {
+              tokens: [`token-${i}`, ...state.sensitive.tokens],
+              secrets: {...state.sensitive.secrets, [`key-${i}`]: `secret-${i}`},
+            },
+            public: {
+              messages: [`msg-${i}`, ...state.public.messages],
+            },
+          })
+        }
       }
 
       return (
@@ -535,23 +525,24 @@ describe('OmitPathsPlugin - Advanced Edge Cases', () => {
       secret: 'secret-value',
     }
 
-    let pluginCreateCalled = false
-    let pluginPersistCalled = false
+    // Create mock functions to track plugin lifecycle calls
+    const onStoreCreateMock = vi.fn()
+    const beforePersistMock = vi.fn()
 
     const lifecyclePlugin = createOmitPathsPlugin<TestState>([['secret']], 'lifecycleTest')
 
-    // Wrap plugin methods to track calls
+    // Wrap plugin methods with mock functions
     const originalPlugin = lifecyclePlugin
     const wrappedPlugin = {
       ...originalPlugin,
-      onStoreCreate: (store: any) => {
-        pluginCreateCalled = true
+      onStoreCreate: vi.fn((store: any) => {
+        onStoreCreateMock(store)
         return originalPlugin.onStoreCreate?.(store)
-      },
-      beforePersist: (state: any, storageType: any, store: any) => {
-        pluginPersistCalled = true
+      }),
+      beforePersist: vi.fn((state: any, storageType: any, store: any) => {
+        beforePersistMock(state, storageType, store)
         return originalPlugin.beforePersist?.(state, storageType, store)
-      },
+      }),
     }
 
     const store = createStore(initialState, {
@@ -560,7 +551,10 @@ describe('OmitPathsPlugin - Advanced Edge Cases', () => {
       plugins: [wrappedPlugin],
     })
 
-    expect(pluginCreateCalled).toBe(true)
+    // Verify onStoreCreate was called during store creation
+    expect(wrappedPlugin.onStoreCreate).toHaveBeenCalledTimes(1)
+    expect(wrappedPlugin.onStoreCreate).toHaveBeenCalledWith(store)
+    expect(onStoreCreateMock).toHaveBeenCalledTimes(1)
 
     const {StoreProvider, useSelector, useDispatch} = createStoreContext(store)
 
@@ -599,8 +593,15 @@ describe('OmitPathsPlugin - Advanced Edge Cases', () => {
       expect(screen.getByTestId('data')).toHaveTextContent('updated')
     })
 
-    // Plugin lifecycle methods should have been called
-    expect(pluginPersistCalled).toBe(true)
+    // Verify beforePersist was called during state updates/persistence
+    expect(wrappedPlugin.beforePersist).toHaveBeenCalled()
+    expect(beforePersistMock).toHaveBeenCalled()
+
+    // Verify the beforePersist was called with the correct parameters
+    const beforePersistCall = wrappedPlugin.beforePersist.mock.calls[0]
+    expect(beforePersistCall[0]).toMatchObject({data: 'updated', secret: 'new-secret'})
+    expect(beforePersistCall[1]).toBe(StorageType.Local)
+    expect(beforePersistCall[2]).toBe(store)
 
     // Clean up
     store.destroy({clearHistory: true, removePersistedState: true, resetRegistry: true})
