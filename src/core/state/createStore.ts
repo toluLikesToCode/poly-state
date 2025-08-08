@@ -635,7 +635,10 @@ export function createStore<S extends object>(
       for (let i = 0; i < path.length - 1; i++) {
         const key = path[i]
         // Prevent prototype pollution
-        if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+        if (
+          typeof key === 'string' &&
+          (key === '__proto__' || key === 'constructor' || key === 'prototype')
+        ) {
           handleError(
             new StoreError('Prototype-polluting key detected in path', {
               operation: 'updatePath',
@@ -673,7 +676,10 @@ export function createStore<S extends object>(
       // Get the final key and current value
       const finalKey = path[path.length - 1]
       // Prevent prototype pollution for the final key
-      if (finalKey === '__proto__' || finalKey === 'constructor' || finalKey === 'prototype') {
+      if (
+        typeof finalKey === 'string' &&
+        (finalKey === '__proto__' || finalKey === 'constructor' || finalKey === 'prototype')
+      ) {
         handleError(
           new StoreError('Prototype-polluting key detected in path', {
             operation: 'updatePath',
@@ -808,6 +814,19 @@ export function createStore<S extends object>(
 
     for (let i = 0; i < path.length - 1; i++) {
       const key = path[i]
+
+      // Prevent prototype pollution
+      if (
+        typeof key === 'string' &&
+        (key === '__proto__' || key === 'constructor' || key === 'prototype')
+      ) {
+        throw new StoreError('Prototype-polluting key detected in path', {
+          operation: 'buildMinimalDiff',
+          path,
+          pathIndex: i,
+          key,
+        })
+      }
 
       // Get the full object/array at this level from newState to preserve siblings
       const fullObjectAtLevel = currentState[key]
