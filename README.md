@@ -243,6 +243,16 @@ store.updatePath(['user', 'preferences', 'theme'], currentTheme =>
 - **subscribeToPath(path, listener)**: Subscribes to changes at a specific nested path (e.g.,
   'user.name').
 
+Async listeners and cautions
+
+- Listeners (subscribe, subscribeTo, subscribeToPath) are invoked synchronously by the store. If a
+  listener is async and returns a Promise, the store won’t await it (fire-and-forget).
+- Errors after an await won’t be caught by the store unless you handle them. Wrap async work in
+  try/catch or attach your own .catch.
+- Multiple async executions can overlap on rapid updates; queue or guard if ordering matters.
+- Prefer thunks or middleware for async flows that need ordering, cancellation, or centralized error
+  handling.
+
 #### Selectors
 
 **select(selector)**: Creates a memoized selector to compute derived data. The selector only
@@ -380,6 +390,11 @@ useStoreEffect(
 
 **useSubscribeTo(selector, listener)**: A lower-level hook to subscribe a listener function to state
 changes.
+
+Note on async listeners
+
+- These hooks follow the same listener semantics as the core store: async listeners are not awaited
+  and may run concurrently. Handle errors inside the listener and guard ordering if needed.
 
 **useSubscribeToPath(path, listener)**: Subscribes a listener to a specific nested path.
 

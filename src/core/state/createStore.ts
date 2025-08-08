@@ -250,7 +250,17 @@ export function createStore<S extends object>(
 
     listeners.forEach(listener => {
       try {
-        listener(safeCurrentState, safePrevState)
+        const res: any = listener(safeCurrentState, safePrevState)
+        if (res && typeof res.then === 'function') {
+          res.catch((e: any) => {
+            handleError(
+              new StoreError('Async listener rejected', {
+                operation: 'notifyListeners(async)',
+                error: e,
+              })
+            )
+          })
+        }
       } catch (e: any) {
         handleError(
           new StoreError('Listener invocation failed', {

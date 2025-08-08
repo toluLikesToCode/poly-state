@@ -47,6 +47,13 @@ export interface TypeDefinition<T> {
 /**
  * Function that receives state updates
  * @typeParam S - The type of the state
+ *
+ * @remarks
+ * The store invokes listeners synchronously and does not await their return value.
+ * If you provide an async function, it will be treated as fire-and-forget:
+ * - It will not block other listeners or subsequent state updates.
+ * - Errors thrown after an `await` won't be caught by the store. Wrap your logic in try/catch.
+ * - Multiple async runs may overlap across rapid state changes; serialize if ordering matters.
  */
 export type Listener<S extends object> = (newState: S, prevState?: S) => void
 

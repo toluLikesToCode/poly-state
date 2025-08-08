@@ -25,6 +25,35 @@ export class SelectorManager<S extends object> implements ISelectorManager<S> {
     this.storeInstance = store
   }
 
+  /**
+   * Safely invoke a dependency listener. If it returns a Promise, attach a catch handler
+   * to avoid unhandled promise rejections. Synchronous errors are caught and rethrown
+   * as StoreError by the surrounding callers where appropriate.
+   */
+  private _invokeListenerSafely<T>(
+    listener: DependencyListener<T> | ((...args: any[]) => void),
+    newValue: any,
+    oldValue: any,
+    context: {label: string; subscriptionId?: string}
+  ) {
+    try {
+      const result: any = (listener as any)(newValue, oldValue)
+      if (result && typeof result.then === 'function') {
+        result.catch((err: unknown) => {
+          // We cannot route to store's onError here without a handleError reference.
+          // Log with context to aid debugging and prevent unhandled rejections.
+          console.error(`[SelectorManager] Unhandled error in async ${context.label}`, {
+            error: err,
+            subscriptionId: context.subscriptionId,
+          })
+        })
+      }
+    } catch (err) {
+      // Let callers wrap this in StoreError so the store's error pipeline can handle it
+      throw err
+    }
+  }
+
   private ensureCleanupRunning() {
     if (this.cleanupInterval || this.activeSelectors.size === 0) return
 
@@ -415,7 +444,10 @@ export class SelectorManager<S extends object> implements ISelectorManager<S> {
               if (subscription.isActive) {
                 try {
                   subscription.lastValue = currentValue
-                  subscription.listener(currentValue, oldValue)
+                  this._invokeListenerSafely(subscription.listener, currentValue, oldValue, {
+                    label: 'DependencyListener (debounced)',
+                    subscriptionId: subscription.id,
+                  })
                 } catch (error: any) {
                   throw new StoreError('Dependency listener execution failed', {
                     operation: 'dependencyListener',
@@ -429,7 +461,10 @@ export class SelectorManager<S extends object> implements ISelectorManager<S> {
             // Call immediately and update lastValue
             try {
               subscription.lastValue = currentValue
-              subscription.listener(currentValue, oldValue)
+              this._invokeListenerSafely(subscription.listener, currentValue, oldValue, {
+                label: 'DependencyListener',
+                subscriptionId: subscription.id,
+              })
             } catch (error: any) {
               throw new StoreError('Dependency listener execution failed', {
                 operation: 'dependencyListener',
@@ -484,7 +519,10 @@ export class SelectorManager<S extends object> implements ISelectorManager<S> {
     // Call immediately if requested
     if (immediate) {
       try {
-        subscription.listener(initialValue, initialValue)
+        this._invokeListenerSafely(subscription.listener, initialValue, initialValue, {
+          label: 'DependencyListener (immediate)',
+          subscriptionId: subscription.id,
+        })
       } catch (error: any) {
         throw new StoreError('Immediate dependency listener execution failed', {
           operation: 'immediateDependencyListener',
@@ -567,7 +605,10 @@ export class SelectorManager<S extends object> implements ISelectorManager<S> {
                 try {
                   // Update lastValues only when the debounced listener is actually called
                   lastValues = currentValues
-                  listener(currentValues, oldValues)
+                  this._invokeListenerSafely(listener as any, currentValues, oldValues, {
+                    label: 'MultiDependencyListener (debounced)',
+                    subscriptionId,
+                  })
                 } catch (error: any) {
                   throw new StoreError('Multi-dependency listener execution failed', {
                     operation: 'multiDependencyListener',
@@ -581,7 +622,10 @@ export class SelectorManager<S extends object> implements ISelectorManager<S> {
             // Call immediately and update lastValues
             try {
               lastValues = currentValues
-              listener(currentValues, oldValues)
+              this._invokeListenerSafely(listener as any, currentValues, oldValues, {
+                label: 'MultiDependencyListener',
+                subscriptionId,
+              })
             } catch (error: any) {
               throw new StoreError('Multi-dependency listener execution failed', {
                 operation: 'multiDependencyListener',
@@ -638,7 +682,10 @@ export class SelectorManager<S extends object> implements ISelectorManager<S> {
     // Call immediately if requested
     if (immediate) {
       try {
-        listener(lastValues, lastValues)
+        this._invokeListenerSafely(listener as any, lastValues, lastValues, {
+          label: 'MultiDependencyListener (immediate)',
+          subscriptionId,
+        })
       } catch (error: any) {
         throw new StoreError('Immediate multi-dependency listener execution failed', {
           operation: 'immediateMultiDependencyListener',
