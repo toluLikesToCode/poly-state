@@ -634,6 +634,18 @@ export function createStore<S extends object>(
       // Navigate to the parent object/array with better error handling
       for (let i = 0; i < path.length - 1; i++) {
         const key = path[i]
+        // Prevent prototype pollution
+        if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+          handleError(
+            new StoreError('Prototype-polluting key detected in path', {
+              operation: 'updatePath',
+              path,
+              pathIndex: i,
+              key,
+            })
+          )
+          return // Exit the produce function early
+        }
 
         if (current[key] === undefined) {
           // Auto-create missing intermediate objects/arrays based on next key type
@@ -660,6 +672,18 @@ export function createStore<S extends object>(
 
       // Get the final key and current value
       const finalKey = path[path.length - 1]
+      // Prevent prototype pollution for the final key
+      if (finalKey === '__proto__' || finalKey === 'constructor' || finalKey === 'prototype') {
+        handleError(
+          new StoreError('Prototype-polluting key detected in path', {
+            operation: 'updatePath',
+            path,
+            pathIndex: path.length - 1,
+            key: finalKey,
+          })
+        )
+        return // Exit the produce function early
+      }
       const currentValue = current[finalKey]
 
       try {
