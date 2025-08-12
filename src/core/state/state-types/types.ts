@@ -73,7 +73,7 @@ type updatePathMethodType<S extends object> = {
 
   <V = any>(path: FlexiblePath, updater: FlexiblePathUpdater<V>): void
 
-  (path: (string | number)[], updater: EnhancedPathUpdater<any>): void
+  (path: (string | number)[], updater: EnhancedPathUpdater<any, S>): void
 }
 
 export type ThunkContext<S extends object> = {
@@ -719,9 +719,9 @@ export interface ReadOnlyStore<S extends object> {
  *
  * @template V - The type of the value at the specified path
  */
-export type EnhancedPathUpdater<V = any> =
-  | ((currentValue: V) => V)
-  | ((currentValue: V) => V | undefined) // Allow returning undefined to delete
+export type EnhancedPathUpdater<V = any, S extends object = any> =
+  | ((currentValue: V, store: ReadOnlyStore<S>) => V)
+  | ((currentValue: V, store: ReadOnlyStore<S>) => V | undefined) // Allow returning undefined to delete
   | V
   | undefined // Allow undefined to delete the property
 
@@ -753,7 +753,7 @@ export type TypedPathUpdater<S extends object, P extends FlexiblePath> = P exten
   ? K extends keyof S
     ? Rest extends readonly (string | number)[]
       ? Rest extends readonly []
-        ? EnhancedPathUpdater<S[K]>
+        ? EnhancedPathUpdater<S[K], S>
         : Rest extends FlexiblePath
           ? TypedPathUpdater<S[K] extends object ? S[K] : never, Rest>
           : never
@@ -762,7 +762,7 @@ export type TypedPathUpdater<S extends object, P extends FlexiblePath> = P exten
       ? S extends readonly (infer Item)[]
         ? Rest extends readonly (string | number)[]
           ? Rest extends readonly []
-            ? EnhancedPathUpdater<Item>
+            ? EnhancedPathUpdater<Item, S>
             : Rest extends FlexiblePath
               ? TypedPathUpdater<Item extends object ? Item : never, Rest>
               : never

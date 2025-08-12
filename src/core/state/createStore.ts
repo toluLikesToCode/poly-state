@@ -608,18 +608,6 @@ export function createStore<S extends object>(
       : never
   ) => {
     if (isDestroyed) return
-
-    // // Validate path is not empty
-    // if (!Array.isArray(path) || path.length === 0) {
-    //   handleError(
-    //     new StoreError('updatePath requires a non-empty path array', {
-    //       operation: 'updatePath',
-    //       path,
-    //     })
-    //   )
-    //   return
-    // }
-
     // Use Immer to safely update the path with automatic structural sharing
     // During batching, use the virtual state that includes batched changes
     const baseState =
@@ -696,7 +684,7 @@ export function createStore<S extends object>(
         // Apply the updater function with proper type handling
         let newValue: any
         if (typeof updater === 'function') {
-          newValue = (updater as Function)(currentValue)
+          newValue = (updater as Function)(currentValue, storeInstance.asReadOnly())
         } else {
           newValue = updater
         }

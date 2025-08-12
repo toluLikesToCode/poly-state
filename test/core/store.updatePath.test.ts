@@ -141,17 +141,14 @@ describe('Advanced Path Update Operations', () => {
   })
 
   describe('Deep Nested Object Updates', () => {
-    // beforeEach(() => {
-    //   store.reset()
-    // })
-
     afterEach(() => {
       store.reset()
     })
 
     it('should update deeply nested primitive values', () => {
-      updatePath(['user', 'profile', 'name'], current => {
+      updatePath(['user', 'profile', 'name'], (current, store) => {
         expect(current).toBe('John Doe')
+        expect(store.getState().user.profile.name).toBe('John Doe')
         return 'Jane Smith'
       })
 
