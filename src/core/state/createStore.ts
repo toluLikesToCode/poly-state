@@ -604,22 +604,10 @@ export function createStore<S extends object>(
     updater: PathValue<S, P> extends infer V
       ? V extends never
         ? never
-        : EnhancedPathUpdater<V>
+        : EnhancedPathUpdater<S, V>
       : never
   ) => {
     if (isDestroyed) return
-
-    // // Validate path is not empty
-    // if (!Array.isArray(path) || path.length === 0) {
-    //   handleError(
-    //     new StoreError('updatePath requires a non-empty path array', {
-    //       operation: 'updatePath',
-    //       path,
-    //     })
-    //   )
-    //   return
-    // }
-
     // Use Immer to safely update the path with automatic structural sharing
     // During batching, use the virtual state that includes batched changes
     const baseState =
@@ -696,7 +684,7 @@ export function createStore<S extends object>(
         // Apply the updater function with proper type handling
         let newValue: any
         if (typeof updater === 'function') {
-          newValue = (updater as Function)(currentValue)
+          newValue = updater(currentValue, storeInstance.asReadOnly())
         } else {
           newValue = updater
         }
@@ -741,50 +729,6 @@ export function createStore<S extends object>(
       const diff = buildMinimalDiff(nextState, path as unknown as (string | number)[])
       _internalDispatch(diff, false)
     }
-
-    // if (nextState !== baseState) {
-    //   // Manually create a diff that includes deletion markers.
-    //   const oldVal = getPath(baseState, path as string[])
-    //   const newVal = getPath(nextState, path as string[])
-
-    //   let updatePayload: any = {}
-
-    //   if (
-    //     newVal &&
-    //     typeof newVal === 'object' &&
-    //     !Array.isArray(newVal) &&
-    //     oldVal &&
-    //     typeof oldVal === 'object' &&
-    //     !Array.isArray(oldVal)
-    //   ) {
-    //     // Create a diff for object changes
-    //     Object.keys(newVal).forEach(key => {
-    //       if (oldVal[key] !== newVal[key]) {
-    //         updatePayload[key] = newVal[key]
-    //       }
-    //     })
-    //     Object.keys(oldVal).forEach(key => {
-    //       if (!(key in newVal)) {
-    //         updatePayload[key] = DELETE_PROPERTY // Explicitly mark keys for deletion
-    //       }
-    //     })
-    //   } else {
-    //     // For arrays, primitives, or type changes, just replace the value
-    //     updatePayload = newVal
-    //   }
-
-    //   // Wrap the payload in the path structure for dispatching
-    //   const diff: any = {} // ✅ Use 'any' type to allow numeric and string keys
-    //   let current: any = diff // ✅ Inferred 'any' type
-    //   for (let i = 0; i < path.length - 1; i++) {
-    //     const key = path[i]
-    //     current[key] = {}
-    //     current = current[key]
-    //   }
-    //   current[path[path.length - 1]] = updatePayload
-
-    //   _internalDispatch(diff as ActionPayload<S>, false)
-    // }
   }) as any
 
   storeInstance.getHistory = (): {

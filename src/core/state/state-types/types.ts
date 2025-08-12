@@ -68,12 +68,12 @@ export type Dispatch<S extends object> = {
 
 export type Path = (string | number)[]
 
-type updatePathMethodType<S extends object> = {
+export type updatePathMethodType<S extends object> = {
   <P extends PathsOf<S>>(path: P, updater: TypedPathUpdater<S, P>): void
 
-  <V = any>(path: FlexiblePath, updater: FlexiblePathUpdater<V>): void
+  <V = any>(path: FlexiblePath, updater: FlexiblePathUpdater<S, V>): void
 
-  (path: (string | number)[], updater: EnhancedPathUpdater<any>): void
+  (path: (string | number)[], updater: EnhancedPathUpdater<S, any>): void
 }
 
 export type ThunkContext<S extends object> = {
@@ -719,9 +719,9 @@ export interface ReadOnlyStore<S extends object> {
  *
  * @template V - The type of the value at the specified path
  */
-export type EnhancedPathUpdater<V = any> =
-  | ((currentValue: V) => V)
-  | ((currentValue: V) => V | undefined) // Allow returning undefined to delete
+export type EnhancedPathUpdater<S extends object, V = any> =
+  | ((currentValue: V, store: ReadOnlyStore<S>) => V)
+  | ((currentValue: V, store: ReadOnlyStore<S>) => V | undefined) // Allow returning undefined to delete
   | V
   | undefined // Allow undefined to delete the property
 
@@ -746,25 +746,26 @@ export type EnhancedPathUpdater<V = any> =
  * @template S - The state type
  * @template P - The path tuple type
  */
-export type TypedPathUpdater<S extends object, P extends FlexiblePath> = P extends readonly [
-  infer K,
-  ...infer Rest,
-]
-  ? K extends keyof S
+export type TypedPathUpdater<
+  RootS extends object,
+  P extends FlexiblePath,
+  Curr extends object = RootS,
+> = P extends readonly [infer K, ...infer Rest]
+  ? K extends keyof Curr
     ? Rest extends readonly (string | number)[]
       ? Rest extends readonly []
-        ? EnhancedPathUpdater<S[K]>
+        ? EnhancedPathUpdater<RootS, Curr[K]>
         : Rest extends FlexiblePath
-          ? TypedPathUpdater<S[K] extends object ? S[K] : never, Rest>
+          ? TypedPathUpdater<RootS, Rest, Curr[K] extends object ? Curr[K] : never>
           : never
       : never
     : K extends number
-      ? S extends readonly (infer Item)[]
+      ? Curr extends readonly (infer Item)[]
         ? Rest extends readonly (string | number)[]
           ? Rest extends readonly []
-            ? EnhancedPathUpdater<Item>
+            ? EnhancedPathUpdater<RootS, Item>
             : Rest extends FlexiblePath
-              ? TypedPathUpdater<Item extends object ? Item : never, Rest>
+              ? TypedPathUpdater<RootS, Rest, Item extends object ? Item : never>
               : never
           : never
         : never
@@ -775,7 +776,7 @@ export type TypedPathUpdater<S extends object, P extends FlexiblePath> = P exten
  * Flexible path updater that works with runtime path validation
  * while still providing good type inference when possible.
  */
-export type FlexiblePathUpdater<V = any> = EnhancedPathUpdater<V>
+export type FlexiblePathUpdater<S extends object, V = any> = EnhancedPathUpdater<S, V>
 
 /**
  * Overloaded updatePath method signatures for maximum type safety and flexibility
@@ -799,7 +800,7 @@ export interface PathUpdateMethods<S extends object> {
    * @param path - Array of keys/indices representing the path
    * @param updater - Updater function that receives and returns values of type V
    */
-  <V = any>(path: FlexiblePath, updater: FlexiblePathUpdater<V>): void
+  <V = any>(path: FlexiblePath, updater: FlexiblePathUpdater<S, V>): void
 
   /**
    * Most flexible updatePath for complex runtime scenarios.
@@ -808,7 +809,7 @@ export interface PathUpdateMethods<S extends object> {
    * @param path - Array of keys/indices representing the path
    * @param updater - Updater function with minimal type constraints
    */
-  (path: (string | number)[], updater: EnhancedPathUpdater<any>): void
+  (path: (string | number)[], updater: EnhancedPathUpdater<S, any>): void
 }
 
 /**

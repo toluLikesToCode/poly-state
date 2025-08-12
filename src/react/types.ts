@@ -345,10 +345,10 @@ export type UseUpdatePathHook<S extends object> = () => {
   <P extends PathsOf<S>>(path: P, updater: TypedPathUpdater<S, P>): void
 
   // Flexible updatePath for runtime paths with value type inference
-  <V = any>(path: FlexiblePath, updater: FlexiblePathUpdater<V>): void
+  <V = any>(path: FlexiblePath, updater: FlexiblePathUpdater<S, V>): void
 
   // Most flexible updatePath for complex runtime scenarios
-  (path: (string | number)[], updater: EnhancedPathUpdater<any>): void
+  (path: (string | number)[], updater: EnhancedPathUpdater<S, any>): void
 }
 
 /**
