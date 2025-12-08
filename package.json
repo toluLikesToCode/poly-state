@@ -102,7 +102,7 @@
     "vitest-browser-react": "^1.0.1"
   },
   "dependencies": {
-    "immer": "^10.1.1",
+    "immer": "^11.0.1",
     "jsan": "^3.1.14",
     "redux": "^5.0.1",
     "zod": "^4.0.14"
