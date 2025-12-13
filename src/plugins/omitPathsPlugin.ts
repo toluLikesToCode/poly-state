@@ -1,6 +1,6 @@
 import type {PathsOf, FlexiblePath} from '../core/state/state-types/path-types'
 import type {Plugin} from '../core/state/state-types/types'
-import {deepMergeWithPathPreservation} from '../core/utils/path'
+import {deepMergeWithPathPreservation as merge} from '../core/utils/path'
 
 // Describe supported path patterns for omission.
 // - FlexiblePath covers string/number segments e.g. ['user', 'token'] or ['todos', 0, 'id']
@@ -119,7 +119,8 @@ type PathsToRemove<S> = PathToRemove<S>[]
 export function createOmitPathsPlugin<S extends object>(
   pathsToRemove: PathsToRemove<S>,
   storeName?: string,
-  initialStateParam?: S
+  initialStateParam?: S,
+  options: {validateState: boolean} = {validateState: false}
 ): Plugin<S> {
   // Early exit for empty paths
   if (!pathsToRemove.length) {
@@ -131,11 +132,11 @@ export function createOmitPathsPlugin<S extends object>(
   // Store the captured initial state at plugin creation time
   let storedInitialState: S | null = initialStateParam || null
   // Recursively remove value at a given path, supporting arrays, objects, and wildcards
-  const removeAtPath = (
+  function removeAtPath(
     obj: any,
     pathSegments: readonly (string | number | '*')[],
     depth: number
-  ): any => {
+  ): any {
     // Defensive validation
     if (!obj || (typeof obj !== 'object' && !Array.isArray(obj))) {
       return obj
@@ -229,7 +230,10 @@ export function createOmitPathsPlugin<S extends object>(
   }
 
   // Enhanced state validation to prevent crashes
-  const validateAndSanitizeState = (state: any): any => {
+  function validateAndSanitizeState(state: any): any {
+    if (!options.validateState) {
+      return state
+    }
     if (!state || typeof state !== 'object') {
       if (process.env.NODE_ENV !== 'production') {
         console.warn('[omitPathsPlugin] Invalid state structure, using fallback')
@@ -268,14 +272,14 @@ export function createOmitPathsPlugin<S extends object>(
         console.warn('[OmitPathsPlugin] Failed to capture initial state in onStoreCreate:', error)
       }
     },
-    beforePersist(state) {
+    beforePersist(state, _storageType, _store) {
       try {
         // Validate and sanitize state before processing
         const validState = validateAndSanitizeState(state)
 
         let newState = validState
         for (const path of pathsToRemove) {
-          newState = removeAtPath(newState, path as readonly (string | number | '*')[], 0)
+          newState = removeAtPath(newState, path, 0)
         }
         return newState
       } catch (error) {
@@ -301,11 +305,7 @@ export function createOmitPathsPlugin<S extends object>(
         }
 
         // Merge loaded state with initial state, preserving omitted paths
-        const result = deepMergeWithPathPreservation(
-          storedInitialState,
-          validLoadedState,
-          pathsToRemove as readonly (readonly (string | number)[])[]
-        )
+        const result = merge(storedInitialState, validLoadedState, pathsToRemove)
 
         return result
       } catch (error) {
@@ -316,7 +316,7 @@ export function createOmitPathsPlugin<S extends object>(
         return loadedState
       }
     },
-    onCrossTabSync(syncedState, sourceSessionId, store) {
+    onCrossTabSync(syncedState, _sourceSessionId, store) {
       try {
         // Validate and sanitize the synced state
         const validSyncedState = validateAndSanitizeState(syncedState)
@@ -324,24 +324,15 @@ export function createOmitPathsPlugin<S extends object>(
         // Get the current state to restore omitted paths from
         const currentState = store.getState()
 
-        if (!currentState) {
-          return validSyncedState
-        }
+        if (!currentState) return validSyncedState
 
         // Merge synced state with current state, preserving omitted paths from current state
-        const result = deepMergeWithPathPreservation(
-          currentState,
-          validSyncedState,
-          pathsToRemove as readonly (readonly (string | number)[])[]
-        )
+        const result = merge(currentState, validSyncedState, pathsToRemove)
 
         return result
       } catch (error) {
-        if (process.env.NODE_ENV !== 'production') {
+        if (process.env.NODE_ENV !== 'production')
           console.error('[omitPathsPlugin] Error in onCrossTabSync:', error)
-        }
-        // Return original synced state as fallback
-        return syncedState
       }
     },
   }
