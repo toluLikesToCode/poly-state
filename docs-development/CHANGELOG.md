@@ -52,6 +52,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - TypeScript compilation errors in example files
 - Inconsistent import paths in documentation and examples
 - Missing Prettier dependency in package.json
+- Type error in prototype-pollution checks by guarding string-only keys in updatePath (prevents
+  unintended number vs. string comparisons) – src/core/state/createStore.ts
 
 ### Documentation
 
@@ -106,5 +108,5 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **v1.0.0-rc.1**: Release candidate with final API
 - **v1.0.0**: Official stable release to npm
 
-[Unreleased]: https://github.com/yourusername/poly-state/compare/v1.0.0-dev...HEAD
-[1.0.0-dev]: https://github.com/yourusername/poly-state/tree/v1.0.0-dev
+[Unreleased]: https://github.com/toluLikesToCode/poly-state/compare/v1.0.0-dev...HEAD
+[1.0.0-dev]: https://github.com/toluLikesToCode/poly-state/tree/v1.0.0-dev
