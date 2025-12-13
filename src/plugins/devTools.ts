@@ -265,6 +265,7 @@ export function createSimpleDevToolsPlugin<S extends object>(
   let devTools: ConnectResponse
   let store: Store<S>
   let liftedStateManager: LiftedStateManager<S>
+  let devToolsUnsubscribe: (() => void) | undefined
   let isUpdatingFromDevTools = false
   let isPaused = false
   let isLocked = false
@@ -464,7 +465,7 @@ export function createSimpleDevToolsPlugin<S extends object>(
         devTools.init(liftedStateManager.getLiftedState())
 
         // Subscribe to DevTools messages
-        devTools.subscribe((message: DevToolsMessage) => {
+        devToolsUnsubscribe = devTools.subscribe((message: DevToolsMessage) => {
           switch (message.type) {
             case 'DISPATCH':
               handleDispatchMessage(message)
@@ -660,9 +661,8 @@ export function createSimpleDevToolsPlugin<S extends object>(
     onDestroy: () => {
       if (!storeCreated) return
 
-      if (devTools) {
-        devTools.unsubscribe()
-      }
+      devToolsUnsubscribe?.()
+      devToolsUnsubscribe = undefined
 
       if (
         window.__REDUX_DEVTOOLS_EXTENSION__ &&
