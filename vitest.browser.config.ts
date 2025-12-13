@@ -1,6 +1,10 @@
 /// <reference types="vitest" />
 import {defineConfig} from 'vitest/config'
 import react from '@vitejs/plugin-react'
+import {ensureCryptoHash} from './test/utils/cryptoHashPolyfill'
+
+// Backfill crypto.hash for Node 18 in CI before Vite bootstraps
+ensureCryptoHash()
 
 export default defineConfig({
   plugins: [

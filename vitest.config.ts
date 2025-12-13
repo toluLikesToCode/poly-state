@@ -1,5 +1,9 @@
 /// <reference types="vitest" />
 import {defineConfig} from 'vitest/config'
+import {ensureCryptoHash} from './test/utils/cryptoHashPolyfill'
+
+// Backfill crypto.hash for Node 18 in CI
+ensureCryptoHash()
 
 export default defineConfig({
   test: {
